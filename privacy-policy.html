@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refleks Avı Gizlilik Politikası</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f7fb;
+            --surface: rgba(255, 255, 255, 0.92);
+            --surface-strong: #ffffff;
+            --text: #16213d;
+            --muted: #5c6784;
+            --primary: #4a6cf7;
+            --accent: #ff3b4d;
+            --border: rgba(22, 33, 61, 0.08);
+            --shadow: 0 24px 64px rgba(22, 33, 61, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(74, 108, 247, 0.12), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(255, 59, 77, 0.10), transparent 24%),
+                linear-gradient(180deg, #eef2fb 0%, var(--bg) 100%);
+            line-height: 1.7;
+        }
+
+        .container {
+            width: min(920px, calc(100% - 32px));
+            margin: 48px auto;
+        }
+
+        .hero,
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero {
+            padding: 40px 32px;
+            margin-bottom: 24px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(74, 108, 247, 0.10);
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        h1 {
+            margin: 18px 0 12px;
+            font-size: clamp(34px, 5vw, 52px);
+            line-height: 1.05;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 18px;
+            max-width: 720px;
+        }
+
+        .meta {
+            margin-top: 22px;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .card {
+            padding: 14px;
+        }
+
+        .section {
+            padding: 18px 18px 22px;
+            border-radius: 22px;
+        }
+
+        .section + .section {
+            border-top: 1px solid var(--border);
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 24px;
+        }
+
+        p {
+            margin: 0 0 12px;
+        }
+
+        ul {
+            margin: 10px 0 0 18px;
+            padding: 0;
+        }
+
+        li + li {
+            margin-top: 8px;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .contact {
+            background: linear-gradient(135deg, rgba(74, 108, 247, 0.08), rgba(255, 59, 77, 0.08));
+        }
+
+        .email {
+            display: inline-block;
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: var(--surface-strong);
+            border: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+            margin: 24px 0 8px;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                width: min(100% - 20px, 920px);
+                margin: 20px auto 28px;
+            }
+
+            .hero {
+                padding: 28px 20px;
+                border-radius: 24px;
+            }
+
+            .card {
+                padding: 10px;
+                border-radius: 24px;
+            }
+
+            .section {
+                padding: 14px 12px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <section class="hero">
+            <div class="eyebrow">Refleks Avı • Gizlilik Politikası</div>
+            <h1>Gizlilik Politikası</h1>
+            <p class="subtitle">
+                Refleks Avı olarak kullanıcı gizliliğine önem veriyoruz. Bu sayfa, uygulamayı
+                kullanırken hangi verilerin işlenebileceğini ve bu verilerin hangi amaçlarla
+                kullanılabileceğini açıklar.
+            </p>
+            <p class="meta"><strong>Son güncelleme:</strong> 27 Nisan 2026</p>
+        </section>
+
+        <section class="card">
+            <div class="section">
+                <h2>1. Toplanan Bilgiler</h2>
+                <p>Refleks Avı, temel oyun deneyimi için kullanıcıdan doğrudan ad, e-posta veya hesap bilgisi istemez.</p>
+                <ul>
+                    <li><strong>Oyun verileri:</strong> En iyi skor gibi bazı veriler cihaz üzerinde yerel olarak saklanabilir.</li>
+                    <li><strong>Reklam verileri:</strong> Uygulamada Google AdMob kullanılmaktadır. AdMob, reklam sunumu ve ölçümü amacıyla cihaz bilgileri, reklam kimliği, IP adresi, yaklaşık konum veya kullanım verileri işleyebilir.</li>
+                    <li><strong>Teknik veriler:</strong> Ağ durumu ve benzeri teknik bilgiler uygulamanın sağlıklı çalışması için kullanılabilir.</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>2. Verilerin Kullanım Amaçları</h2>
+                <ul>
+                    <li>Oyunun doğru çalışmasını sağlamak</li>
+                    <li>En iyi skor gibi oyun ilerleme verilerini korumak</li>
+                    <li>Reklam göstermek ve reklam performansını ölçmek</li>
+                    <li>Hata ayıklama ve teknik sorunları çözmek</li>
+                    <li>Uygulama kararlılığını ve kullanıcı deneyimini iyileştirmek</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>3. Reklam Hizmetleri</h2>
+                <p>
+                    Refleks Avı, üçüncü taraf reklam sağlayıcısı olarak <strong>Google AdMob</strong> kullanır.
+                    Google’ın veri işleme uygulamaları hakkında daha fazla bilgi için aşağıdaki bağlantıları inceleyebilirsiniz:
+                </p>
+                <ul>
+                    <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a></li>
+                    <li><a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">How Google uses information from sites or apps that use its services</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>4. Veri Paylaşımı</h2>
+                <p>Refleks Avı kullanıcı verilerini satmaz.</p>
+                <p>
+                    Ancak reklam ve teknik altyapı kapsamında bazı veriler aşağıdaki üçüncü taraf hizmet sağlayıcılarla paylaşılabilir:
+                </p>
+                <ul>
+                    <li>Google AdMob</li>
+                    <li>Google Play Services</li>
+                </ul>
+                <p>Bu paylaşım yalnızca uygulamanın çalışması, reklam sunumu ve hizmet kalitesinin korunması amacıyla yapılır.</p>
+            </div>
+
+            <div class="section">
+                <h2>5. Veri Saklama</h2>
+                <ul>
+                    <li>Oyun içi yerel veriler cihaz üzerinde saklanabilir.</li>
+                    <li>Reklam sağlayıcıları, kendi politikalarına uygun olarak veri saklayabilir.</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>6. Çocukların Gizliliği</h2>
+                <p>
+                    Refleks Avı genel kullanıcı kitlesine yöneliktir. Uygulama özellikle çocuklara yönelik
+                    olarak tasarlanmamıştır. Eğer uygulama çocuklara yönelik dağıtılacaksa, Google Play
+                    Families Policy ve ilgili reklam politikalarına uygun ek düzenlemeler yapılmalıdır.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>7. Güvenlik</h2>
+                <p>
+                    Kullanıcı verilerinin korunması için makul teknik önlemler alınır. Ancak internet üzerinden
+                    hiçbir veri aktarımı veya elektronik saklama yöntemi yüzde yüz güvenli değildir.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>8. Kullanıcı Hakları</h2>
+                <p>
+                    Kullanıcılar, cihazlarında saklanan uygulama verilerini uygulamayı kaldırarak veya uygulama
+                    verilerini temizleyerek silebilir.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>9. Değişiklikler</h2>
+                <p>
+                    Bu Gizlilik Politikası zaman zaman güncellenebilir. Güncel sürüm bu sayfada yayımlanır.
+                </p>
+            </div>
+
+            <div class="section contact">
+                <h2>10. İletişim</h2>
+                <p>Gizlilik Politikası ile ilgili sorularınız için aşağıdaki e-posta adresi kullanılabilir:</p>
+                <p><span class="email">BURAYA_MAIL_ADRESINIZI_YAZIN</span></p>
+            </div>
+        </section>
+
+        <p class="footer">Refleks Avı • Privacy Policy Page</p>
+    </main>
+</body>
+</html>
