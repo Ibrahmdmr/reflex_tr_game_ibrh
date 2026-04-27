@@ -1,3 +1,37 @@
 <resources>
-    <string name="app_name">reflex_tr_game_ibrh</string>
+    <string name="app_name">Refleks Avı</string>
+
+    <string name="game_title">Refleks Avı</string>
+    <string name="game_tagline">Hızını test et, ritmini koru ve en yüksek skora ulaş.</string>
+    <string name="start_game">Başla</string>
+    <string name="how_to_play_title">Nasıl Oynanır?</string>
+    <string name="how_to_play_target">30 saniye boyunca rastgele çıkan kırmızı hedefe dokun.</string>
+    <string name="how_to_play_score">Her doğru dokunuşta skor artar ve hedef yeni yere geçer.</string>
+    <string name="how_to_play_lives">3 canın var. Hedef dışına basarsan can kaybedersin.</string>
+    <string name="how_to_play_end">Süre dolduğunda veya canın bittiğinde oyun sona erer.</string>
+
+    <string name="score">Skor</string>
+    <string name="lives">Can</string>
+    <string name="time">Süre</string>
+    <string name="seconds_short">%1$ds</string>
+    <string name="best_score">En İyi Skor</string>
+    <string name="best_score_value">En İyi Skor: %1$d</string>
+    <string name="play_area_title">Oyun Alanı</string>
+    <string name="play_area_subtitle">Kırmızı hedefi yakala</string>
+    <string name="play_area_hint">Dokun ve puanını yükselt</string>
+
+    <string name="game_over_title">Oyun Bitti</string>
+    <string name="new_record">Yeni Rekor!</string>
+    <string name="continue_game">Devam Et</string>
+    <string name="watch_ad_and_continue">Reklam İzle ve Devam Et</string>
+    <string name="rewarded_loading">Reklam Yükleniyor...</string>
+    <string name="rewarded_loading_helper">Reklam hazır olduğunda buton otomatik aktif olur.</string>
+    <string name="rewarded_opening">Reklam Açılıyor...</string>
+    <string name="rewarded_opening_helper">Lütfen reklam penceresinin açılmasını bekle.</string>
+    <string name="rewarded_not_ready">Reklam Hazır Değil</string>
+    <string name="rewarded_not_ready_helper">Reklam şu an yüklenemedi. Arka planda yeniden deneniyor.</string>
+    <string name="continue_used">Devam Hakkı Kullanıldı</string>
+    <string name="continue_used_helper">Bu oyunda ikinci kez devam edemezsin.</string>
+    <string name="retry_game">Tekrar Oyna</string>
+    <string name="back_to_home">Ana Sayfaya Dön</string>
 </resources>
