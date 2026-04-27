@@ -42,11 +42,10 @@ class MainActivity : ComponentActivity() {
         }
 
         super.onCreate(savedInstanceState)
-        Log.d(MainActivityLogTag, "MainActivity created")
+        logDebug("MainActivity created")
         adMobManager = AdMobManager(this)
         adMobManager.onRewardedUiStateChanged = { uiState ->
-            Log.d(
-                MainActivityLogTag,
+            logDebug(
                 "Rewarded state -> ready=${uiState.isReady}, loading=${uiState.isLoading}, showing=${uiState.isShowing}, failed=${uiState.hasLoadFailed}"
             )
             rewardedAdUiState = uiState
@@ -63,10 +62,10 @@ class MainActivity : ComponentActivity() {
                     AppRoot(
                         rewardedAdUiState = rewardedAdUiState,
                         onRewardedContinueRequested = { onRewardEarned ->
-                            Log.d(MainActivityLogTag, "Continue button pressed")
+                            logDebug("Continue button pressed")
                             adMobManager.showRewardedAd(
                                 onRewardEarned = {
-                                    Log.d(MainActivityLogTag, "Reward earned callback triggered")
+                                    logDebug("Reward earned callback triggered")
                                     onRewardEarned()
                                 }
                             )
@@ -82,12 +81,18 @@ class MainActivity : ComponentActivity() {
 
     private fun initializeMobileAds() {
         lifecycleScope.launch(Dispatchers.IO) {
-            Log.d(MainActivityLogTag, "MobileAds initialization started")
+            logDebug("MobileAds initialization started")
             MobileAds.initialize(this@MainActivity) {}
             withContext(Dispatchers.Main) {
-                Log.d(MainActivityLogTag, "MobileAds initialized, preloading ads")
+                logDebug("MobileAds initialized, preloading ads")
                 adMobManager.preloadAds()
             }
+        }
+    }
+
+    private fun logDebug(message: String) {
+        if (BuildConfig.AD_LOGGING_ENABLED) {
+            Log.d(MainActivityLogTag, message)
         }
     }
 }

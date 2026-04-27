@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.reflex.tr.game.ibrh.BuildConfig
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -23,6 +24,8 @@ data class RewardedAdUiState(
 class AdMobManager(
     private val activity: Activity
 ) {
+    private val rewardedAdUnitId = BuildConfig.REWARDED_AD_UNIT_ID
+    private val interstitialAdUnitId = BuildConfig.INTERSTITIAL_AD_UNIT_ID
     private var rewardedAd: RewardedAd? = null
     private var interstitialAd: InterstitialAd? = null
     private var isRewardedLoading = false
@@ -53,7 +56,7 @@ class AdMobManager(
     ) {
         val ad = rewardedAd
         if (ad == null) {
-            Log.d(TAG, "Ad not ready")
+            logDebug("Ad not ready")
             loadRewardedAd()
             return
         }
@@ -68,7 +71,7 @@ class AdMobManager(
                 hasLoadFailed = false
             )
         }
-        Log.d(TAG, "Rewarded ad is showing")
+        logDebug("Rewarded ad is showing")
         var rewardEarned = false
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
@@ -78,14 +81,14 @@ class AdMobManager(
                     )
                 }
                 if (rewardEarned) {
-                    Log.d(TAG, "Rewarded ad dismissed after reward, granting continue")
+                    logDebug("Rewarded ad dismissed after reward, granting continue")
                     onRewardEarned()
                 }
                 loadRewardedAd()
             }
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                Log.w(TAG, "Rewarded ad failed to show: ${adError.message}")
+                logWarn("Rewarded ad failed to show: ${adError.message}")
                 updateRewardedUiState {
                     it.copy(
                         isShowing = false,
@@ -98,19 +101,16 @@ class AdMobManager(
 
         ad.show(activity) {
             rewardEarned = true
-            Log.d(TAG, "User earned rewarded ad reward")
+            logDebug("User earned rewarded ad reward")
         }
     }
 
     private var gameCount = 0
+    private val interstitialInterval = 4
 
     fun showInterstitialAd() {
         gameCount++
-
-        // 3-5 oyun arası random
-        val shouldShow = (3..5).random()
-
-        if (gameCount % shouldShow != 0) return
+        if (gameCount % interstitialInterval != 0) return
 
         val ad = interstitialAd ?: return
 
@@ -122,10 +122,12 @@ class AdMobManager(
             }
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                logWarn("Interstitial ad failed to show: ${adError.message}")
                 loadInterstitialAd()
             }
         }
 
+        logDebug("Interstitial ad is showing")
         ad.show(activity)
     }
 
@@ -133,7 +135,7 @@ class AdMobManager(
         if (isRewardedLoading || rewardedAd != null) return
 
         mainHandler.removeCallbacks(rewardedRetryRunnable)
-        Log.d(TAG, "Rewarded ad is loading")
+        logDebug("Rewarded ad is loading")
         isRewardedLoading = true
         updateRewardedUiState {
             it.copy(
@@ -144,11 +146,11 @@ class AdMobManager(
         }
         RewardedAd.load(
             activity,
-            REWARDED_TEST_AD_UNIT_ID,
+            rewardedAdUnitId,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
-                    Log.d(TAG, "Rewarded ad loaded")
+                    logDebug("Rewarded ad loaded")
                     rewardedAd = ad
                     isRewardedLoading = false
                     updateRewardedUiState {
@@ -162,7 +164,7 @@ class AdMobManager(
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    Log.w(TAG, "Rewarded ad failed to load: ${loadAdError.message}")
+                    logWarn("Rewarded ad failed to load: ${loadAdError.message}")
                     rewardedAd = null
                     isRewardedLoading = false
                     updateRewardedUiState {
@@ -185,16 +187,17 @@ class AdMobManager(
         isInterstitialLoading = true
         InterstitialAd.load(
             activity,
-            INTERSTITIAL_TEST_AD_UNIT_ID,
+            interstitialAdUnitId,
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
+                    logDebug("Interstitial ad loaded")
                     interstitialAd = ad
                     isInterstitialLoading = false
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    Log.w(TAG, "Interstitial ad failed to load: ${loadAdError.message}")
+                    logWarn("Interstitial ad failed to load: ${loadAdError.message}")
                     interstitialAd = null
                     isInterstitialLoading = false
                 }
@@ -202,12 +205,20 @@ class AdMobManager(
         )
     }
 
+    private fun logDebug(message: String) {
+        if (BuildConfig.AD_LOGGING_ENABLED) {
+            Log.d(TAG, message)
+        }
+    }
+
+    private fun logWarn(message: String) {
+        if (BuildConfig.AD_LOGGING_ENABLED) {
+            Log.w(TAG, message)
+        }
+    }
+
     companion object {
         private const val TAG = "AdMobManager"
         private const val REWARDED_RETRY_DELAY_MS = 3_000L
-
-        private const val REWARDED_TEST_AD_UNIT_ID = "ca-app-pub-2483444595618509/5335804928"
-        private const val INTERSTITIAL_TEST_AD_UNIT_ID = "ca-app-pub-2483444595618509/3693129772"
-
     }
 }

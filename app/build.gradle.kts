@@ -16,19 +16,34 @@ android {
         applicationId = "com.reflex.tr.game.ibrh"
         minSdk = 25
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_APP_ID", "\"ca-app-pub-3940256099942544~3347511713\"")
+            buildConfigField("String", "REWARDED_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField("String", "INTERSTITIAL_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("boolean", "AD_LOGGING_ENABLED", "true")
+        }
         release {
             isMinifyEnabled = false
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-2483444595618509~3630426306"
+            buildConfigField("String", "ADMOB_APP_ID", "\"ca-app-pub-2483444595618509~3630426306\"")
+            buildConfigField("String", "REWARDED_AD_UNIT_ID", "\"ca-app-pub-2483444595618509/5335804928\"")
+            buildConfigField("String", "INTERSTITIAL_AD_UNIT_ID", "\"ca-app-pub-2483444595618509/3693129772\"")
+            buildConfigField("boolean", "AD_LOGGING_ENABLED", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
