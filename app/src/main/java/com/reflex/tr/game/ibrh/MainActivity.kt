@@ -1,5 +1,7 @@
 package com.reflex.tr.game.ibrh
 
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -12,24 +14,38 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.ads.MobileAds
 import com.reflex.tr.game.ibrh.ads.AdMobManager
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
+import com.reflex.tr.game.ibrh.ui.game.AppLanguage
+import com.reflex.tr.game.ibrh.ui.game.GamePreferences
 import com.reflex.tr.game.ibrh.ui.game.GameScreen
+import com.reflex.tr.game.ibrh.ui.game.HowToPlayScreen
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private const val SplashDurationMillis = 3_000L
 private const val MainActivityLogTag = "MainActivityAds"
+private const val GameRoute = "game"
+private const val HowToPlayRoute = "how_to_play"
 
 class MainActivity : ComponentActivity() {
     private lateinit var adMobManager: AdMobManager
@@ -106,17 +122,70 @@ fun AppRoot(
     },
     onInterstitialAdRequested: () -> Unit = {}
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-    ) {
-        GameScreen(
-            rewardedAdUiState = rewardedAdUiState,
-            onRewardedContinueRequested = onRewardedContinueRequested,
-            onInterstitialAdRequested = onInterstitialAdRequested
-        )
+    val navController = rememberNavController()
+    val context = LocalContext.current
+    val gamePreferences = remember(context) { GamePreferences(context.applicationContext) }
+    val selectedLanguage by gamePreferences.languageFlow.collectAsStateWithLifecycle(
+        initialValue = AppLanguage.Turkish
+    )
+    val isSoundEnabled by gamePreferences.soundEnabledFlow.collectAsStateWithLifecycle(
+        initialValue = true
+    )
+    val coroutineScope = rememberCoroutineScope()
+    val localizedContext = remember(context, selectedLanguage) {
+        context.createLocalizedContext(selectedLanguage)
     }
+
+    CompositionLocalProvider(LocalContext provides localizedContext) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+        ) {
+            NavHost(
+                navController = navController,
+                startDestination = GameRoute
+            ) {
+                composable(GameRoute) {
+                    GameScreen(
+                        rewardedAdUiState = rewardedAdUiState,
+                        selectedLanguage = selectedLanguage,
+                        isSoundEnabled = isSoundEnabled,
+                        onLanguageSelected = { language ->
+                            coroutineScope.launch {
+                                gamePreferences.saveLanguage(language)
+                            }
+                        },
+                        onSoundEnabledChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveSoundEnabled(enabled)
+                            }
+                        },
+                        onRewardedContinueRequested = onRewardedContinueRequested,
+                        onInterstitialAdRequested = onInterstitialAdRequested,
+                        onHowToPlayClick = {
+                            navController.navigate(HowToPlayRoute)
+                        }
+                    )
+                }
+                composable(HowToPlayRoute) {
+                    HowToPlayScreen(
+                        onBackClick = {
+                            navController.popBackStack()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun Context.createLocalizedContext(language: AppLanguage): Context {
+    val locale = Locale.forLanguageTag(language.code)
+    Locale.setDefault(locale)
+    val configuration = Configuration(resources.configuration)
+    configuration.setLocale(locale)
+    return createConfigurationContext(configuration)
 }
 
 @Preview(showBackground = true)
@@ -130,7 +199,13 @@ fun AppRootPreview() {
             GameScreen(
                 uiState = com.reflex.tr.game.ibrh.ui.game.GameUiState(),
                 rewardedAdUiState = RewardedAdUiState(isReady = true),
+                selectedLanguage = AppLanguage.Turkish,
+                isSoundEnabled = true,
                 onStartClick = {},
+                onModeStartClick = {},
+                onHowToPlayClick = {},
+                onLanguageSelected = {},
+                onSoundEnabledChange = {},
                 onHomeClick = {},
                 onPauseGame = {},
                 onResumeGame = {},

@@ -4,7 +4,15 @@
     <string name="game_title">Refleks Avı</string>
     <string name="game_tagline">Hızını test et, ritmini koru ve en yüksek skora ulaş.</string>
     <string name="start_game">Başla</string>
+    <string name="start_classic_game">Klasik Mod Başlat</string>
+    <string name="start_moving_game">Hareketli Hedef Başlat</string>
+    <string name="start_fake_game">Sahte Hedef Başlat</string>
+    <string name="start_color_game">Renk Refleksi Başlat</string>
     <string name="how_to_play_title">Nasıl Oynanır?</string>
+    <string name="how_to_play_home_description">Modları, kuralları ve doğru hedefleri öğren.</string>
+    <string name="how_to_play_screen_subtitle">Her modun ritmini ve risklerini hızlıca öğren.</string>
+    <string name="open_details">İncele</string>
+    <string name="back_to_modes">Modlara Dön</string>
     <string name="how_to_play_target">30 saniye boyunca rastgele çıkan kırmızı hedefe dokun.</string>
     <string name="how_to_play_score">Her doğru dokunuşta skor artar ve hedef yeni yere geçer.</string>
     <string name="how_to_play_lives">3 canın var. Hedef dışına basarsan can kaybedersin.</string>
@@ -16,12 +24,71 @@
     <string name="seconds_short">%1$ds</string>
     <string name="best_score">En İyi Skor</string>
     <string name="best_score_value">En İyi Skor: %1$d</string>
-    <string name="play_area_title">Oyun Alanı</string>
+    <string name="play_area_title">Refleks Arenası</string>
+    <string name="arena_reflex">Refleks Arenası</string>
+    <string name="arena_challenge">Challenge Alanı</string>
+    <string name="arena_target">Hedef Arenası</string>
     <string name="play_area_subtitle">Kırmızı hedefi yakala</string>
     <string name="play_area_hint">Dokun ve puanını yükselt</string>
+    <string name="game_modes_title">Oyun Modları</string>
+    <string name="mode_classic_title">Klasik Mod</string>
+    <string name="mode_classic_description">Refleksini test et.</string>
+    <string name="mode_classic_long_description">Reflekslerini test etmenin en saf hali. Hedef ekrana gelir, sen zaman dolmadan dokunursun. Her doğru dokunuş skorunu artırır, oyun ilerledikçe süre daralır ve tempo yükselir.</string>
+    <string name="mode_moving_title">Hareketli Hedef</string>
+    <string name="mode_moving_description">Hedef hareket eder, hız giderek artar.</string>
+    <string name="mode_moving_long_description">Hedef artık yerinde durmuyor. Ekranda hareket eden hedefi yakala, doğru anda dokun ve hızlanan tempoya ayak uydur. Göz, el ve refleks uyumunu en çok zorlayan modlardan biri.</string>
+    <string name="mode_fake_title">Sahte Hedef</string>
+    <string name="mode_fake_description">Yanlış hedefe dokunma.</string>
+    <string name="mode_fake_long_description">Her gördüğün hedef doğru hedef değildir. Gerçek hedefi ayırt et, sahte hedeflere dokunma. Yanlış seçim oyunu bitirebilir. Dikkatini ve refleksini aynı anda test eder.</string>
+    <string name="mode_color_title">Renk Refleksi</string>
+    <string name="mode_color_description">Sadece doğru renge bas.</string>
+    <string name="mode_color_long_description">Ekranda farklı renkler belirir ama sadece istenen renge dokunmalısın. Görev rengini takip et, yanlış renge basma. Hızlı karar verme ve dikkat bu modda çok önemlidir.</string>
+    <string name="mode_difficulty_easy">Kolay</string>
+    <string name="mode_difficulty_medium">Orta</string>
+    <string name="mode_difficulty_hard">Zor</string>
+    <string name="mode_moving_play_hint">Hareket eden hedefi yakala</string>
+    <string name="mode_fake_play_hint">Yanlış hedefe dokunma</string>
+    <string name="mode_color_play_hint">Görev: sadece %1$s renge bas</string>
+    <string name="mode_color_task_badge">BAS: %1$s</string>
+    <string name="mode_best_score_value">En iyi: %1$d</string>
+    <string name="score_feedback_plus_one">+1</string>
+    <string name="combo_value">KOMBO x%1$d</string>
+    <string name="combo_short_value">x%1$d</string>
+    <string name="combo_great">GREAT</string>
+    <string name="combo_perfect">PERFECT</string>
+    <string name="max_combo">Maks Combo</string>
+    <string name="accuracy">İsabet</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="change_mode">Mod Değiştir</string>
+    <string name="daily_challenge_title">Günün Görevi</string>
+    <string name="daily_challenge_done">Tamam</string>
+    <string name="daily_challenge_completed_badge">Tamamlandı</string>
+    <string name="daily_challenge_completed_title">Görev başarıyla tamamlandı</string>
+    <string name="daily_challenge_completed_description">Yeni görev yarın açılacak.</string>
+    <string name="daily_challenge_progress">%1$d/%2$d</string>
+    <string name="daily_challenge_score_20_title">20 skor yap</string>
+    <string name="daily_challenge_score_20_description">Tek oyunda tempoyu koru ve 20 skora ulaş.</string>
+    <string name="daily_challenge_play_3_title">3 oyun bitir</string>
+    <string name="daily_challenge_play_3_description">Üç deneme tamamla, ritmini bul ve refleksini ısıt.</string>
+    <string name="daily_challenge_fake_10_title">Sahte Hedefte 10 skor</string>
+    <string name="daily_challenge_fake_10_description">Sahte hedeflere kanmadan 10 doğru dokunuş yap.</string>
+    <string name="language_selection_title">Dil Seçimi</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_english">English</string>
+    <string name="sound_on">Ses Açık</string>
+    <string name="sound_off">Ses Kapalı</string>
+    <string name="example_gameplay_title">Örnek oynanış</string>
+    <string name="example_classic">Hedef ekranda belirir. Zamanında dokun, skorunu artır ve süre bitmeden rekorunu kovala.</string>
+    <string name="example_moving">Hedef kısa aralıklarla yer değiştirir. Skor arttıkça hareket hızlanır, refleksin daha fazla test edilir.</string>
+    <string name="example_fake">Gerçek hedefin yanında sahte hedefler çıkar. Sadece gerçek hedef skor kazandırır; yanlış hedef can götürür.</string>
+    <string name="example_color">Aktif renk görevi üstte görünür. Sadece istenen renge bas, yanlış renk can kaybettirir.</string>
+    <string name="target_color_red">kırmızı</string>
+    <string name="target_color_blue">mavi</string>
+    <string name="target_color_yellow">sarı</string>
+    <string name="target_color_green">yeşil</string>
 
     <string name="exit_game_title">Oyundan çıkılsın mı?</string>
-    <string name="exit_game_message">Oyun duraklatıldı. Devam edebilir ya da ana sayfaya dönebilirsin.</string>
+    <string name="exit_game_message">Oyun duraklatıldı. Devam edebilir veya ana sayfaya dönebilirsin.</string>
     <string name="game_over_title">Oyun Bitti</string>
     <string name="new_record">Yeni Rekor!</string>
     <string name="continue_game">Devam Et</string>
@@ -38,4 +105,25 @@
     <string name="continue_used_helper">Bu oyunda ikinci kez devam edemezsin.</string>
     <string name="retry_game">Tekrar Oyna</string>
     <string name="back_to_home">Ana Sayfaya Dön</string>
+
+    <string-array name="rules_classic">
+        <item>Hedefe zamanında dokun.</item>
+        <item>Süre dolmadan skorunu artır.</item>
+        <item>Oyun ilerledikçe hedef daha hızlı kaybolur.</item>
+    </string-array>
+    <string-array name="rules_moving">
+        <item>Hedef sürekli hareket eder.</item>
+        <item>Hız arttıkça reflekslerin test edilir.</item>
+        <item>Boş alana basmak can kaybettirir.</item>
+    </string-array>
+    <string-array name="rules_fake">
+        <item>Yanlış hedefe dokunma.</item>
+        <item>Sadece gerçek hedef skor kazandırır.</item>
+        <item>Skor yükseldikçe sahte hedef sayısı artar.</item>
+    </string-array>
+    <string-array name="rules_color">
+        <item>Sadece istenen renge dokun.</item>
+        <item>Yanlış renkte hedefe basarsan can kaybedersin.</item>
+        <item>Aktif renk belirli aralıklarla değişir.</item>
+    </string-array>
 </resources>

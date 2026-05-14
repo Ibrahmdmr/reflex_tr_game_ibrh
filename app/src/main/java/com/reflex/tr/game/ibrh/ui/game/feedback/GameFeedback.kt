@@ -44,9 +44,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.ui.game.GameSoundController
 import com.reflex.tr.game.ibrh.ui.game.GameSoundEffect
+import com.reflex.tr.game.ibrh.ui.game.GameTargetRole
+import com.reflex.tr.game.ibrh.ui.game.ReflexTargetColor
 import com.reflex.tr.game.ibrh.ui.game.TargetPosition
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -54,11 +59,16 @@ import kotlin.math.roundToInt
 @Composable
 fun TargetMarker(
     modifier: Modifier = Modifier,
+    targetColor: ReflexTargetColor = ReflexTargetColor.Red,
+    role: GameTargetRole = GameTargetRole.Correct,
+    spawnKey: Any = Unit,
+    comboLevel: Int = 0,
     onTap: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
     val popScale = remember { Animatable(1f) }
+    val spawnScale = remember { Animatable(0.72f) }
     val isPressed by interactionSource.collectIsPressedAsState()
     val currentOnTap by rememberUpdatedState(onTap)
     val infiniteTransition = rememberInfiniteTransition(label = "target_pulse")
@@ -85,10 +95,20 @@ fun TargetMarker(
         ),
         label = "target_glow_alpha"
     )
+    LaunchedEffect(spawnKey) {
+        spawnScale.snapTo(0.72f)
+        spawnScale.animateTo(1.08f, tween(130, easing = FastOutSlowInEasing))
+        spawnScale.animateTo(1f, tween(90, easing = FastOutSlowInEasing))
+    }
+    val baseColor = targetColor.toComposeColor()
+    val ringAlpha = if (role == GameTargetRole.Correct) 0.78f else 0.52f
+    val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.82f
+    val borderAlpha = if (role == GameTargetRole.Correct) 0.82f else 0.38f
+    val comboBoost = (comboLevel / 5f).coerceIn(0f, 1f)
 
     Box(
         modifier = modifier
-            .scale(animatedScale * popScale.value)
+            .scale(animatedScale * popScale.value * spawnScale.value)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -112,13 +132,13 @@ fun TargetMarker(
             modifier = Modifier
                 .size(88.dp)
                 .scale(pulseScale * 1.02f)
-                .alpha(glowAlpha)
+                .alpha((glowAlpha + comboBoost * 0.18f).coerceAtMost(0.55f))
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            ReflexGamePalette.targetRing.copy(alpha = 0.78f),
-                            ReflexGamePalette.targetRing.copy(alpha = 0.22f),
+                            baseColor.copy(alpha = ringAlpha),
+                            baseColor.copy(alpha = 0.22f),
                             Color.Transparent
                         )
                     )
@@ -128,9 +148,9 @@ fun TargetMarker(
             modifier = Modifier
                 .size(82.dp)
                 .scale(pulseScale)
-                .shadow(16.dp, CircleShape, clip = false)
+                .shadow(20.dp + (comboBoost * 8).dp, CircleShape, clip = false)
                 .clip(CircleShape)
-                .background(ReflexGamePalette.targetRing.copy(alpha = 0.34f))
+                .background(baseColor.copy(alpha = 0.38f + comboBoost * 0.1f))
         )
         Box(
             modifier = Modifier
@@ -140,11 +160,11 @@ fun TargetMarker(
                     Brush.radialGradient(
                         colors = listOf(
                             Color.White.copy(alpha = 0.9f),
-                            ArcadeCoralSoft
+                            baseColor.copy(alpha = 0.24f)
                         )
                     )
                 )
-                .border(1.5.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                .border(1.5.dp, Color.White.copy(alpha = borderAlpha), CircleShape)
         )
         Box(
             modifier = Modifier
@@ -153,13 +173,13 @@ fun TargetMarker(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFFFF9B89),
-                            Color(0xFFFF7463),
-                            ReflexGamePalette.targetCore
+                            baseColor.copy(alpha = 0.68f),
+                            baseColor.copy(alpha = 0.9f),
+                            baseColor.copy(alpha = coreAlpha)
                         )
                     )
                 )
-                .border(2.5.dp, Color.White.copy(alpha = 0.82f), CircleShape)
+                .border(2.5.dp, Color.White.copy(alpha = borderAlpha), CircleShape)
         )
         GlossyHighlight(
             modifier = Modifier
@@ -172,6 +192,15 @@ fun TargetMarker(
                 .size(width = 11.dp, height = 11.dp),
             alpha = 0.84f
         )
+    }
+}
+
+private fun ReflexTargetColor.toComposeColor(): Color {
+    return when (this) {
+        ReflexTargetColor.Red -> ReflexGamePalette.targetCore
+        ReflexTargetColor.Blue -> ArcadeBlue
+        ReflexTargetColor.Gold -> ArcadeGold
+        ReflexTargetColor.Teal -> ArcadeTeal
     }
 }
 
@@ -299,6 +328,8 @@ fun rememberShakeTranslationX(trigger: Int): Float {
 internal data class GameSoundHooks(
     val onHit: () -> Unit = {},
     val onMiss: () -> Unit = {},
+    val onCombo: () -> Unit = {},
+    val onCountdown: () -> Unit = {},
     val onGameOver: () -> Unit = {}
 )
 
@@ -316,18 +347,26 @@ fun rememberAnimatedPressScale(
 }
 
 @Composable
-internal fun rememberGameSoundHooks(): GameSoundHooks {
+internal fun rememberGameSoundHooks(
+    isSoundEnabled: Boolean
+): GameSoundHooks {
     val context = LocalContext.current
     val soundController = remember(context) { GameSoundController(context) }
+
+    LaunchedEffect(soundController, isSoundEnabled) {
+        soundController.isEnabled = isSoundEnabled
+    }
 
     DisposableEffect(soundController) {
         onDispose { soundController.release() }
     }
 
-    return remember(soundController) {
+    return remember(soundController, isSoundEnabled) {
         GameSoundHooks(
             onHit = { soundController.play(GameSoundEffect.Hit) },
             onMiss = { soundController.play(GameSoundEffect.Miss) },
+            onCombo = { soundController.play(GameSoundEffect.Combo) },
+            onCountdown = { soundController.play(GameSoundEffect.Countdown) },
             onGameOver = { soundController.play(GameSoundEffect.GameOver) }
         )
     }

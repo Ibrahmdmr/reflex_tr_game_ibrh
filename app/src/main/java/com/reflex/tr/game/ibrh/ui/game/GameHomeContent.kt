@@ -1,5 +1,7 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -17,48 +19,59 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.components.GamePanelCard
-import com.reflex.tr.game.ibrh.ui.game.components.HowToPlayItem
 import com.reflex.tr.game.ibrh.ui.game.components.PrimaryGameButton
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
 @Composable
 fun HomeContent(
     bestScore: Int,
+    bestScoresByMode: Map<GameMode, Int>,
+    selectedMode: GameMode,
+    dailyChallengeState: DailyChallengeState,
+    isSoundEnabled: Boolean,
+    selectedLanguage: AppLanguage,
     onStartClick: () -> Unit,
+    onModeStartClick: (GameMode) -> Unit,
+    onHowToPlayClick: () -> Unit,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onSoundToggleClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val isCompactHeight = maxHeight <= 780.dp
         val contentScrollState = rememberScrollState()
-        val howToPlayScrollState = rememberScrollState()
-        val panelPadding = if (isCompactHeight) 16.dp else 22.dp
-        val contentSpacing = if (isCompactHeight) 12.dp else 18.dp
-        val howToPlaySpacing = if (isCompactHeight) 10.dp else 12.dp
-        val contentPadding = if (isCompactHeight) 16.dp else 18.dp
-        val howToPlayHeight = if (isCompactHeight) 132.dp else 236.dp
+        val panelPadding = if (isCompactHeight) 14.dp else 18.dp
+        val contentSpacing = if (isCompactHeight) 10.dp else 14.dp
 
         GamePanelCard(
             modifier = Modifier
@@ -81,10 +94,32 @@ fun HomeContent(
                     ) {
                         GameLogo(isCompactHeight = isCompactHeight)
 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.size(40.dp))
+                            Text(
+                                text = stringResource(R.string.game_title),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = ReflexGamePalette.textPrimary,
+                                textAlign = TextAlign.Center
+                            )
+                            SoundToggleButton(
+                                isSoundEnabled = isSoundEnabled,
+                                onClick = onSoundToggleClick
+                            )
+                        }
+
                         Text(
-                            text = stringResource(R.string.game_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = ReflexGamePalette.textPrimary,
+                            text = if (isSoundEnabled) {
+                                stringResource(R.string.sound_on)
+                            } else {
+                                stringResource(R.string.sound_off)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSoundEnabled) ArcadeTeal else ReflexGamePalette.textSecondary,
                             textAlign = TextAlign.Center
                         )
 
@@ -100,17 +135,26 @@ fun HomeContent(
                             isCompactHeight = isCompactHeight
                         )
 
-                        HowToPlayPanel(
-                            scrollState = howToPlayScrollState,
-                            height = howToPlayHeight,
-                            contentPadding = contentPadding,
-                            itemSpacing = howToPlaySpacing,
-                            modifier = Modifier.fillMaxWidth()
+                        GameModeSection(
+                            bestScoresByMode = bestScoresByMode,
+                            selectedMode = selectedMode,
+                            onModeStartClick = onModeStartClick
+                        )
+
+                        DailyChallengeCard(
+                            state = dailyChallengeState
+                        )
+
+                        HowToPlayEntryCard(onClick = onHowToPlayClick)
+
+                        LanguageSelectionSection(
+                            selectedLanguage = selectedLanguage,
+                            onLanguageSelected = onLanguageSelected
                         )
                     }
 
                     PrimaryGameButton(
-                        text = stringResource(R.string.start_game),
+                        text = stringResource(selectedMode.startButtonRes),
                         onClick = onStartClick
                     )
                 }
@@ -120,80 +164,385 @@ fun HomeContent(
 }
 
 @Composable
-private fun HowToPlayPanel(
-    scrollState: ScrollState,
-    height: Dp,
-    contentPadding: Dp,
-    itemSpacing: Dp,
+private fun SoundToggleButton(
+    isSoundEnabled: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GamePanelCard(
-        modifier = modifier,
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        tonalElevation = 0.dp,
-        contentPadding = contentPadding
+    val accentColor = if (isSoundEnabled) ArcadeTeal else ReflexGamePalette.textSecondary
+    val scale by animateFloatAsState(
+        targetValue = if (isSoundEnabled) 1f else 0.94f,
+        animationSpec = tween(durationMillis = 160),
+        label = "sound_toggle_scale"
+    )
+    val contentDescription = if (isSoundEnabled) {
+        stringResource(R.string.sound_on)
+    } else {
+        stringResource(R.string.sound_off)
+    }
+
+    Surface(
+        modifier = modifier
+            .size(40.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = if (isSoundEnabled) 10f else 2f
+            }
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(onClick = onClick),
+        color = accentColor.copy(alpha = if (isSoundEnabled) 0.18f else 0.1f),
+        shape = CircleShape,
+        border = BorderStroke(1.dp, accentColor.copy(alpha = if (isSoundEnabled) 0.52f else 0.26f))
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
-            Text(
-                text = stringResource(R.string.how_to_play_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = ReflexGamePalette.textPrimary
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(
+                    if (isSoundEnabled) {
+                        R.drawable.ic_volume_up_24
+                    } else {
+                        R.drawable.ic_volume_off_24
+                    }
+                ),
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(20.dp)
             )
-            BoxWithConstraints(
+        }
+    }
+}
+
+@Composable
+private fun HowToPlayEntryCard(
+    onClick: () -> Unit
+) {
+    val interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(height)
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeGold)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.how_to_play_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary
+                )
+                Text(
+                    text = stringResource(R.string.how_to_play_home_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ReflexGamePalette.textSecondary
+                )
+            }
+            Text(
+                text = stringResource(R.string.open_details),
+                style = MaterialTheme.typography.labelMedium,
+                color = ArcadeGold
+            )
+        }
+    }
+}
+
+@Composable
+private fun GameModeSection(
+    bestScoresByMode: Map<GameMode, Int>,
+    selectedMode: GameMode,
+    onModeStartClick: (GameMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.game_modes_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = ReflexGamePalette.textPrimary
+        )
+        GameMode.entries.forEach { mode ->
+            GameModeCard(
+                mode = mode,
+                bestScore = bestScoresByMode[mode] ?: 0,
+                selected = mode == selectedMode,
+                onClick = { onModeStartClick(mode) }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun GameModeCard(
+    mode: GameMode,
+    onClick: () -> Unit,
+    bestScore: Int? = null,
+    selected: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val accentColor = modeAccentColor(mode)
+    val interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.01f else 1f,
+        animationSpec = tween(durationMillis = 180),
+        label = "mode_card_selected_scale"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = if (selected) 14f else 4f
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        color = if (selected) accentColor.copy(alpha = 0.18f) else ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = if (selected) 0.62f else 0.28f))
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState)
-                        .padding(end = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(itemSpacing)
+                Text(
+                    text = modeIcon(mode),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accentColor
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(mode.titleRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary
+                    )
+                    Text(
+                        text = stringResource(mode.descriptionRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ReflexGamePalette.textSecondary
+                    )
+                }
+                Surface(
+                    color = accentColor.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(999.dp)
                 ) {
-                    HowToPlayItem(text = stringResource(R.string.how_to_play_target))
-                    HowToPlayItem(text = stringResource(R.string.how_to_play_score))
-                    HowToPlayItem(text = stringResource(R.string.how_to_play_lives))
-                    HowToPlayItem(text = stringResource(R.string.how_to_play_end))
-                }
-
-                if (scrollState.maxValue > 0) {
-                    val viewportHeight = constraints.maxHeight
-                    val contentHeight = viewportHeight + scrollState.maxValue
-                    val thumbHeight = (maxHeight * viewportHeight / contentHeight)
-                        .coerceAtLeast(28.dp)
-                    val scrollProgress = scrollState.value.toFloat() / scrollState.maxValue
-                    val thumbOffset = (maxHeight - thumbHeight) * scrollProgress
-
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .width(5.dp)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White.copy(alpha = 0.18f))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(y = thumbOffset)
-                            .width(5.dp)
-                            .heightIn(min = thumbHeight, max = thumbHeight)
-                            .clip(RoundedCornerShape(50))
-                            .background(ArcadeGold)
+                    Text(
+                        text = stringResource(mode.difficultyRes),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ReflexGamePalette.textPrimary
                     )
                 }
+            }
+            if (bestScore != null) {
+                Text(
+                    text = stringResource(R.string.mode_best_score_value, bestScore),
+                    modifier = Modifier.padding(start = 40.dp, end = 14.dp, bottom = 12.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textSecondary
+                )
             }
         }
     }
 }
 
 @Composable
+private fun DailyChallengeCard(
+    state: DailyChallengeState,
+    modifier: Modifier = Modifier
+) {
+    val accent = if (state.completed) ArcadeTeal else ArcadeGold
+    val scale by animateFloatAsState(
+        targetValue = if (state.completed) 1.01f else 1f,
+        animationSpec = tween(durationMillis = 220),
+        label = "daily_challenge_complete_scale"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = if (state.completed) 16f else 6f
+            },
+        color = if (state.completed) {
+            ArcadeTeal.copy(alpha = 0.12f)
+        } else {
+            ReflexGamePalette.cardGlassStrong
+        },
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (state.completed) "✓" else "!",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.daily_challenge_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = accent
+                )
+                Text(
+                    text = if (state.completed) {
+                        stringResource(R.string.daily_challenge_completed_title)
+                    } else {
+                        stringResource(state.type.titleRes)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary
+                )
+                Text(
+                    text = if (state.completed) {
+                        stringResource(R.string.daily_challenge_completed_description)
+                    } else {
+                        stringResource(state.type.descriptionRes)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary
+                )
+            }
+            Surface(
+                color = accent.copy(alpha = if (state.completed) 0.2f else 0.14f),
+                shape = RoundedCornerShape(999.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.24f))
+            ) {
+                Text(
+                    text = if (state.completed) {
+                        stringResource(R.string.daily_challenge_completed_badge)
+                    } else {
+                        stringResource(R.string.daily_challenge_progress, state.progress, state.target)
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textPrimary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanguageSelectionSection(
+    selectedLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.language_selection_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = ReflexGamePalette.textPrimary
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            LanguageChip(
+                text = stringResource(R.string.language_turkish),
+                selected = selectedLanguage == AppLanguage.Turkish,
+                onClick = { onLanguageSelected(AppLanguage.Turkish) },
+                modifier = Modifier.weight(1f)
+            )
+            LanguageChip(
+                text = stringResource(R.string.language_english),
+                selected = selectedLanguage == AppLanguage.English,
+                onClick = { onLanguageSelected(AppLanguage.English) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val color = if (selected) ArcadeGold else ReflexGamePalette.neonBlue
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        color = color.copy(alpha = if (selected) 0.22f else 0.1f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = if (selected) 0.56f else 0.24f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = ReflexGamePalette.textPrimary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+internal fun modeAccentColor(mode: GameMode): Color {
+    return when (mode) {
+        GameMode.Classic -> ArcadeGold
+        GameMode.MovingTarget -> ArcadeBlue
+        GameMode.FakeTarget -> ReflexGamePalette.targetRing
+        GameMode.ColorReflex -> ArcadeTeal
+    }
+}
+
+internal fun modeIcon(mode: GameMode): String {
+    return when (mode) {
+        GameMode.Classic -> "◎"
+        GameMode.MovingTarget -> "↗"
+        GameMode.FakeTarget -> "◇"
+        GameMode.ColorReflex -> "◆"
+    }
+}
+
+@Composable
 private fun GameLogo(isCompactHeight: Boolean) {
-    val containerSize = if (isCompactHeight) 98.dp else 142.dp
-    val iconSize = if (isCompactHeight) 76.dp else 106.dp
-    val badgeOffsetX = if (isCompactHeight) 30.dp else 42.dp
-    val badgeOffsetY = if (isCompactHeight) (-28).dp else (-40).dp
+    val containerSize = if (isCompactHeight) 72.dp else 104.dp
+    val iconSize = if (isCompactHeight) 58.dp else 82.dp
+    val badgeOffsetX = if (isCompactHeight) 24.dp else 34.dp
+    val badgeOffsetY = if (isCompactHeight) (-22).dp else (-32).dp
     val badgeSize = if (isCompactHeight) 14.dp else 16.dp
 
     Box(

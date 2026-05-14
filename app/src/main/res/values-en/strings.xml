@@ -1,0 +1,129 @@
+<resources>
+    <string name="app_name">Reflex Hunt</string>
+
+    <string name="game_title">Reflex Hunt</string>
+    <string name="game_tagline">Test your speed, keep your rhythm, and chase your best score.</string>
+    <string name="start_game">Start</string>
+    <string name="start_classic_game">Start Classic Mode</string>
+    <string name="start_moving_game">Start Moving Target</string>
+    <string name="start_fake_game">Start Fake Target</string>
+    <string name="start_color_game">Start Color Reflex</string>
+    <string name="how_to_play_title">How to Play?</string>
+    <string name="how_to_play_home_description">Learn the modes, rules, and correct targets.</string>
+    <string name="how_to_play_screen_subtitle">Learn each mode’s rhythm and risks quickly.</string>
+    <string name="open_details">View</string>
+    <string name="back_to_modes">Back to Modes</string>
+    <string name="how_to_play_target">Tap the red target that appears randomly for 30 seconds.</string>
+    <string name="how_to_play_score">Each correct tap increases your score and moves the target.</string>
+    <string name="how_to_play_lives">You have 3 lives. Tapping outside the target costs a life.</string>
+    <string name="how_to_play_end">The game ends when time runs out or you lose all lives.</string>
+
+    <string name="score">Score</string>
+    <string name="lives">Lives</string>
+    <string name="time">Time</string>
+    <string name="seconds_short">%1$ds</string>
+    <string name="best_score">Best Score</string>
+    <string name="best_score_value">Best Score: %1$d</string>
+    <string name="play_area_title">Reflex Arena</string>
+    <string name="arena_reflex">Reflex Arena</string>
+    <string name="arena_challenge">Challenge Arena</string>
+    <string name="arena_target">Target Arena</string>
+    <string name="play_area_subtitle">Catch the red target</string>
+    <string name="play_area_hint">Tap to raise your score</string>
+    <string name="game_modes_title">Game Modes</string>
+    <string name="mode_classic_title">Classic Mode</string>
+    <string name="mode_classic_description">Test your reflexes.</string>
+    <string name="mode_classic_long_description">The purest way to test your reflexes. A target appears on the screen and you must tap it before time runs out. Every correct tap increases your score, while the pace gets faster as you progress.</string>
+    <string name="mode_moving_title">Moving Target</string>
+    <string name="mode_moving_description">The target moves and gets faster over time.</string>
+    <string name="mode_moving_long_description">The target no longer stays still. Catch the moving target, tap at the right moment, and keep up with the increasing speed. This mode challenges your eyes, hands, and reflexes together.</string>
+    <string name="mode_fake_title">Fake Target</string>
+    <string name="mode_fake_description">Don’t tap the wrong target.</string>
+    <string name="mode_fake_long_description">Not every target you see is the correct one. Find the real target and avoid the fake ones. A wrong tap can end the game. This mode tests both your focus and reaction speed.</string>
+    <string name="mode_color_title">Color Reflex</string>
+    <string name="mode_color_description">Tap only the correct color.</string>
+    <string name="mode_color_long_description">Different colors appear on the screen, but you must tap only the requested color. Follow the active color task and avoid wrong taps. Fast decision-making is the key.</string>
+    <string name="mode_difficulty_easy">Easy</string>
+    <string name="mode_difficulty_medium">Medium</string>
+    <string name="mode_difficulty_hard">Hard</string>
+    <string name="mode_moving_play_hint">Catch the moving target</string>
+    <string name="mode_fake_play_hint">Don’t tap the wrong target</string>
+    <string name="mode_color_play_hint">Task: tap only %1$s</string>
+    <string name="mode_color_task_badge">TAP: %1$s</string>
+    <string name="mode_best_score_value">Best: %1$d</string>
+    <string name="score_feedback_plus_one">+1</string>
+    <string name="combo_value">COMBO x%1$d</string>
+    <string name="combo_short_value">x%1$d</string>
+    <string name="combo_great">GREAT</string>
+    <string name="combo_perfect">PERFECT</string>
+    <string name="max_combo">Max Combo</string>
+    <string name="accuracy">Accuracy</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="change_mode">Change Mode</string>
+    <string name="daily_challenge_title">Daily Challenge</string>
+    <string name="daily_challenge_done">Done</string>
+    <string name="daily_challenge_completed_badge">Completed</string>
+    <string name="daily_challenge_completed_title">Challenge completed</string>
+    <string name="daily_challenge_completed_description">A new challenge unlocks tomorrow.</string>
+    <string name="daily_challenge_progress">%1$d/%2$d</string>
+    <string name="daily_challenge_score_20_title">Score 20</string>
+    <string name="daily_challenge_score_20_description">Keep your rhythm and reach 20 score in one run.</string>
+    <string name="daily_challenge_play_3_title">Finish 3 games</string>
+    <string name="daily_challenge_play_3_description">Complete three runs, find your rhythm, and warm up your reflexes.</string>
+    <string name="daily_challenge_fake_10_title">Score 10 in Fake Target</string>
+    <string name="daily_challenge_fake_10_description">Ignore the fake targets and land 10 correct taps.</string>
+    <string name="language_selection_title">Language</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_english">English</string>
+    <string name="sound_on">Sound On</string>
+    <string name="sound_off">Sound Off</string>
+    <string name="example_gameplay_title">Example gameplay</string>
+    <string name="example_classic">The target appears on the screen. Tap it in time, raise your score, and chase a record before time runs out.</string>
+    <string name="example_moving">The target changes position in short intervals. As your score rises, it moves faster and tests your reflexes harder.</string>
+    <string name="example_fake">Fake targets appear next to the real one. Only the real target scores; wrong targets cost a life.</string>
+    <string name="example_color">The active color rule appears at the top. Tap only the requested color; wrong colors cost a life.</string>
+    <string name="target_color_red">red</string>
+    <string name="target_color_blue">blue</string>
+    <string name="target_color_yellow">yellow</string>
+    <string name="target_color_green">green</string>
+
+    <string name="exit_game_title">Exit game?</string>
+    <string name="exit_game_message">The game is paused. You can continue or return to the home screen.</string>
+    <string name="game_over_title">Game Over</string>
+    <string name="new_record">New Record!</string>
+    <string name="continue_game">Continue</string>
+    <string name="watch_ad_and_continue">Watch Ad and Continue</string>
+    <string name="rewarded_loading">Loading Ad...</string>
+    <string name="rewarded_loading_helper">The button will activate automatically when the ad is ready.</string>
+    <string name="rewarded_opening">Opening Ad...</string>
+    <string name="rewarded_opening_helper">Please wait for the ad window to open.</string>
+    <string name="rewarded_continue_ready_helper">Your continue is ready. Jump back in when you are ready.</string>
+    <string name="rewarded_continue_grace">Game starting, get ready...</string>
+    <string name="rewarded_not_ready">Ad Not Ready</string>
+    <string name="rewarded_not_ready_helper">The ad could not load right now. We are retrying in the background.</string>
+    <string name="continue_used">Continue Used</string>
+    <string name="continue_used_helper">You cannot continue a second time in this game.</string>
+    <string name="retry_game">Play Again</string>
+    <string name="back_to_home">Back to Home</string>
+
+    <string-array name="rules_classic">
+        <item>Tap the target in time.</item>
+        <item>Raise your score before time runs out.</item>
+        <item>The target disappears faster as the game progresses.</item>
+    </string-array>
+    <string-array name="rules_moving">
+        <item>The target keeps moving.</item>
+        <item>Higher speed tests your reflexes.</item>
+        <item>Tapping empty space costs a life.</item>
+    </string-array>
+    <string-array name="rules_fake">
+        <item>Don’t tap the wrong target.</item>
+        <item>Only the real target gives score.</item>
+        <item>More fake targets appear as your score rises.</item>
+    </string-array>
+    <string-array name="rules_color">
+        <item>Tap only the requested color.</item>
+        <item>Tapping the wrong color costs a life.</item>
+        <item>The active color changes at intervals.</item>
+    </string-array>
+</resources>

@@ -1,6 +1,9 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import android.content.Context
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,6 +46,7 @@ import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberGameSoundHooks
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
+import java.util.Locale
 
 private val ScreenHorizontalPadding = 20.dp
 private val ScreenVerticalPadding = 18.dp
@@ -50,10 +55,15 @@ private val ScreenVerticalPadding = 18.dp
 fun GameScreen(
     viewModel: GameViewModel = viewModel(),
     rewardedAdUiState: RewardedAdUiState = RewardedAdUiState(),
+    selectedLanguage: AppLanguage = AppLanguage.Turkish,
+    isSoundEnabled: Boolean = true,
+    onLanguageSelected: (AppLanguage) -> Unit = {},
+    onSoundEnabledChange: (Boolean) -> Unit = {},
     onRewardedContinueRequested: (onRewardEarned: () -> Unit) -> Unit = { onRewardEarned ->
         onRewardEarned()
     },
-    onInterstitialAdRequested: () -> Unit = {}
+    onInterstitialAdRequested: () -> Unit = {},
+    onHowToPlayClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -67,7 +77,13 @@ fun GameScreen(
     GameScreen(
         uiState = uiState,
         rewardedAdUiState = rewardedAdUiState,
+        selectedLanguage = selectedLanguage,
+        isSoundEnabled = isSoundEnabled,
         onStartClick = viewModel::startGame,
+        onModeStartClick = viewModel::selectMode,
+        onHowToPlayClick = onHowToPlayClick,
+        onLanguageSelected = onLanguageSelected,
+        onSoundEnabledChange = onSoundEnabledChange,
         onHomeClick = viewModel::goToHome,
         onPauseGame = viewModel::pauseGame,
         onResumeGame = viewModel::resumeGame,
@@ -88,17 +104,23 @@ fun GameScreen(
 fun GameScreen(
     uiState: GameUiState,
     rewardedAdUiState: RewardedAdUiState,
+    selectedLanguage: AppLanguage,
+    isSoundEnabled: Boolean,
     onStartClick: () -> Unit,
+    onModeStartClick: (GameMode) -> Unit,
+    onHowToPlayClick: () -> Unit,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
     onHomeClick: () -> Unit,
     onPauseGame: () -> Unit,
     onResumeGame: () -> Unit,
-    onTargetTap: () -> Unit,
+    onTargetTap: (Long) -> Unit,
     onMissTap: () -> Unit,
     onContinueClick: () -> Unit,
     onRetryClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val soundHooks = rememberGameSoundHooks()
+    val soundHooks = rememberGameSoundHooks(isSoundEnabled = isSoundEnabled)
     var missFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackPosition by remember { mutableStateOf(uiState.targetPosition) }
@@ -112,6 +134,16 @@ fun GameScreen(
     LaunchedEffect(uiState.isGameOver) {
         if (uiState.isGameOver) {
             soundHooks.onGameOver()
+        }
+    }
+
+    LaunchedEffect(uiState.timeLeftSeconds, uiState.hasGameStarted, uiState.isGameOver) {
+        if (
+            uiState.hasGameStarted &&
+            !uiState.isGameOver &&
+            uiState.timeLeftSeconds in 1..5
+        ) {
+            soundHooks.onCountdown()
         }
     }
 
@@ -130,13 +162,20 @@ fun GameScreen(
         }
     }
 
-    val handleTargetTap: () -> Unit = {
+    val handleTargetTap: (Long) -> Unit = { targetId ->
         if (isGameplayInputEnabled) {
-            hitFeedbackPosition = uiState.targetPosition
-            hitFeedbackTrigger += 1
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            soundHooks.onHit()
-            onTargetTap()
+            val tappedTarget = uiState.targets.firstOrNull { it.id == targetId }
+            if (tappedTarget?.role == GameTargetRole.Correct) {
+                hitFeedbackPosition = tappedTarget.position
+                hitFeedbackTrigger += 1
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                soundHooks.onHit()
+                val nextCombo = uiState.combo + 1
+                if (nextCombo == 2 || nextCombo == 5 || nextCombo == 10) {
+                    soundHooks.onCombo()
+                }
+            }
+            onTargetTap(targetId)
         }
     }
 
@@ -211,7 +250,16 @@ fun GameScreen(
         if (!uiState.hasGameStarted) {
             HomeContent(
                 bestScore = uiState.bestScore,
+                bestScoresByMode = uiState.bestScoresByMode,
+                selectedMode = uiState.selectedMode,
+                dailyChallengeState = uiState.dailyChallengeState,
+                isSoundEnabled = isSoundEnabled,
                 onStartClick = onStartClick,
+                onModeStartClick = onModeStartClick,
+                onHowToPlayClick = onHowToPlayClick,
+                selectedLanguage = selectedLanguage,
+                onLanguageSelected = onLanguageSelected,
+                onSoundToggleClick = { onSoundEnabledChange(!isSoundEnabled) },
                 modifier = Modifier.align(Alignment.Center)
             )
             return@Box
@@ -247,6 +295,9 @@ fun GameScreen(
                     score = uiState.score,
                     bestScore = uiState.bestScore,
                     isNewBestScore = uiState.isNewBestScore,
+                    mode = uiState.selectedMode,
+                    maxCombo = uiState.maxCombo,
+                    accuracyPercent = calculateAccuracyPercent(uiState),
                     reason = uiState.gameOverReason,
                     showContinueButton = shouldShowContinueSlot,
                     continueButtonText = continueButtonText,
@@ -254,6 +305,7 @@ fun GameScreen(
                     isContinueEnabled = continueButtonEnabled,
                     isContinueLoading = continueButtonLoading,
                     onHomeClick = onHomeClick,
+                    onChangeModeClick = onHomeClick,
                     onContinueClick = onContinueClick,
                     onRetryClick = onRetryClick
                 )
@@ -262,6 +314,7 @@ fun GameScreen(
 
         if (showExitGameDialog) {
             ExitGameDialog(
+                selectedLanguage = selectedLanguage,
                 onContinueClick = {
                     showExitGameDialog = false
                     onResumeGame()
@@ -275,41 +328,71 @@ fun GameScreen(
     }
 }
 
+private fun calculateAccuracyPercent(uiState: GameUiState): Int {
+    if (uiState.totalAttempts <= 0) return 0
+    return ((uiState.successfulHits * 100f) / uiState.totalAttempts).toInt().coerceIn(0, 100)
+}
+
 @Composable
 private fun ExitGameDialog(
+    selectedLanguage: AppLanguage,
     onContinueClick: () -> Unit,
     onHomeClick: () -> Unit
 ) {
+    val title = localizedStringResource(R.string.exit_game_title, selectedLanguage)
+    val message = localizedStringResource(R.string.exit_game_message, selectedLanguage)
+    val continueText = localizedStringResource(R.string.continue_game, selectedLanguage)
+    val homeText = localizedStringResource(R.string.back_to_home, selectedLanguage)
+
     AlertDialog(
         onDismissRequest = onContinueClick,
         containerColor = ReflexGamePalette.cardGlassStrong,
         title = {
             Text(
-                text = stringResource(R.string.exit_game_title),
+                text = title,
                 color = ReflexGamePalette.textPrimary
             )
         },
         text = {
             Text(
-                text = stringResource(R.string.exit_game_message),
+                text = message,
                 color = ReflexGamePalette.textSecondary
             )
         },
         confirmButton = {
             PrimaryGameButton(
-                text = stringResource(R.string.continue_game),
+                text = continueText,
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth()
             )
         },
         dismissButton = {
             SecondaryGameButton(
-                text = stringResource(R.string.back_to_home),
+                text = homeText,
                 onClick = onHomeClick,
                 modifier = Modifier.fillMaxWidth()
             )
         }
     )
+}
+
+@Composable
+private fun localizedStringResource(
+    @StringRes id: Int,
+    selectedLanguage: AppLanguage
+): String {
+    val context = LocalContext.current
+    val localizedContext = remember(context, selectedLanguage) {
+        context.createLanguageContext(selectedLanguage)
+    }
+    return localizedContext.getString(id)
+}
+
+private fun Context.createLanguageContext(language: AppLanguage): Context {
+    val locale = Locale.forLanguageTag(language.code)
+    val configuration = Configuration(resources.configuration)
+    configuration.setLocale(locale)
+    return createConfigurationContext(configuration)
 }
 
 @Composable
@@ -340,7 +423,13 @@ private fun HomePreview() {
         GameScreen(
             uiState = GameUiState(bestScore = 27),
             rewardedAdUiState = RewardedAdUiState(isReady = true),
+            selectedLanguage = AppLanguage.Turkish,
+            isSoundEnabled = true,
             onStartClick = {},
+            onModeStartClick = {},
+            onHowToPlayClick = {},
+            onLanguageSelected = {},
+            onSoundEnabledChange = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
@@ -365,7 +454,13 @@ private fun PlayingPreview() {
                 hasGameStarted = true
             ),
             rewardedAdUiState = RewardedAdUiState(isReady = true),
+            selectedLanguage = AppLanguage.Turkish,
+            isSoundEnabled = true,
             onStartClick = {},
+            onModeStartClick = {},
+            onHowToPlayClick = {},
+            onLanguageSelected = {},
+            onSoundEnabledChange = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
@@ -394,7 +489,13 @@ private fun GameOverPreview() {
                 canContinueWithReward = true
             ),
             rewardedAdUiState = RewardedAdUiState(isReady = true),
+            selectedLanguage = AppLanguage.Turkish,
+            isSoundEnabled = true,
             onStartClick = {},
+            onModeStartClick = {},
+            onHowToPlayClick = {},
+            onLanguageSelected = {},
+            onSoundEnabledChange = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
