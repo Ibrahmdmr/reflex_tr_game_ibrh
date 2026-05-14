@@ -182,7 +182,6 @@ fun AppRoot(
 
 private fun Context.createLocalizedContext(language: AppLanguage): Context {
     val locale = Locale.forLanguageTag(language.code)
-    Locale.setDefault(locale)
     val configuration = Configuration(resources.configuration)
     configuration.setLocale(locale)
     return createConfigurationContext(configuration)
