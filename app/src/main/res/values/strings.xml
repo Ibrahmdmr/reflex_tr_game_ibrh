@@ -20,6 +20,8 @@
     <string name="play_area_subtitle">Kırmızı hedefi yakala</string>
     <string name="play_area_hint">Dokun ve puanını yükselt</string>
 
+    <string name="exit_game_title">Oyundan çıkılsın mı?</string>
+    <string name="exit_game_message">Oyun duraklatıldı. Devam edebilir ya da ana sayfaya dönebilirsin.</string>
     <string name="game_over_title">Oyun Bitti</string>
     <string name="new_record">Yeni Rekor!</string>
     <string name="continue_game">Devam Et</string>
@@ -28,6 +30,8 @@
     <string name="rewarded_loading_helper">Reklam hazır olduğunda buton otomatik aktif olur.</string>
     <string name="rewarded_opening">Reklam Açılıyor...</string>
     <string name="rewarded_opening_helper">Lütfen reklam penceresinin açılmasını bekle.</string>
+    <string name="rewarded_continue_ready_helper">Devam hakkın hazır. Hazır olduğunda oyuna dön.</string>
+    <string name="rewarded_continue_grace">Oyun başlıyor, hazır ol...</string>
     <string name="rewarded_not_ready">Reklam Hazır Değil</string>
     <string name="rewarded_not_ready_helper">Reklam şu an yüklenemedi. Arka planda yeniden deneniyor.</string>
     <string name="continue_used">Devam Hakkı Kullanıldı</string>

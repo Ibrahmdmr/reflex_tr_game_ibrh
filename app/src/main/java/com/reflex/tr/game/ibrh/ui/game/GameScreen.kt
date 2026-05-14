@@ -1,14 +1,22 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,12 +30,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
+import com.reflex.tr.game.ibrh.ui.game.components.PrimaryGameButton
+import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberGameSoundHooks
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
@@ -58,10 +69,16 @@ fun GameScreen(
         rewardedAdUiState = rewardedAdUiState,
         onStartClick = viewModel::startGame,
         onHomeClick = viewModel::goToHome,
+        onPauseGame = viewModel::pauseGame,
+        onResumeGame = viewModel::resumeGame,
         onTargetTap = viewModel::onTargetTapped,
         onMissTap = viewModel::onMissTapped,
         onContinueClick = {
-            onRewardedContinueRequested(viewModel::continueGameAfterReward)
+            if (uiState.isRewardContinueReady) {
+                viewModel.continueGameAfterReward()
+            } else {
+                onRewardedContinueRequested(viewModel::onRewardContinueEarned)
+            }
         },
         onRetryClick = viewModel::retryGame
     )
@@ -73,6 +90,8 @@ fun GameScreen(
     rewardedAdUiState: RewardedAdUiState,
     onStartClick: () -> Unit,
     onHomeClick: () -> Unit,
+    onPauseGame: () -> Unit,
+    onResumeGame: () -> Unit,
     onTargetTap: () -> Unit,
     onMissTap: () -> Unit,
     onContinueClick: () -> Unit,
@@ -84,6 +103,11 @@ fun GameScreen(
     var hitFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackPosition by remember { mutableStateOf(uiState.targetPosition) }
     var previousLives by remember { mutableIntStateOf(uiState.lives) }
+    var showExitGameDialog by remember { mutableStateOf(false) }
+    val isGameplayInputEnabled =
+        !uiState.isPaused &&
+            !uiState.isResumeGracePeriod &&
+            !uiState.isGameOver
 
     LaunchedEffect(uiState.isGameOver) {
         if (uiState.isGameOver) {
@@ -101,48 +125,70 @@ fun GameScreen(
     }
 
     val handleMissTap: () -> Unit = {
-        onMissTap()
+        if (isGameplayInputEnabled) {
+            onMissTap()
+        }
     }
 
     val handleTargetTap: () -> Unit = {
-        if (!uiState.isGameOver) {
+        if (isGameplayInputEnabled) {
             hitFeedbackPosition = uiState.targetPosition
             hitFeedbackTrigger += 1
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             soundHooks.onHit()
+            onTargetTap()
         }
-        onTargetTap()
     }
 
-    val shouldShowContinueSlot = uiState.canContinueWithReward || uiState.hasUsedRewardContinue
+    BackHandler(enabled = uiState.hasGameStarted) {
+        if (uiState.isGameOver) {
+            onHomeClick()
+        } else if (!showExitGameDialog) {
+            onPauseGame()
+            showExitGameDialog = true
+        }
+    }
+
+    val shouldShowContinueSlot =
+        uiState.canContinueWithReward ||
+            uiState.isRewardContinueReady ||
+            uiState.hasUsedRewardContinue
     val continueButtonText = when {
+        uiState.isRewardContinueReady ->
+            stringResource(R.string.continue_game)
         uiState.hasUsedRewardContinue ->
-            androidx.compose.ui.res.stringResource(R.string.continue_used)
+            stringResource(R.string.continue_used)
         rewardedAdUiState.isShowing ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_opening)
+            stringResource(R.string.rewarded_opening)
         rewardedAdUiState.isReady ->
-            androidx.compose.ui.res.stringResource(R.string.watch_ad_and_continue)
+            stringResource(R.string.watch_ad_and_continue)
         rewardedAdUiState.hasLoadFailed ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_not_ready)
+            stringResource(R.string.rewarded_not_ready)
         else ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_loading)
+            stringResource(R.string.rewarded_loading)
     }
     val continueButtonEnabled =
-        uiState.canContinueWithReward &&
-            rewardedAdUiState.isReady &&
-            !rewardedAdUiState.isShowing
+        uiState.isRewardContinueReady ||
+            (
+                uiState.canContinueWithReward &&
+                    rewardedAdUiState.isReady &&
+                    !rewardedAdUiState.isShowing
+            )
     val continueButtonLoading =
+        !uiState.isRewardContinueReady &&
         uiState.canContinueWithReward &&
             (rewardedAdUiState.isShowing || rewardedAdUiState.isLoading)
     val continueHelperText = when {
+        uiState.isRewardContinueReady ->
+            stringResource(R.string.rewarded_continue_ready_helper)
         uiState.hasUsedRewardContinue ->
-            androidx.compose.ui.res.stringResource(R.string.continue_used_helper)
+            stringResource(R.string.continue_used_helper)
         rewardedAdUiState.isShowing ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_opening_helper)
+            stringResource(R.string.rewarded_opening_helper)
         rewardedAdUiState.hasLoadFailed ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_not_ready_helper)
+            stringResource(R.string.rewarded_not_ready_helper)
         !rewardedAdUiState.isReady ->
-            androidx.compose.ui.res.stringResource(R.string.rewarded_loading_helper)
+            stringResource(R.string.rewarded_loading_helper)
         else -> null
     }
 
@@ -180,6 +226,12 @@ fun GameScreen(
             onMissTap = handleMissTap
         )
 
+        if (uiState.isResumeGracePeriod) {
+            RewardContinueGraceOverlay(
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
         AnimatedVisibility(
             visible = uiState.isGameOver,
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
@@ -207,6 +259,77 @@ fun GameScreen(
                 )
             }
         }
+
+        if (showExitGameDialog) {
+            ExitGameDialog(
+                onContinueClick = {
+                    showExitGameDialog = false
+                    onResumeGame()
+                },
+                onHomeClick = {
+                    showExitGameDialog = false
+                    onHomeClick()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExitGameDialog(
+    onContinueClick: () -> Unit,
+    onHomeClick: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onContinueClick,
+        containerColor = ReflexGamePalette.cardGlassStrong,
+        title = {
+            Text(
+                text = stringResource(R.string.exit_game_title),
+                color = ReflexGamePalette.textPrimary
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.exit_game_message),
+                color = ReflexGamePalette.textSecondary
+            )
+        },
+        confirmButton = {
+            PrimaryGameButton(
+                text = stringResource(R.string.continue_game),
+                onClick = onContinueClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        dismissButton = {
+            SecondaryGameButton(
+                text = stringResource(R.string.back_to_home),
+                onClick = onHomeClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun RewardContinueGraceOverlay(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(24.dp),
+        tonalElevation = 0.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.14f)
+        )
+    ) {
+        Text(
+            text = stringResource(R.string.rewarded_continue_grace),
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
+            style = MaterialTheme.typography.titleMedium,
+            color = ReflexGamePalette.textPrimary
+        )
     }
 }
 
@@ -219,6 +342,8 @@ private fun HomePreview() {
             rewardedAdUiState = RewardedAdUiState(isReady = true),
             onStartClick = {},
             onHomeClick = {},
+            onPauseGame = {},
+            onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},
@@ -242,6 +367,8 @@ private fun PlayingPreview() {
             rewardedAdUiState = RewardedAdUiState(isReady = true),
             onStartClick = {},
             onHomeClick = {},
+            onPauseGame = {},
+            onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},
@@ -269,6 +396,8 @@ private fun GameOverPreview() {
             rewardedAdUiState = RewardedAdUiState(isReady = true),
             onStartClick = {},
             onHomeClick = {},
+            onPauseGame = {},
+            onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},

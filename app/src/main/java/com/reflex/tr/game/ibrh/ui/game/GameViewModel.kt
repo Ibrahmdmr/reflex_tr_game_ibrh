@@ -19,6 +19,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private const val INITIAL_LIVES = 3
         private const val INITIAL_TIME_SECONDS = 30
         private const val REWARD_CONTINUE_TIME_SECONDS = 10
+        private const val REWARD_CONTINUE_GRACE_MILLIS = 2_000L
         private const val INITIAL_TARGET_SIZE_DP = 82
         private const val MIN_TARGET_SIZE_DP = 48
         private const val INITIAL_TARGET_VISIBLE_DURATION_MS = 1_800L
@@ -33,6 +34,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private var timerJob: Job? = null
     private var targetTimeoutJob: Job? = null
+    private var rewardContinueGraceJob: Job? = null
     private var completedGameCount = 0
     private val gamePreferences = GamePreferences(application)
 
@@ -46,7 +48,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onTargetTapped() {
         val currentState = _uiState.value
-        if (!currentState.hasGameStarted || currentState.isGameOver) return
+        if (!currentState.canAcceptGameplayInput()) return
 
         _uiState.update {
             val newScore = it.score + 1
@@ -70,7 +72,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onMissTapped() {
         val currentState = _uiState.value
-        if (!currentState.hasGameStarted || currentState.isGameOver) return
+        if (!currentState.canAcceptGameplayInput()) return
 
         val remainingLives = currentState.lives - 1
         if (remainingLives <= 0) {
@@ -95,36 +97,80 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         launchNewGame()
     }
 
+    fun pauseGame() {
+        val currentState = _uiState.value
+        if (!currentState.hasGameStarted || currentState.isPaused || currentState.isGameOver) return
+
+        timerJob?.cancel()
+        targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
+        _uiState.update { it.copy(isPaused = true) }
+    }
+
+    fun resumeGame() {
+        val currentState = _uiState.value
+        if (!currentState.hasGameStarted || !currentState.isPaused || currentState.isGameOver) return
+
+        _uiState.update { it.copy(isPaused = false) }
+        if (currentState.isResumeGracePeriod) {
+            startRewardContinueGracePeriod()
+        } else {
+            startTimer()
+            startTargetTimeout()
+        }
+    }
+
     fun goToHome() {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
         _uiState.value = createInitialState().copy(
             bestScore = _uiState.value.bestScore,
             isNewBestScore = false
         )
     }
 
-    fun continueGameAfterReward() {
+    fun onRewardContinueEarned() {
         val currentState = _uiState.value
         if (!currentState.isGameOver || currentState.hasUsedRewardContinue) return
 
+        _uiState.update {
+            it.copy(
+                isRewardContinueReady = true,
+                canContinueWithReward = true
+            )
+        }
+    }
+
+    fun continueGameAfterReward() {
+        val currentState = _uiState.value
+        if (
+            !currentState.isGameOver ||
+            currentState.hasUsedRewardContinue ||
+            !currentState.isRewardContinueReady
+        ) return
+
+        timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
         _uiState.update {
             it.copy(
                 hasGameStarted = true,
                 lives = 1,
                 timeLeftSeconds = REWARD_CONTINUE_TIME_SECONDS,
                 targetPosition = generateRandomTargetPosition(),
+                isPaused = false,
+                isResumeGracePeriod = true,
                 isGameOver = false,
                 gameOverReason = null,
                 hasUsedRewardContinue = true,
+                isRewardContinueReady = false,
                 canContinueWithReward = false,
                 shouldRequestInterstitialAd = false,
                 targetLifetimeKey = it.targetLifetimeKey + 1
             )
         }
-        startTimer()
-        startTargetTimeout()
+        startRewardContinueGracePeriod()
     }
 
     fun onInterstitialAdRequestHandled() {
@@ -134,6 +180,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun launchNewGame() {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
         _uiState.value = createInitialState().copy(
             bestScore = _uiState.value.bestScore,
             hasGameStarted = true,
@@ -154,11 +201,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_uiState.value.timeLeftSeconds > 0 && !_uiState.value.isGameOver) {
+            while (
+                _uiState.value.timeLeftSeconds > 0 &&
+                !_uiState.value.isPaused &&
+                !_uiState.value.isResumeGracePeriod &&
+                !_uiState.value.isGameOver
+            ) {
                 delay(1_000L)
 
                 val currentState = _uiState.value
-                if (currentState.isGameOver) break
+                if (
+                    currentState.isPaused ||
+                    currentState.isResumeGracePeriod ||
+                    currentState.isGameOver
+                ) break
 
                 val newTime = currentState.timeLeftSeconds - 1
                 if (newTime <= 0) {
@@ -177,6 +233,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun endGame() {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
         finishGame(
             lives = 0,
             reason = REASON_NO_LIVES
@@ -186,7 +243,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun startTargetTimeout() {
         targetTimeoutJob?.cancel()
         val currentState = _uiState.value
-        if (!currentState.hasGameStarted || currentState.isGameOver) return
+        if (!currentState.canAcceptGameplayInput()) return
 
         val targetLifetimeKey = currentState.targetLifetimeKey
         val visibleDurationMillis = currentState.targetVisibleDurationMillis
@@ -195,8 +252,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val latestState = _uiState.value
             if (
                 latestState.hasGameStarted &&
-                !latestState.isGameOver &&
-                latestState.targetLifetimeKey == targetLifetimeKey
+                    !latestState.isPaused &&
+                    !latestState.isResumeGracePeriod &&
+                    !latestState.isGameOver &&
+                    latestState.targetLifetimeKey == targetLifetimeKey
             ) {
                 onTargetTimedOut()
             }
@@ -205,7 +264,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun onTargetTimedOut() {
         val currentState = _uiState.value
-        if (!currentState.hasGameStarted || currentState.isGameOver) return
+        if (!currentState.canAcceptGameplayInput()) return
 
         val remainingLives = currentState.lives - 1
         if (remainingLives <= 0) {
@@ -233,6 +292,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
         completedGameCount += 1
         val shouldRequestInterstitialAd =
             completedGameCount % INTERSTITIAL_AD_GAME_OVER_INTERVAL == 0
@@ -242,9 +302,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 lives = lives,
                 timeLeftSeconds = timeLeftSeconds,
                 hasGameStarted = true,
+                isPaused = false,
+                isResumeGracePeriod = false,
                 isGameOver = true,
                 gameOverReason = reason,
                 canContinueWithReward = !it.hasUsedRewardContinue,
+                isRewardContinueReady = false,
                 shouldRequestInterstitialAd = shouldRequestInterstitialAd
             )
         }
@@ -265,6 +328,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun startRewardContinueGracePeriod() {
+        rewardContinueGraceJob?.cancel()
+        rewardContinueGraceJob = viewModelScope.launch {
+            delay(REWARD_CONTINUE_GRACE_MILLIS)
+            val currentState = _uiState.value
+            if (
+                currentState.hasGameStarted &&
+                currentState.isResumeGracePeriod &&
+                !currentState.isPaused &&
+                !currentState.isGameOver
+            ) {
+                _uiState.update { it.copy(isResumeGracePeriod = false) }
+                startTimer()
+                startTargetTimeout()
+            }
+        }
+    }
+
     private fun calculateDifficultyLevel(score: Int): Int {
         return (score / 5 + 1).coerceIn(1, 8)
     }
@@ -278,6 +359,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val durationReduction = (score / 2) * 80L
         return (INITIAL_TARGET_VISIBLE_DURATION_MS - durationReduction)
             .coerceAtLeast(MIN_TARGET_VISIBLE_DURATION_MS)
+    }
+
+    private fun GameUiState.canAcceptGameplayInput(): Boolean {
+        return hasGameStarted &&
+            !isPaused &&
+            !isResumeGracePeriod &&
+            !isGameOver
     }
 
     private fun generateRandomTargetPosition(
@@ -310,5 +398,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
+        rewardContinueGraceJob?.cancel()
     }
 }

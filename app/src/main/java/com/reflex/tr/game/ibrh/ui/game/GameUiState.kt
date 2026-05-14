@@ -17,9 +17,12 @@ data class GameUiState(
     val targetVisibleDurationMillis: Long = 1_800L,
     val targetLifetimeKey: Int = 0,
     val hasGameStarted: Boolean = false,
+    val isPaused: Boolean = false,
+    val isResumeGracePeriod: Boolean = false,
     val isGameOver: Boolean = false,
     val gameOverReason: String? = null,
     val hasUsedRewardContinue: Boolean = false,
+    val isRewardContinueReady: Boolean = false,
     val canContinueWithReward: Boolean = false,
     val shouldRequestInterstitialAd: Boolean = false
 )

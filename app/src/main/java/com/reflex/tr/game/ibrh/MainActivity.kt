@@ -132,6 +132,8 @@ fun AppRootPreview() {
                 rewardedAdUiState = RewardedAdUiState(isReady = true),
                 onStartClick = {},
                 onHomeClick = {},
+                onPauseGame = {},
+                onResumeGame = {},
                 onTargetTap = {},
                 onMissTap = {},
                 onContinueClick = {},
