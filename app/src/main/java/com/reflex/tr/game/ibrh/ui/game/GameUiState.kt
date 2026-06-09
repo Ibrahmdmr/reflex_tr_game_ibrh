@@ -313,13 +313,16 @@ enum class LeaderboardPeriod {
 data class LeaderboardSnapshot(
     val weekKey: String = "",
     val selectedMode: GameMode = GameMode.Classic,
-    val selectedPeriod: LeaderboardPeriod = LeaderboardPeriod.Weekly,
+    val selectedPeriod: LeaderboardPeriod = LeaderboardPeriod.AllTime,
     val entries: List<LeaderboardEntry> = emptyList(),
     val playerRank: Int = 0,
     @StringRes val motivationRes: Int = R.string.leaderboard_motivation_default,
     val motivationPlayerName: String = "",
     val motivationScoreGap: Int = 0,
-    val refreshedTick: Int = 0
+    val refreshedTick: Int = 0,
+    val isLoading: Boolean = false,
+    val isOffline: Boolean = false,
+    @StringRes val statusMessageRes: Int? = null
 )
 
 data class DailyChallengeState(

@@ -13,6 +13,8 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
+import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 
 data class RewardedAdUiState(
     val isReady: Boolean = false,
@@ -118,6 +120,10 @@ class AdMobManager(
         ad.show(activity) {
             rewardEarned = true
             AdAnalyticsTracker.track("rewarded_complete", adParams("placement" to placement))
+            FirebaseGameServices.logEvent(
+                event = FirebaseEvent.RewardedAdWatched,
+                params = adParams("placement" to placement)
+            )
             logDebug("User earned rewarded ad reward")
         }
         return true

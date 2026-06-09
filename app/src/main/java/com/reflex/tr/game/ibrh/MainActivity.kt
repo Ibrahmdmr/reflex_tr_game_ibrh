@@ -32,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.ads.MobileAds
 import com.reflex.tr.game.ibrh.ads.AdMobManager
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
+import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.ui.game.RewardedAction
 import com.reflex.tr.game.ibrh.ui.game.AppLanguage
 import com.reflex.tr.game.ibrh.ui.game.GamePreferences
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         logDebug("MainActivity created")
+        FirebaseGameServices.initialize(this)
         adMobManager = AdMobManager(this)
         adMobManager.onRewardedUiStateChanged = { uiState ->
             logDebug(

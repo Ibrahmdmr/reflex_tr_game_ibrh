@@ -1,6 +1,7 @@
 package com.reflex.tr.game.ibrh.ui.game
 
 import android.app.Application
+import android.os.Bundle
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,8 @@ import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.AdAnalyticsTracker
 import com.reflex.tr.game.ibrh.ads.AdConfig
 import com.reflex.tr.game.ibrh.ads.adParams
+import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
+import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,9 +39,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val adConfig = AdConfig.Default
     private val gamePreferences = GamePreferences(application)
-    private val leaderboardRepository: LeaderboardRepository = LocalLeaderboardRepository()
+    private val leaderboardRepository: LeaderboardRepository = FirestoreLeaderboardRepository()
     private var selectedLeaderboardMode = GameMode.Classic
-    private var selectedLeaderboardPeriod = LeaderboardPeriod.Weekly
+    private var selectedLeaderboardPeriod = LeaderboardPeriod.AllTime
     private var leaderboardRefreshTick = 0
     private val _uiState = MutableStateFlow(createInitialState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -49,6 +52,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var movingTargetJob: Job? = null
     private var colorRuleJob: Job? = null
     private var comboResetJob: Job? = null
+    private var leaderboardRefreshJob: Job? = null
     private var completedGameCount = 0
     private var nextInterstitialGameCount = randomInterstitialInterval()
     private var nextTargetId = 0L
@@ -58,13 +62,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         observeBestScore()
+        refreshProfileAndLeaderboard()
     }
 
     fun startGame() {
+        trackGameStart(_uiState.value.selectedMode)
         launchNewGame(mode = _uiState.value.selectedMode)
     }
 
     fun startGame(mode: GameMode) {
+        trackGameStart(mode)
         launchNewGame(mode = mode)
     }
 
@@ -303,6 +310,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun updatePlayerName(name: String): Boolean {
         val sanitizedName = sanitizePlayerName(name) ?: return false
         gamePreferences.savePlayerName(sanitizedName)
+        FirebaseGameServices.logEvent(
+            event = FirebaseEvent.PlayerNameChanged,
+            params = Bundle().apply {
+                putInt("name_length", sanitizedName.length)
+            }
+        )
         refreshProfileAndLeaderboard()
         return true
     }
@@ -324,7 +337,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshLeaderboard() {
         leaderboardRefreshTick += 1
-        refreshProfileAndLeaderboard()
+        refreshProfileAndLeaderboard(showLoading = true)
     }
 
     fun claimAchievementReward(achievementId: String) {
@@ -368,6 +381,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
+        FirebaseGameServices.logEvent(
+            event = FirebaseEvent.ThemePurchased,
+            params = Bundle().apply {
+                putString("theme", theme.storageKey)
+                putInt("price", theme.coinPrice)
+            }
+        )
         gamePreferences.saveProgressionState(updatedProgression)
     }
 
@@ -588,6 +608,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (shouldRequestInterstitialAd) {
             nextInterstitialGameCount = completedGameCount + randomInterstitialInterval()
         }
+        val scoreMode = _uiState.value.selectedMode
+        val previousModeBestScore = _uiState.value.bestScoresByMode[scoreMode] ?: 0
 
         val finalState = _uiState.updateAndGet {
             val currentModeBest = it.bestScoresByMode[it.selectedMode] ?: 0
@@ -667,6 +689,38 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         gamePreferences.saveWeeklyBestScore(finalState.selectedMode, finalState.score)
         gamePreferences.saveDailyChallengeState(finalState.dailyChallengeState)
         gamePreferences.saveProgressionState(finalState.progressionState)
+        if (finalState.score > previousModeBestScore) {
+            viewModelScope.launch {
+                val uploaded = leaderboardRepository.uploadScore(
+                    playerName = finalState.playerProfile.name,
+                    score = finalState.score,
+                    level = finalState.progressionState.level,
+                    selectedTheme = finalState.progressionState.activeTheme,
+                    mode = finalState.selectedMode
+                )
+                if (uploaded) {
+                    loadRemoteLeaderboard(showLoading = false)
+                }
+            }
+        }
+        FirebaseGameServices.logEvent(
+            event = FirebaseEvent.GameOver,
+            params = Bundle().apply {
+                putString("mode", finalState.selectedMode.storageKey)
+                putInt("score", finalState.score)
+                putInt("max_combo", finalState.maxCombo)
+                putBoolean("new_best", finalState.isNewBestScore)
+            }
+        )
+    }
+
+    private fun trackGameStart(mode: GameMode) {
+        FirebaseGameServices.logEvent(
+            event = FirebaseEvent.GameStart,
+            params = Bundle().apply {
+                putString("mode", mode.storageKey)
+            }
+        )
     }
 
     private fun createInitialState(
@@ -968,7 +1022,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return (xp / 250 + 1).coerceAtLeast(1)
     }
 
-    private fun refreshProfileAndLeaderboard() {
+    private fun refreshProfileAndLeaderboard(showLoading: Boolean = false) {
         val profile = gamePreferences.getPlayerProfile()
         _uiState.update {
             it.copy(
@@ -977,9 +1031,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     profile = profile,
                     progression = it.progressionState,
                     bestScoresByMode = it.bestScoresByMode
+                ).copy(
+                    isLoading = showLoading,
+                    statusMessageRes = if (showLoading) R.string.leaderboard_loading else it.leaderboardSnapshot.statusMessageRes
                 )
             )
         }
+        loadRemoteLeaderboard(showLoading = showLoading)
     }
 
     private fun createLeaderboardSnapshot(
@@ -992,7 +1050,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             LeaderboardPeriod.Weekly -> profile.weeklyBestScoresByMode[mode] ?: 0
             LeaderboardPeriod.AllTime -> bestScoresByMode[mode] ?: 0
         }
-        return leaderboardRepository.getWeeklyLeaderboard(
+        return leaderboardRepository.getLocalLeaderboard(
             playerName = profile.name,
             playerScore = leaderboardScore,
             playerTheme = progression.activeTheme,
@@ -1001,6 +1059,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             selectedPeriod = selectedLeaderboardPeriod,
             refreshTick = leaderboardRefreshTick
         )
+    }
+
+    private fun loadRemoteLeaderboard(showLoading: Boolean) {
+        leaderboardRefreshJob?.cancel()
+        leaderboardRefreshJob = viewModelScope.launch {
+            val state = _uiState.value
+            val profile = gamePreferences.getPlayerProfile()
+            val mode = selectedLeaderboardMode
+            val leaderboardScore = when (selectedLeaderboardPeriod) {
+                LeaderboardPeriod.Weekly -> profile.weeklyBestScoresByMode[mode] ?: 0
+                LeaderboardPeriod.AllTime -> state.bestScoresByMode[mode] ?: 0
+            }
+            val snapshot = leaderboardRepository.refreshLeaderboard(
+                playerName = profile.name,
+                playerScore = leaderboardScore,
+                playerTheme = state.progressionState.activeTheme,
+                playerRankTier = rankFor(score = leaderboardScore, level = state.progressionState.level),
+                playerLevel = state.progressionState.level,
+                selectedMode = mode,
+                selectedPeriod = selectedLeaderboardPeriod,
+                refreshTick = leaderboardRefreshTick
+            ).copy(isLoading = false)
+
+            _uiState.update {
+                it.copy(
+                    playerProfile = profile,
+                    leaderboardSnapshot = snapshot
+                )
+            }
+        }
     }
 
     private fun sanitizePlayerName(name: String): String? {

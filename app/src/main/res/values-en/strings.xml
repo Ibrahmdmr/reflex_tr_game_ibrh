@@ -199,11 +199,14 @@
     <string name="achievement_play_10_description">Complete 10 games in total.</string>
     <string name="achievement_record_breaker_title">Record Breaker</string>
     <string name="achievement_record_breaker_description">Break your best score in any mode.</string>
-    <string name="leaderboard_title">Local Leaderboard</string>
-    <string name="leaderboard_local_note">On-device ranking • Simulated rivals</string>
+    <string name="leaderboard_title">Leaderboard</string>
+    <string name="leaderboard_local_note">Real player scores • Firestore powered</string>
     <string name="leaderboard_period_weekly">Weekly</string>
     <string name="leaderboard_period_all_time">All Time</string>
-    <string name="leaderboard_refreshed">Ranking refreshed.</string>
+    <string name="leaderboard_refreshed">Leaderboard refreshed.</string>
+    <string name="leaderboard_refresh_failed">Couldn’t refresh the leaderboard. Showing local score.</string>
+    <string name="leaderboard_offline_cache">Showing offline data.</string>
+    <string name="leaderboard_loading">Loading leaderboard…</string>
     <string name="leaderboard_you">You</string>
     <string name="leaderboard_you_named">You • %1$s</string>
     <string name="leaderboard_motivation_default">This week’s top spot is waiting for you!</string>

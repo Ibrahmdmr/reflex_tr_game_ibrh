@@ -73,6 +73,8 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import java.util.Locale
 import kotlinx.coroutines.delay
+import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
+import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 
 @Composable
 fun HomeContent(
@@ -138,7 +140,6 @@ fun HomeContent(
         if (showPlayerNameDialog) {
             PlayerNameDialog(
                 currentName = playerProfile.name,
-                selectedLanguage = selectedLanguage,
                 onSave = { name ->
                     val saved = onPlayerNameChange(name)
                     if (saved) showPlayerNameDialog = false
@@ -263,7 +264,7 @@ private fun HomeHeader(
         Text(
             text = stringResource(R.string.game_title),
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.headlineMedium,
+            style = if (isCompactHeight) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
             color = ReflexGamePalette.textPrimary,
             textAlign = TextAlign.Center
         )
@@ -290,7 +291,7 @@ private fun PlayTabContent(
         style = MaterialTheme.typography.bodyMedium,
         color = ReflexGamePalette.textSecondary,
         textAlign = TextAlign.Center,
-        maxLines = 2,
+        maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
     HomeQuickStats(
@@ -395,6 +396,9 @@ private fun LeaderboardTabContent(
     onPeriodSelected: (LeaderboardPeriod) -> Unit,
     onRefreshClick: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        FirebaseGameServices.logEvent(FirebaseEvent.LeaderboardOpen)
+    }
     LeaderboardSection(
         snapshot = leaderboardSnapshot,
         onModeSelected = onModeSelected,
@@ -447,7 +451,7 @@ private fun QuickStatCard(
         border = BorderStroke(1.dp, accent.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
@@ -461,7 +465,7 @@ private fun QuickStatCard(
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelLarge,
                 color = ReflexGamePalette.textPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -483,7 +487,7 @@ private fun AchievementSummaryCard(
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.3f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -809,7 +813,7 @@ private fun DailyChallengeCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(30.dp)
                     .clip(CircleShape)
                     .background(accent.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center
@@ -823,7 +827,7 @@ private fun DailyChallengeCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.daily_challenge_title),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     color = accent
                 )
                 Text(
@@ -845,7 +849,7 @@ private fun DailyChallengeCard(
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = ReflexGamePalette.textSecondary,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -860,7 +864,7 @@ private fun DailyChallengeCard(
                     } else {
                         stringResource(R.string.daily_challenge_progress, state.progress, state.target)
                     },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = ReflexGamePalette.textPrimary,
                     maxLines = 1,
@@ -936,8 +940,8 @@ private fun DailyStreakMiniCard(
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -946,7 +950,7 @@ private fun DailyStreakMiniCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
                         .background(accent.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center
@@ -1077,7 +1081,7 @@ private fun DailyRewardProgressLine(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         DailyRewardCoinPlan.forEachIndexed { index, coins ->
             val dayNumber = index + 1
@@ -1100,7 +1104,7 @@ private fun DailyRewardProgressLine(
                     } else {
                         stringResource(R.string.daily_reward_day_short, dayNumber)
                     },
-                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 5.dp),
+                    modifier = Modifier.padding(horizontal = 1.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (active) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary,
                     textAlign = TextAlign.Center,
@@ -1427,7 +1431,9 @@ private fun LeaderboardSection(
     modifier: Modifier = Modifier
 ) {
     var isRefreshing by remember { mutableStateOf(false) }
-    var showRefreshMessage by remember(snapshot.refreshedTick) { mutableStateOf(snapshot.refreshedTick > 0) }
+    var showRefreshMessage by remember(snapshot.refreshedTick, snapshot.statusMessageRes) {
+        mutableStateOf(snapshot.statusMessageRes != null)
+    }
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
             delay(450)
@@ -1465,7 +1471,7 @@ private fun LeaderboardSection(
                 border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.4f))
             ) {
                 Text(
-                    text = if (isRefreshing) "…" else "↻",
+                    text = if (isRefreshing || snapshot.isLoading) "…" else "↻",
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                     style = MaterialTheme.typography.titleSmall,
                     color = ReflexGamePalette.textPrimary,
@@ -1481,11 +1487,12 @@ private fun LeaderboardSection(
             selectedMode = snapshot.selectedMode,
             onModeSelected = onModeSelected
         )
-        if (showRefreshMessage) {
+        val statusMessageRes = snapshot.statusMessageRes
+        if (showRefreshMessage && statusMessageRes != null) {
             Text(
-                text = stringResource(R.string.leaderboard_refreshed),
+                text = stringResource(statusMessageRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = ArcadeTeal
+                color = if (snapshot.isOffline) ArcadeGold else ArcadeTeal
             )
         }
         Text(
@@ -1570,7 +1577,7 @@ private fun LeaderboardPeriodSelector(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        LeaderboardPeriod.entries.forEach { period ->
+        listOf(LeaderboardPeriod.AllTime).forEach { period ->
             val selected = period == selectedPeriod
             Surface(
                 modifier = Modifier
@@ -1685,37 +1692,16 @@ private fun WeeklyChallengeCard(
 @Composable
 private fun PlayerNameDialog(
     currentName: String,
-    selectedLanguage: AppLanguage,
     onSave: (String) -> Boolean,
     onDismiss: () -> Unit
 ) {
     var name by remember(currentName) { mutableStateOf(currentName.ifBlank { randomPlayerNameSuggestion() }) }
     var hasError by remember { mutableStateOf(false) }
-    val titleText = if (selectedLanguage == AppLanguage.Turkish) {
-        stringResource(R.string.player_name_dialog_title_tr)
-    } else {
-        stringResource(R.string.player_name_dialog_title)
-    }
-    val descriptionText = if (selectedLanguage == AppLanguage.Turkish) {
-        stringResource(R.string.player_name_dialog_description_tr)
-    } else {
-        stringResource(R.string.player_name_dialog_description)
-    }
-    val hintText = if (selectedLanguage == AppLanguage.Turkish) {
-        stringResource(R.string.player_name_dialog_hint_tr)
-    } else {
-        stringResource(R.string.player_name_dialog_hint)
-    }
-    val saveText = if (selectedLanguage == AppLanguage.Turkish) {
-        stringResource(R.string.player_name_save_tr)
-    } else {
-        stringResource(R.string.player_name_save)
-    }
-    val errorText = if (selectedLanguage == AppLanguage.Turkish) {
-        stringResource(R.string.player_name_error_tr)
-    } else {
-        stringResource(R.string.player_name_error)
-    }
+    val titleText = stringResource(R.string.player_name_dialog_title)
+    val descriptionText = stringResource(R.string.player_name_dialog_description)
+    val hintText = stringResource(R.string.player_name_dialog_hint)
+    val saveText = stringResource(R.string.player_name_save)
+    val errorText = stringResource(R.string.player_name_error)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2323,10 +2309,10 @@ internal fun modeIcon(mode: GameMode): String {
 
 @Composable
 private fun GameLogo(isCompactHeight: Boolean) {
-    val containerSize = if (isCompactHeight) 62.dp else 82.dp
-    val iconSize = if (isCompactHeight) 50.dp else 66.dp
-    val badgeOffsetX = if (isCompactHeight) 20.dp else 28.dp
-    val badgeOffsetY = if (isCompactHeight) (-18).dp else (-24).dp
+    val containerSize = if (isCompactHeight) 50.dp else 82.dp
+    val iconSize = if (isCompactHeight) 42.dp else 66.dp
+    val badgeOffsetX = if (isCompactHeight) 17.dp else 28.dp
+    val badgeOffsetY = if (isCompactHeight) (-15).dp else (-24).dp
     val badgeSize = if (isCompactHeight) 12.dp else 14.dp
 
     Box(
