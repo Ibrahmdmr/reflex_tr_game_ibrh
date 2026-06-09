@@ -4,6 +4,10 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ads.AdAnalyticsTracker
+import com.reflex.tr.game.ibrh.ads.AdConfig
+import com.reflex.tr.game.ibrh.ads.adParams
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,21 +23,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val INITIAL_LIVES = 3
         private const val INITIAL_TIME_SECONDS = 30
-        private const val REWARD_CONTINUE_TIME_SECONDS = 10
         private const val REWARD_CONTINUE_GRACE_MILLIS = 2_000L
         private const val INITIAL_TARGET_SIZE_DP = 82
         private const val MIN_TARGET_SIZE_DP = 48
         private const val INITIAL_TARGET_VISIBLE_DURATION_MS = 1_800L
         private const val MIN_TARGET_VISIBLE_DURATION_MS = 850L
-        private const val MIN_INTERSTITIAL_AD_GAME_OVER_INTERVAL = 3
-        private const val MAX_INTERSTITIAL_AD_GAME_OVER_INTERVAL = 5
         private const val COLOR_RULE_CHANGE_INTERVAL_MS = 5_000L
         private const val COMBO_WINDOW_MILLIS = 1_250L
-        private const val REASON_TIME_UP = "Süre doldu."
-        private const val REASON_NO_LIVES = "Canların tükendi."
+        private val REASON_TIME_UP = R.string.game_over_reason_time_up
+        private val REASON_NO_LIVES = R.string.game_over_reason_no_lives
     }
 
+    private val adConfig = AdConfig.Default
     private val gamePreferences = GamePreferences(application)
+    private val leaderboardRepository: LeaderboardRepository = LocalLeaderboardRepository()
+    private var selectedLeaderboardMode = GameMode.Classic
+    private var selectedLeaderboardPeriod = LeaderboardPeriod.Weekly
+    private var leaderboardRefreshTick = 0
     private val _uiState = MutableStateFlow(createInitialState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
@@ -47,6 +53,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var nextInterstitialGameCount = randomInterstitialInterval()
     private var nextTargetId = 0L
     private var lastHitElapsedMillis = 0L
+    private var gameStartedElapsedMillis = 0L
+    private var lastInterstitialShownElapsedMillis = 0L
 
     init {
         observeBestScore()
@@ -170,6 +178,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bestScore = _uiState.value.bestScore,
             selectedMode = _uiState.value.selectedMode,
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
+            progressionState = gamePreferences.getProgressionState(),
+            playerProfile = gamePreferences.getPlayerProfile(),
+            leaderboardSnapshot = createLeaderboardSnapshot(
+                profile = gamePreferences.getPlayerProfile(),
+                progression = gamePreferences.getProgressionState(),
+                bestScoresByMode = _uiState.value.bestScoresByMode
+            ),
             isNewBestScore = false
         )
     }
@@ -210,13 +225,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 hasGameStarted = true,
                 lives = 1,
-                timeLeftSeconds = REWARD_CONTINUE_TIME_SECONDS,
+                timeLeftSeconds = adConfig.rewardedContinueSeconds,
                 targetPosition = nextTargets.firstCorrectPosition(),
                 targets = nextTargets,
                 isPaused = false,
                 isResumeGracePeriod = true,
                 isGameOver = false,
                 gameOverReason = null,
+                gameOverReasonRes = null,
                 hasUsedRewardContinue = true,
                 isRewardContinueReady = false,
                 canContinueWithReward = false,
@@ -225,9 +241,169 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         startRewardContinueGracePeriod()
+        AdAnalyticsTracker.track("continue_used", adParams("score" to currentState.score))
     }
 
-    fun onInterstitialAdRequestHandled() {
+    fun onDoubleCoinsRewardEarned() {
+        val state = _uiState.value
+        if (!state.isGameOver || state.isCoinDoubleClaimed || state.baseCoinsThisGame <= 0) return
+
+        val bonusCoins = state.baseCoinsThisGame * (adConfig.doubleCoinMultiplier - 1).coerceAtLeast(1)
+        val updatedProgression = state.progressionState.copy(
+            coins = state.progressionState.coins + bonusCoins
+        )
+        _uiState.update {
+            it.copy(
+                progressionState = updatedProgression,
+                earnedCoinsThisGame = it.earnedCoinsThisGame + bonusCoins,
+                isCoinDoubleClaimed = true,
+                pendingRewardedAction = null
+            )
+        }
+        gamePreferences.saveProgressionState(updatedProgression)
+        AdAnalyticsTracker.track(
+            eventName = "double_coin_used",
+            params = adParams(
+                "base_coins" to state.baseCoinsThisGame,
+                "multiplier" to adConfig.doubleCoinMultiplier,
+                "total_coins" to updatedProgression.coins
+            )
+        )
+    }
+
+    fun claimDailyReward() {
+        val state = _uiState.value
+        val reward = state.progressionState.dailyReward
+        if (!reward.canClaim) return
+
+        val rewardedProgression = applyDailyReward(
+            progression = state.progressionState
+        )
+        _uiState.update { it.copy(progressionState = rewardedProgression) }
+        gamePreferences.saveProgressionState(rewardedProgression)
+        gamePreferences.saveDailyRewardClaim(streakDay = rewardedProgression.dailyReward.streakDay)
+    }
+
+    fun protectDailyRewardStreak() {
+        val state = _uiState.value
+        val reward = state.progressionState.dailyReward
+        if (!reward.canProtectStreak) return
+
+        gamePreferences.protectDailyRewardStreak()
+        val refreshedProgression = gamePreferences.getProgressionState()
+        _uiState.update {
+            it.copy(
+                progressionState = it.progressionState.copy(
+                    dailyReward = refreshedProgression.dailyReward
+                )
+            )
+        }
+    }
+
+    fun updatePlayerName(name: String): Boolean {
+        val sanitizedName = sanitizePlayerName(name) ?: return false
+        gamePreferences.savePlayerName(sanitizedName)
+        refreshProfileAndLeaderboard()
+        return true
+    }
+
+    fun selectPlayerTitle(title: PlayerTitle) {
+        gamePreferences.savePlayerTitle(title)
+        refreshProfileAndLeaderboard()
+    }
+
+    fun selectLeaderboardMode(mode: GameMode) {
+        selectedLeaderboardMode = mode
+        refreshProfileAndLeaderboard()
+    }
+
+    fun selectLeaderboardPeriod(period: LeaderboardPeriod) {
+        selectedLeaderboardPeriod = period
+        refreshProfileAndLeaderboard()
+    }
+
+    fun refreshLeaderboard() {
+        leaderboardRefreshTick += 1
+        refreshProfileAndLeaderboard()
+    }
+
+    fun claimAchievementReward(achievementId: String) {
+        val state = _uiState.value
+        val achievement = state.progressionState.achievements.firstOrNull { it.id == achievementId }
+        if (achievement == null || !achievement.unlocked || achievement.claimed) return
+
+        val updatedAchievements = state.progressionState.achievements.map {
+            if (it.id == achievementId) it.copy(claimed = true) else it
+        }
+        val updatedXp = state.progressionState.xp + achievement.rewardXp
+        val updatedProgression = state.progressionState.copy(
+            coins = state.progressionState.coins + achievement.rewardCoins,
+            xp = updatedXp,
+            level = calculateLevel(updatedXp),
+            achievements = updatedAchievements,
+            lastLevelUp = calculateLevel(updatedXp).takeIf { it > state.progressionState.level },
+            latestUnlockedAchievementIds = emptyList()
+        )
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
+    fun buyTheme(theme: PlayerTheme) {
+        val state = _uiState.value
+        val progression = state.progressionState
+        if (theme in progression.unlockedThemes || progression.coins < theme.coinPrice) return
+
+        val updatedProgression = progression.copy(
+            coins = progression.coins - theme.coinPrice,
+            selectedTheme = theme,
+            unlockedThemes = progression.unlockedThemes + theme
+        )
+        _uiState.update {
+            it.copy(
+                progressionState = updatedProgression,
+                leaderboardSnapshot = createLeaderboardSnapshot(
+                    profile = it.playerProfile,
+                    progression = updatedProgression,
+                    bestScoresByMode = it.bestScoresByMode
+                )
+            )
+        }
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
+    fun tryThemeForOneGame(theme: PlayerTheme) {
+        val state = _uiState.value
+        if (theme in state.progressionState.unlockedThemes) return
+
+        val updatedProgression = state.progressionState.copy(
+            trialTheme = theme,
+            trialGamesRemaining = 1
+        )
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+    }
+
+    fun selectTheme(theme: PlayerTheme) {
+        val state = _uiState.value
+        if (theme !in state.progressionState.unlockedThemes) return
+
+        val updatedProgression = state.progressionState.copy(selectedTheme = theme)
+        _uiState.update {
+            it.copy(
+                progressionState = updatedProgression,
+                leaderboardSnapshot = createLeaderboardSnapshot(
+                    profile = it.playerProfile,
+                    progression = updatedProgression,
+                    bestScoresByMode = it.bestScoresByMode
+                )
+            )
+        }
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
+    fun onInterstitialAdRequestHandled(wasShown: Boolean) {
+        if (wasShown) {
+            lastInterstitialShownElapsedMillis = SystemClock.elapsedRealtime()
+        }
         _uiState.update { it.copy(shouldRequestInterstitialAd = false) }
     }
 
@@ -242,10 +418,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             mode = mode,
             bestScores = _uiState.value.bestScoresByMode
         )
+        val currentProgression = gamePreferences.getProgressionState().copy(
+            trialTheme = _uiState.value.progressionState.trialTheme,
+            trialGamesRemaining = _uiState.value.progressionState.trialGamesRemaining
+        )
         lastHitElapsedMillis = 0L
+        gameStartedElapsedMillis = SystemClock.elapsedRealtime()
         _uiState.value = initialState.copy(
             bestScore = _uiState.value.bestScore,
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
+            progressionState = currentProgression,
+            earnedCoinsThisGame = 0,
+            baseCoinsThisGame = 0,
+            isCoinDoubleClaimed = false,
             hasGameStarted = true,
             isNewBestScore = false
         )
@@ -258,9 +443,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             gamePreferences.bestScoresFlow.collect { bestScores ->
                 _uiState.update {
+                    val profile = gamePreferences.getPlayerProfile()
                     it.copy(
                         bestScoresByMode = bestScores,
-                        bestScore = bestScores[it.selectedMode] ?: 0
+                        bestScore = bestScores[it.selectedMode] ?: 0,
+                        playerProfile = profile,
+                        leaderboardSnapshot = createLeaderboardSnapshot(
+                            profile = profile,
+                            progression = it.progressionState,
+                            bestScoresByMode = bestScores
+                        )
                     )
                 }
             }
@@ -289,7 +481,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (newTime <= 0) {
                     finishGame(
                         timeLeftSeconds = 0,
-                        reason = REASON_TIME_UP
+                        reasonRes = REASON_TIME_UP
                     )
                     break
                 } else {
@@ -317,7 +509,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         finishGame(
             lives = 0,
-            reason = REASON_NO_LIVES
+            reasonRes = REASON_NO_LIVES
         )
     }
 
@@ -376,7 +568,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun finishGame(
         lives: Int = _uiState.value.lives,
         timeLeftSeconds: Int = _uiState.value.timeLeftSeconds,
-        reason: String? = _uiState.value.gameOverReason
+        reason: String? = _uiState.value.gameOverReason,
+        reasonRes: Int? = _uiState.value.gameOverReasonRes
     ) {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
@@ -385,7 +578,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         colorRuleJob?.cancel()
         comboResetJob?.cancel()
         completedGameCount += 1
-        val shouldRequestInterstitialAd = completedGameCount >= nextInterstitialGameCount
+        val gameDurationMillis = (SystemClock.elapsedRealtime() - gameStartedElapsedMillis).coerceAtLeast(0L)
+        val shouldRequestInterstitialAd = shouldRequestInterstitialAfterGame(
+            score = _uiState.value.score,
+            bestScore = _uiState.value.bestScore,
+            isNewBestScore = _uiState.value.isNewBestScore,
+            gameDurationMillis = gameDurationMillis
+        )
         if (shouldRequestInterstitialAd) {
             nextInterstitialGameCount = completedGameCount + randomInterstitialInterval()
         }
@@ -393,12 +592,50 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val finalState = _uiState.updateAndGet {
             val currentModeBest = it.bestScoresByMode[it.selectedMode] ?: 0
             val isNewModeBest = it.score > currentModeBest
+            val earnedCoins = calculateEarnedCoins(
+                score = it.score,
+                maxCombo = it.maxCombo,
+                isNewBestScore = isNewModeBest
+            )
+            val progressionFromStorage = gamePreferences.getProgressionState()
+            val updatedProgression = updateProgressionAfterGame(
+                progression = it.progressionState.copy(
+                    dailyReward = progressionFromStorage.dailyReward,
+                    achievements = progressionFromStorage.achievements,
+                    weeklyChallenge = progressionFromStorage.weeklyChallenge
+                ),
+                mode = it.selectedMode,
+                score = it.score,
+                hits = it.successfulHits,
+                maxCombo = it.maxCombo,
+                earnedCoins = earnedCoins,
+                isNewBestScore = isNewModeBest
+            )
+            val trialAwareProgression = if (updatedProgression.trialGamesRemaining > 0) {
+                val remaining = updatedProgression.trialGamesRemaining - 1
+                updatedProgression.copy(
+                    trialGamesRemaining = remaining,
+                    trialTheme = updatedProgression.trialTheme.takeIf { remaining > 0 }
+                )
+            } else {
+                updatedProgression
+            }
             val updatedBestScores = if (isNewModeBest) {
                 it.bestScoresByMode + (it.selectedMode to it.score)
             } else {
                 it.bestScoresByMode
             }
             val updatedDailyChallenge = advanceDailyChallengeForGameCompleted(it.dailyChallengeState)
+            val updatedProfile = it.playerProfile.copy(
+                weeklyBestScore = maxOf(it.playerProfile.weeklyBestScore, it.score),
+                weeklyBestScoresByMode = it.playerProfile.weeklyBestScoresByMode +
+                    (it.selectedMode to maxOf(it.playerProfile.weeklyBestScoresByMode[it.selectedMode] ?: 0, it.score))
+            )
+            val updatedLeaderboard = createLeaderboardSnapshot(
+                profile = updatedProfile,
+                progression = trialAwareProgression,
+                bestScoresByMode = updatedBestScores
+            )
             it.copy(
                 lives = lives,
                 timeLeftSeconds = timeLeftSeconds,
@@ -408,9 +645,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 isResumeGracePeriod = false,
                 isGameOver = true,
                 gameOverReason = reason,
+                gameOverReasonRes = reasonRes,
                 bestScore = maxOf(currentModeBest, it.score),
                 bestScoresByMode = updatedBestScores,
                 isNewBestScore = it.isNewBestScore || isNewModeBest,
+                progressionState = trialAwareProgression,
+                playerProfile = updatedProfile,
+                leaderboardSnapshot = updatedLeaderboard,
+                baseCoinsThisGame = earnedCoins,
+                earnedCoinsThisGame = earnedCoins,
+                isCoinDoubleClaimed = false,
                 canContinueWithReward = !it.hasUsedRewardContinue,
                 isRewardContinueReady = false,
                 shouldRequestInterstitialAd = shouldRequestInterstitialAd
@@ -420,7 +664,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             gamePreferences.saveBestScore(finalState.selectedMode, finalState.score)
         }
+        gamePreferences.saveWeeklyBestScore(finalState.selectedMode, finalState.score)
         gamePreferences.saveDailyChallengeState(finalState.dailyChallengeState)
+        gamePreferences.saveProgressionState(finalState.progressionState)
     }
 
     private fun createInitialState(
@@ -437,6 +683,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             score = 0,
             activeColor = activeColor
         )
+        val progression = gamePreferences.getProgressionState()
+        val playerProfile = gamePreferences.getPlayerProfile()
         return GameUiState(
             lives = INITIAL_LIVES,
             timeLeftSeconds = INITIAL_TIME_SECONDS,
@@ -449,7 +697,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bestScoresByMode = bestScores,
             targets = targets,
             activeColor = activeColor,
-            dailyChallengeState = gamePreferences.getDailyChallengeState()
+            dailyChallengeState = gamePreferences.getDailyChallengeState(),
+            progressionState = progression,
+            playerProfile = playerProfile,
+            leaderboardSnapshot = createLeaderboardSnapshot(
+                profile = playerProfile,
+                progression = progression,
+                bestScoresByMode = bestScores
+            )
         )
     }
 
@@ -616,6 +871,193 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun calculateEarnedCoins(
+        score: Int,
+        maxCombo: Int,
+        isNewBestScore: Boolean
+    ): Int {
+        val scoreCoins = score * 4
+        val comboBonus = when {
+            maxCombo >= 20 -> 80
+            maxCombo >= 10 -> 45
+            maxCombo >= 5 -> 25
+            maxCombo >= 2 -> 10
+            else -> 0
+        }
+        val recordBonus = if (isNewBestScore) 60 else 0
+        return (scoreCoins + comboBonus + recordBonus).coerceAtLeast(if (score > 0) 8 else 0)
+    }
+
+    private fun calculateEarnedXp(
+        score: Int,
+        hits: Int,
+        maxCombo: Int,
+        isNewBestScore: Boolean
+    ): Int {
+        val comboXp = when {
+            maxCombo >= 10 -> 45
+            maxCombo >= 5 -> 25
+            else -> 0
+        }
+        return 20 + (score * 3) + hits + comboXp + if (isNewBestScore) 60 else 0
+    }
+
+    private fun updateProgressionAfterGame(
+        progression: ProgressionState,
+        mode: GameMode,
+        score: Int,
+        hits: Int,
+        maxCombo: Int,
+        earnedCoins: Int,
+        isNewBestScore: Boolean
+    ): ProgressionState {
+        val previousAchievements = progression.achievements
+        val nextXp = progression.xp + calculateEarnedXp(score, hits, maxCombo, isNewBestScore)
+        val nextTotalGames = progression.totalGames + 1
+        val nextTotalHits = progression.totalHits + hits
+        val nextMaxCombo = maxOf(progression.lifetimeMaxCombo, maxCombo)
+        val updatedAchievements = previousAchievements.map { achievement ->
+            val nextProgress = when (achievement.type) {
+                AchievementType.PlayGames -> nextTotalGames
+                AchievementType.ScoreInSingleGame -> maxOf(achievement.progress, score)
+                AchievementType.HitTargets -> nextTotalHits
+                AchievementType.ReachCombo -> nextMaxCombo
+                AchievementType.FakeTargetScore -> if (mode == GameMode.FakeTarget) {
+                    maxOf(achievement.progress, score)
+                } else {
+                    achievement.progress
+                }
+                AchievementType.ColorReflexScore -> if (mode == GameMode.ColorReflex) {
+                    maxOf(achievement.progress, score)
+                } else {
+                    achievement.progress
+                }
+                AchievementType.BreakRecord -> if (isNewBestScore) 1 else achievement.progress
+            }.coerceAtMost(achievement.target)
+            achievement.copy(
+                progress = nextProgress,
+                unlocked = nextProgress >= achievement.target
+            )
+        }
+        val newlyUnlocked = updatedAchievements.filter { updated ->
+            updated.unlocked && previousAchievements.none { it.id == updated.id && it.unlocked }
+        }.map { it.id }
+        val nextLevel = calculateLevel(nextXp)
+        val weeklyProgress = (progression.weeklyChallenge.progress + score)
+            .coerceAtMost(progression.weeklyChallenge.target)
+        val weeklyChallenge = progression.weeklyChallenge.copy(
+            progress = weeklyProgress,
+            completed = weeklyProgress >= progression.weeklyChallenge.target
+        )
+
+        return progression.copy(
+            coins = progression.coins + earnedCoins,
+            xp = nextXp,
+            level = nextLevel,
+            totalGames = nextTotalGames,
+            totalHits = nextTotalHits,
+            lifetimeMaxCombo = nextMaxCombo,
+            achievements = updatedAchievements,
+            weeklyChallenge = weeklyChallenge,
+            latestUnlockedAchievementIds = newlyUnlocked,
+            lastLevelUp = nextLevel.takeIf { it > progression.level }
+        )
+    }
+
+    private fun calculateLevel(xp: Int): Int {
+        return (xp / 250 + 1).coerceAtLeast(1)
+    }
+
+    private fun refreshProfileAndLeaderboard() {
+        val profile = gamePreferences.getPlayerProfile()
+        _uiState.update {
+            it.copy(
+                playerProfile = profile,
+                leaderboardSnapshot = createLeaderboardSnapshot(
+                    profile = profile,
+                    progression = it.progressionState,
+                    bestScoresByMode = it.bestScoresByMode
+                )
+            )
+        }
+    }
+
+    private fun createLeaderboardSnapshot(
+        profile: PlayerProfile,
+        progression: ProgressionState,
+        bestScoresByMode: Map<GameMode, Int>
+    ): LeaderboardSnapshot {
+        val mode = selectedLeaderboardMode
+        val leaderboardScore = when (selectedLeaderboardPeriod) {
+            LeaderboardPeriod.Weekly -> profile.weeklyBestScoresByMode[mode] ?: 0
+            LeaderboardPeriod.AllTime -> bestScoresByMode[mode] ?: 0
+        }
+        return leaderboardRepository.getWeeklyLeaderboard(
+            playerName = profile.name,
+            playerScore = leaderboardScore,
+            playerTheme = progression.activeTheme,
+            playerRankTier = rankFor(score = leaderboardScore, level = progression.level),
+            selectedMode = mode,
+            selectedPeriod = selectedLeaderboardPeriod,
+            refreshTick = leaderboardRefreshTick
+        )
+    }
+
+    private fun sanitizePlayerName(name: String): String? {
+        val cleanedName = name.trim().take(12)
+        if (cleanedName.isBlank()) return null
+
+        val loweredName = cleanedName.lowercase()
+        val blockedTerms = listOf("amk", "aq", "oros", "sik", "fuck", "shit")
+        if (blockedTerms.any { loweredName.contains(it) }) return null
+
+        return cleanedName
+    }
+
+    private fun shouldRequestInterstitialAfterGame(
+        score: Int,
+        bestScore: Int,
+        isNewBestScore: Boolean,
+        gameDurationMillis: Long
+    ): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val cooldownPassed = lastInterstitialShownElapsedMillis == 0L ||
+            now - lastInterstitialShownElapsedMillis >= adConfig.interstitialCooldownMillis
+        val isShortGame = gameDurationMillis < adConfig.shortGameThresholdMillis ||
+            score <= adConfig.shortGameScoreThreshold
+        val isHighValueRun = isNewBestScore ||
+            (bestScore > 0 && score >= (bestScore * adConfig.highScoreDelayRatio).toInt())
+
+        return completedGameCount > adConfig.firstInterstitialFreeGames &&
+            completedGameCount >= nextInterstitialGameCount &&
+            cooldownPassed &&
+            !isShortGame &&
+            !isHighValueRun
+    }
+
+    private fun applyDailyReward(
+        progression: ProgressionState
+    ): ProgressionState {
+        val reward = progression.dailyReward
+        if (reward.claimedToday) return progression
+        val nextStreakDay = reward.streakDay + 1
+        val nextDayInCycle = ((nextStreakDay - 1) % DailyRewardCoinPlan.size) + 1
+
+        return progression.copy(
+            coins = progression.coins + reward.rewardCoins,
+            xp = progression.xp + if (reward.isSuperReward) 75 else 25,
+            level = calculateLevel(progression.xp + if (reward.isSuperReward) 75 else 25),
+            dailyReward = reward.copy(
+                canClaim = false,
+                claimedToday = true,
+                canProtectStreak = false,
+                isStreakAtRisk = false,
+                nextRewardCoins = DailyRewardCoinPlan[nextDayInCycle - 1],
+                loyalBadgeUnlocked = reward.loyalBadgeUnlocked || reward.streakDay >= 30
+            )
+        )
+    }
+
     private fun moveTargets() {
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
@@ -760,8 +1202,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun randomInterstitialInterval(): Int {
         return Random.nextInt(
-            from = MIN_INTERSTITIAL_AD_GAME_OVER_INTERVAL,
-            until = MAX_INTERSTITIAL_AD_GAME_OVER_INTERVAL + 1
+            from = adConfig.interstitialMinGameInterval,
+            until = adConfig.interstitialMaxGameInterval + 1
         )
     }
 

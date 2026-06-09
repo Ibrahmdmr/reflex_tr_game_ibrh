@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.components.GamePanelCard
@@ -50,6 +51,10 @@ fun GameOverOverlay(
     maxCombo: Int,
     accuracyPercent: Int,
     reason: String?,
+    earnedCoins: Int,
+    baseCoins: Int,
+    totalCoins: Int,
+    isCoinDoubleClaimed: Boolean,
     showContinueButton: Boolean,
     continueButtonText: String,
     continueHelperText: String?,
@@ -57,7 +62,12 @@ fun GameOverOverlay(
     isContinueLoading: Boolean,
     onHomeClick: () -> Unit,
     onChangeModeClick: () -> Unit,
+    onOpenThemeStoreClick: () -> Unit,
+    isDoubleCoinsEnabled: Boolean,
+    isDoubleCoinsLoading: Boolean,
+    doubleCoinsText: String,
     onContinueClick: () -> Unit,
+    onDoubleCoinsClick: () -> Unit,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -104,16 +114,26 @@ fun GameOverOverlay(
                 }
 
                 Text(
-                    text = stringResource(R.string.game_over_title),
+                    text = gameOverHeadline(
+                        score = score,
+                        bestScore = bestScore,
+                        isNewBestScore = isNewBestScore,
+                        showContinueButton = showContinueButton
+                    ),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = ReflexGamePalette.textPrimary
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Text(
                     text = stringResource(mode.titleRes),
                     style = MaterialTheme.typography.titleSmall,
                     color = ArcadeGold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 if (isNewBestScore) {
@@ -128,9 +148,11 @@ fun GameOverOverlay(
                         Text(
                             text = stringResource(R.string.new_record),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = ReflexGamePalette.textPrimary
-                        )
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     }
                 }
 
@@ -139,7 +161,9 @@ fun GameOverOverlay(
                         text = reason,
                         style = MaterialTheme.typography.bodyLarge,
                         color = ReflexGamePalette.textSecondary,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -203,6 +227,20 @@ fun GameOverOverlay(
                     }
                 }
 
+                CoinEarnedCard(
+                    earnedCoins = earnedCoins,
+                    baseCoins = baseCoins,
+                    totalCoins = totalCoins,
+                    isCoinDoubleClaimed = isCoinDoubleClaimed
+                )
+
+                SecondaryGameButton(
+                    text = doubleCoinsText,
+                    enabled = isDoubleCoinsEnabled,
+                    isLoading = isDoubleCoinsLoading && !isDoubleCoinsEnabled,
+                    onClick = onDoubleCoinsClick
+                )
+
                 PrimaryGameButton(
                     text = stringResource(R.string.retry_game),
                     onClick = onRetryClick
@@ -213,7 +251,12 @@ fun GameOverOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp)
                 ) {
-                    Text(text = stringResource(R.string.back_to_home))
+                    Text(
+                        text = stringResource(R.string.back_to_home),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
                 }
 
                 OutlinedButton(
@@ -221,8 +264,100 @@ fun GameOverOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp)
                 ) {
-                    Text(text = stringResource(R.string.change_mode))
+                    Text(
+                        text = stringResource(R.string.change_mode),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
                 }
+
+                OutlinedButton(
+                    onClick = onOpenThemeStoreClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.theme_shop_title),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun gameOverHeadline(
+    score: Int,
+    bestScore: Int,
+    isNewBestScore: Boolean,
+    showContinueButton: Boolean
+): String {
+    return when {
+        isNewBestScore -> stringResource(R.string.game_over_title)
+        showContinueButton && bestScore > 0 && score >= (bestScore - 3).coerceAtLeast(0) ->
+            stringResource(R.string.continue_almost_record_title)
+        showContinueButton -> stringResource(R.string.continue_offer_title)
+        else -> stringResource(R.string.game_over_title)
+    }
+}
+
+@Composable
+private fun CoinEarnedCard(
+    earnedCoins: Int,
+    baseCoins: Int,
+    totalCoins: Int,
+    isCoinDoubleClaimed: Boolean
+) {
+    val coinScale by animateFloatAsState(
+        targetValue = if (earnedCoins > baseCoins || isCoinDoubleClaimed) 1.05f else 1f,
+        animationSpec = tween(durationMillis = 260),
+        label = "coin_earned_scale"
+    )
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = coinScale
+                scaleY = coinScale
+            },
+        shape = RoundedCornerShape(22.dp),
+        color = ArcadeGold.copy(alpha = 0.14f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeGold.copy(alpha = 0.24f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "◉", color = ArcadeGold, style = MaterialTheme.typography.titleLarge)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.coins_earned_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ArcadeGold
+                )
+                Text(
+                    text = stringResource(R.string.coins_earned_value, earnedCoins),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = ReflexGamePalette.textPrimary
+                )
+                Text(
+                    text = stringResource(R.string.coin_wallet_value, totalCoins),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary
+                )
             }
         }
     }

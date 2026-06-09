@@ -32,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.ads.MobileAds
 import com.reflex.tr.game.ibrh.ads.AdMobManager
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
+import com.reflex.tr.game.ibrh.ui.game.RewardedAction
 import com.reflex.tr.game.ibrh.ui.game.AppLanguage
 import com.reflex.tr.game.ibrh.ui.game.GamePreferences
 import com.reflex.tr.game.ibrh.ui.game.GameScreen
@@ -77,9 +78,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     AppRoot(
                         rewardedAdUiState = rewardedAdUiState,
-                        onRewardedContinueRequested = { onRewardEarned ->
-                            logDebug("Continue button pressed")
+                        onRewardedAdRequested = { action, onRewardEarned ->
+                            logDebug("Rewarded button pressed: $action")
                             adMobManager.showRewardedAd(
+                                placement = action.analyticsName,
                                 onRewardEarned = {
                                     logDebug("Reward earned callback triggered")
                                     onRewardEarned()
@@ -117,10 +119,10 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(
     modifier: Modifier = Modifier,
     rewardedAdUiState: RewardedAdUiState = RewardedAdUiState(),
-    onRewardedContinueRequested: (onRewardEarned: () -> Unit) -> Unit = { onRewardEarned ->
+    onRewardedAdRequested: (RewardedAction, onRewardEarned: () -> Unit) -> Unit = { _, onRewardEarned ->
         onRewardEarned()
     },
-    onInterstitialAdRequested: () -> Unit = {}
+    onInterstitialAdRequested: () -> Boolean = { false }
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -161,7 +163,7 @@ fun AppRoot(
                                 gamePreferences.saveSoundEnabled(enabled)
                             }
                         },
-                        onRewardedContinueRequested = onRewardedContinueRequested,
+                        onRewardedAdRequested = onRewardedAdRequested,
                         onInterstitialAdRequested = onInterstitialAdRequested,
                         onHowToPlayClick = {
                             navController.navigate(HowToPlayRoute)
@@ -179,6 +181,14 @@ fun AppRoot(
         }
     }
 }
+
+private val RewardedAction.analyticsName: String
+    get() = when (this) {
+        RewardedAction.Continue -> "continue"
+        RewardedAction.DoubleCoins -> "double_coin"
+        RewardedAction.UnlockTheme -> "theme_unlock"
+        RewardedAction.ProtectStreak -> "protect_streak"
+    }
 
 private fun Context.createLocalizedContext(language: AppLanguage): Context {
     val locale = Locale.forLanguageTag(language.code)
@@ -205,12 +215,24 @@ fun AppRootPreview() {
                 onHowToPlayClick = {},
                 onLanguageSelected = {},
                 onSoundEnabledChange = {},
+                onDailyRewardClaim = {},
+                onDailyStreakProtect = {},
+                onAchievementClaim = {},
+                onThemeSelect = {},
+                onThemeBuy = {},
+                onThemeTrial = {},
+                onPlayerNameChange = { true },
+                onPlayerTitleSelect = {},
+                onLeaderboardModeSelected = {},
+                onLeaderboardPeriodSelected = {},
+                onLeaderboardRefresh = {},
                 onHomeClick = {},
                 onPauseGame = {},
                 onResumeGame = {},
                 onTargetTap = {},
                 onMissTap = {},
                 onContinueClick = {},
+                onDoubleCoinsClick = {},
                 onRetryClick = {}
             )
         }

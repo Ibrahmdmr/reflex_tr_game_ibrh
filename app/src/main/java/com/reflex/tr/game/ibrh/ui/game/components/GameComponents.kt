@@ -3,6 +3,10 @@ package com.reflex.tr.game.ibrh.ui.game.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,13 +45,18 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberAnimatedPressScale
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCard
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
 @Composable
@@ -118,12 +129,16 @@ fun GameStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
-                color = ReflexGamePalette.textPrimary
+                color = ReflexGamePalette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -172,7 +187,9 @@ fun LivesStatCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -205,25 +222,67 @@ private fun StatCardAccent(accentColor: Color) {
 fun PrimaryGameButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 56.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scale = rememberAnimatedPressScale(interactionSource)
+    val pulse by rememberInfiniteTransition(label = "primary_button_pulse").animateFloat(
+        initialValue = 0.86f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "primary_button_pulse_value"
+    )
 
     Button(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .scale(scale),
+            .height(height)
+            .scale(scale)
+            .graphicsLayer {
+                shadowElevation = 16f + pulse * 18f
+            },
         interactionSource = interactionSource,
         shape = RoundedCornerShape(18.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onPrimary
         )
     ) {
-        Text(text = text, style = MaterialTheme.typography.titleMedium)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            ArcadeBlue.copy(alpha = 0.92f),
+                            ReflexGamePalette.neonPurple.copy(alpha = 0.95f),
+                            ArcadeGold.copy(alpha = 0.82f + pulse * 0.12f)
+                        )
+                    ),
+                    RoundedCornerShape(16.dp)
+                )
+                .border(
+                    1.dp,
+                    Color.White.copy(alpha = 0.28f + pulse * 0.18f),
+                    RoundedCornerShape(16.dp)
+                )
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -265,7 +324,13 @@ fun SecondaryGameButton(
                     color = if (enabled) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary
                 )
             }
-            Text(text = text, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -335,12 +400,18 @@ fun ScoreHighlightCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
-                color = ReflexGamePalette.textPrimary
+                color = ReflexGamePalette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
             )
         }
     }

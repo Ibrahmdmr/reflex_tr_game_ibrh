@@ -45,8 +45,10 @@ import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.ui.game.GameSoundController
 import com.reflex.tr.game.ibrh.ui.game.GameSoundEffect
 import com.reflex.tr.game.ibrh.ui.game.GameTargetRole
+import com.reflex.tr.game.ibrh.ui.game.PlayerTheme
 import com.reflex.tr.game.ibrh.ui.game.ReflexTargetColor
 import com.reflex.tr.game.ibrh.ui.game.TargetPosition
+import com.reflex.tr.game.ibrh.ui.game.themeVisualSpec
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
@@ -63,6 +65,7 @@ fun TargetMarker(
     role: GameTargetRole = GameTargetRole.Correct,
     spawnKey: Any = Unit,
     comboLevel: Int = 0,
+    theme: PlayerTheme = PlayerTheme.NeonRed,
     onTap: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -101,10 +104,12 @@ fun TargetMarker(
         spawnScale.animateTo(1f, tween(90, easing = FastOutSlowInEasing))
     }
     val baseColor = targetColor.toComposeColor()
+    val themeGlowColor = themeVisualSpec(theme).primary
     val ringAlpha = if (role == GameTargetRole.Correct) 0.78f else 0.52f
     val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.82f
     val borderAlpha = if (role == GameTargetRole.Correct) 0.82f else 0.38f
     val comboBoost = (comboLevel / 5f).coerceIn(0f, 1f)
+    val highComboBoost = (comboLevel / 20f).coerceIn(0f, 1f)
 
     Box(
         modifier = modifier
@@ -130,27 +135,36 @@ fun TargetMarker(
     ) {
         Box(
             modifier = Modifier
-                .size(88.dp)
-                .scale(pulseScale * 1.02f)
-                .alpha((glowAlpha + comboBoost * 0.18f).coerceAtMost(0.55f))
+                .size(96.dp + (highComboBoost * 18).dp)
+                .scale(pulseScale * (1.02f + highComboBoost * 0.05f))
+                .alpha((glowAlpha + comboBoost * 0.22f + highComboBoost * 0.18f).coerceAtMost(0.72f))
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
                             baseColor.copy(alpha = ringAlpha),
-                            baseColor.copy(alpha = 0.22f),
+                            themeGlowColor.copy(alpha = 0.34f + highComboBoost * 0.18f),
                             Color.Transparent
                         )
                     )
                 )
         )
+        if (comboLevel >= 10) {
+            Box(
+                modifier = Modifier
+                    .size(112.dp + (highComboBoost * 24).dp)
+                    .scale(1.08f + highComboBoost * 0.08f)
+                    .alpha(0.18f + highComboBoost * 0.18f)
+                    .border(2.dp, themeGlowColor.copy(alpha = 0.78f), CircleShape)
+            )
+        }
         Box(
             modifier = Modifier
                 .size(82.dp)
                 .scale(pulseScale)
-                .shadow(20.dp + (comboBoost * 8).dp, CircleShape, clip = false)
+                .shadow(20.dp + (comboBoost * 14).dp + (highComboBoost * 18).dp, CircleShape, clip = false)
                 .clip(CircleShape)
-                .background(baseColor.copy(alpha = 0.38f + comboBoost * 0.1f))
+                .background(themeGlowColor.copy(alpha = 0.28f + comboBoost * 0.14f + highComboBoost * 0.12f))
         )
         Box(
             modifier = Modifier

@@ -3,7 +3,12 @@ package com.reflex.tr.game.ibrh.ui.game
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
@@ -64,6 +71,8 @@ fun GamePlayContent(
     val missTapInteractionSource = remember { MutableInteractionSource() }
     val shakeTranslationX = rememberShakeTranslationX(trigger = missFeedbackTrigger)
     val targetSize = uiState.targetSizeDp.dp
+    val themeSpec = themeVisualSpec(uiState.progressionState.activeTheme)
+    val comboTier = comboTierFor(uiState.combo)
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -116,12 +125,16 @@ fun GamePlayContent(
                         Text(
                             text = stringResource(uiState.selectedMode.arenaTitleRes),
                             style = MaterialTheme.typography.titleMedium,
-                            color = ReflexGamePalette.textPrimary
+                            color = ReflexGamePalette.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = playAreaSubtitle(uiState),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = ReflexGamePalette.textSecondary
+                            color = ReflexGamePalette.textSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     BestScoreBadge(bestScore = uiState.bestScore)
@@ -138,20 +151,10 @@ fun GamePlayContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    ReflexGamePalette.cardGlassStrong,
-                                    Color(0xFF0B1432),
-                                    Color(0xFF27155D)
-                                )
-                            ),
-                            shape = RoundedCornerShape(28.dp)
-                        )
                         .border(
                             width = 1.dp,
-                            color = ReflexGamePalette.neonBlue.copy(
-                                alpha = 0.2f + (uiState.combo / 10f).coerceIn(0f, 0.22f)
+                            color = themeSpec.primary.copy(
+                                alpha = 0.24f + comboTier.glowBoost * 0.38f
                             ),
                             shape = RoundedCornerShape(28.dp)
                         )
@@ -165,7 +168,12 @@ fun GamePlayContent(
                             translationX = shakeTranslationX
                         }
                 ) {
+                    AnimatedArenaBackground(
+                        theme = uiState.progressionState.activeTheme,
+                        combo = uiState.combo
+                    )
                     MissFeedbackEffect(trigger = missFeedbackTrigger)
+                    ComboEnergyOverlay(combo = uiState.combo)
 
                     Box(
                         modifier = Modifier
@@ -200,6 +208,7 @@ fun GamePlayContent(
                                 role = target.role,
                                 spawnKey = target.id,
                                 comboLevel = uiState.combo,
+                                theme = uiState.progressionState.activeTheme,
                                 onTap = { onTargetTap(target.id) }
                             )
                         }
@@ -220,6 +229,108 @@ fun GamePlayContent(
             }
         }
     }
+}
+
+private data class ComboTier(
+    @StringRes val labelRes: Int?,
+    val glowBoost: Float,
+    val scoreScale: Float
+)
+
+private fun comboTierFor(combo: Int): ComboTier {
+    return when {
+        combo >= 20 -> ComboTier(R.string.combo_tier_ultra, 1f, 1.42f)
+        combo >= 15 -> ComboTier(R.string.combo_tier_energy, 0.82f, 1.32f)
+        combo >= 10 -> ComboTier(R.string.combo_tier_explosion, 0.68f, 1.24f)
+        combo >= 5 -> ComboTier(R.string.combo_tier_pulse, 0.42f, 1.14f)
+        combo >= 3 -> ComboTier(R.string.combo_tier_glow, 0.24f, 1.06f)
+        else -> ComboTier(null, 0f, 1f)
+    }
+}
+
+@Composable
+private fun AnimatedArenaBackground(
+    theme: PlayerTheme,
+    combo: Int
+) {
+    val spec = themeVisualSpec(theme)
+    val transition = rememberInfiniteTransition(label = "arena_background")
+    val drift by transition.animateFloat(
+        initialValue = -0.12f,
+        targetValue = 0.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "arena_drift"
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.42f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "arena_pulse"
+    )
+    val comboBoost = (combo / 20f).coerceIn(0f, 1f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        spec.backgroundTop,
+                        spec.primary.copy(alpha = 0.22f + comboBoost * 0.18f),
+                        spec.backgroundBottom
+                    ),
+                    start = androidx.compose.ui.geometry.Offset(0f, 800f * drift),
+                    end = androidx.compose.ui.geometry.Offset(900f, 900f * (1f - drift))
+                ),
+                shape = RoundedCornerShape(28.dp)
+            )
+    ) {
+        repeat(10) { index ->
+            val x = ((index * 37) % 100) / 100f
+            val y = ((index * 61) % 100) / 100f
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(
+                        x = (24f + x * 260f + drift * 22f).dp,
+                        y = (18f + y * 420f - drift * 18f).dp
+                    )
+                    .size((5 + index % 5 * 2).dp)
+                    .graphicsLayer {
+                        alpha = 0.16f + pulse * 0.32f + comboBoost * 0.22f
+                        shadowElevation = 18f + comboBoost * 18f
+                    }
+                    .background(spec.secondary.copy(alpha = 0.42f), RoundedCornerShape(999.dp))
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComboEnergyOverlay(combo: Int) {
+    if (combo < 5) return
+
+    val tier = comboTierFor(combo)
+    val alpha = (0.08f + tier.glowBoost * 0.16f).coerceAtMost(0.28f)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        ArcadeGold.copy(alpha = alpha),
+                        ArcadeBlue.copy(alpha = alpha * 0.42f),
+                        Color.Transparent
+                    )
+                )
+            )
+    )
 }
 
 @Composable
@@ -255,6 +366,9 @@ private fun ColorTaskBadge(activeColor: ReflexTargetColor) {
                 modifier = Modifier.padding(start = 10.dp),
                 style = MaterialTheme.typography.titleMedium,
                 color = ReflexGamePalette.textPrimary
+                ,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -271,23 +385,47 @@ private fun ReflexTargetColor.toTaskColor(): Color {
 
 @Composable
 private fun ComboStatusBar(combo: Int) {
+    val tier = comboTierFor(combo)
     val accent = when {
+        combo >= 20 -> Color(0xFFFF4FD8)
         combo >= 10 -> ArcadeGold
         combo >= 5 -> ReflexGamePalette.targetRing
         else -> ArcadeBlue
     }
+    val transition = rememberInfiniteTransition(label = "combo_status_pulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 720, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "combo_status_scale"
+    )
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = accent.copy(alpha = 0.14f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = if (combo >= 5) pulse else 1f
+                scaleY = if (combo >= 5) pulse else 1f
+                shadowElevation = 12f + tier.glowBoost * 22f
+            },
+        color = accent.copy(alpha = 0.14f + tier.glowBoost * 0.12f),
         shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.36f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.36f + tier.glowBoost * 0.34f))
     ) {
         Text(
-            text = stringResource(R.string.combo_value, combo),
+            text = if (tier.labelRes == null) {
+                stringResource(R.string.combo_value, combo)
+            } else {
+                "${stringResource(R.string.combo_value, combo)}  •  ${stringResource(tier.labelRes)}"
+            },
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             style = MaterialTheme.typography.titleSmall,
             color = ReflexGamePalette.textPrimary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -302,10 +440,13 @@ private fun ScoreFeedbackEffect(
     val alpha = remember { Animatable(0f) }
     val scale = remember { Animatable(0.82f) }
     val rise = remember { Animatable(0f) }
+    val tier = comboTierFor(combo)
     val feedbackText = when {
+        combo >= 20 -> stringResource(R.string.combo_ultra)
         combo >= 10 -> stringResource(R.string.combo_perfect)
         combo >= 5 -> stringResource(R.string.combo_value, combo)
-        combo >= 2 -> stringResource(R.string.combo_great)
+        combo >= 3 -> stringResource(R.string.combo_great)
+        combo >= 2 -> stringResource(R.string.combo_good)
         else -> stringResource(R.string.score_feedback_plus_one)
     }
 
@@ -314,7 +455,7 @@ private fun ScoreFeedbackEffect(
         alpha.snapTo(1f)
         scale.snapTo(0.82f)
         rise.snapTo(0f)
-        scale.animateTo(1.12f, tween(110, easing = FastOutSlowInEasing))
+        scale.animateTo(1.12f * tier.scoreScale, tween(110, easing = FastOutSlowInEasing))
         rise.animateTo(-34f, tween(320, easing = FastOutSlowInEasing))
         alpha.animateTo(0f, tween(170, easing = FastOutLinearInEasing))
     }
@@ -343,7 +484,9 @@ private fun ScoreFeedbackEffect(
                     this.alpha = alpha.value
                 },
             style = MaterialTheme.typography.titleLarge,
-            color = if (combo >= 10) ArcadeGold else ReflexGamePalette.textPrimary
+            color = if (combo >= 10) ArcadeGold else ReflexGamePalette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -362,7 +505,9 @@ private fun ModeBadge(mode: GameMode) {
             text = stringResource(mode.titleRes),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
-            color = ReflexGamePalette.textPrimary
+            color = ReflexGamePalette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

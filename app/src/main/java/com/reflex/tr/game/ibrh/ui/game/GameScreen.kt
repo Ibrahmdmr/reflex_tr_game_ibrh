@@ -9,6 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -59,18 +64,18 @@ fun GameScreen(
     isSoundEnabled: Boolean = true,
     onLanguageSelected: (AppLanguage) -> Unit = {},
     onSoundEnabledChange: (Boolean) -> Unit = {},
-    onRewardedContinueRequested: (onRewardEarned: () -> Unit) -> Unit = { onRewardEarned ->
+    onRewardedAdRequested: (RewardedAction, onRewardEarned: () -> Unit) -> Unit = { _, onRewardEarned ->
         onRewardEarned()
     },
-    onInterstitialAdRequested: () -> Unit = {},
+    onInterstitialAdRequested: () -> Boolean = { false },
     onHowToPlayClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.shouldRequestInterstitialAd) {
         if (uiState.shouldRequestInterstitialAd) {
-            onInterstitialAdRequested()
-            viewModel.onInterstitialAdRequestHandled()
+            val wasShown = onInterstitialAdRequested()
+            viewModel.onInterstitialAdRequestHandled(wasShown)
         }
     }
 
@@ -84,6 +89,23 @@ fun GameScreen(
         onHowToPlayClick = onHowToPlayClick,
         onLanguageSelected = onLanguageSelected,
         onSoundEnabledChange = onSoundEnabledChange,
+        onDailyRewardClaim = viewModel::claimDailyReward,
+        onDailyStreakProtect = {
+            onRewardedAdRequested(RewardedAction.ProtectStreak, viewModel::protectDailyRewardStreak)
+        },
+        onAchievementClaim = viewModel::claimAchievementReward,
+        onThemeSelect = viewModel::selectTheme,
+        onThemeBuy = viewModel::buyTheme,
+        onThemeTrial = { theme ->
+            onRewardedAdRequested(RewardedAction.UnlockTheme) {
+                viewModel.tryThemeForOneGame(theme)
+            }
+        },
+        onPlayerNameChange = viewModel::updatePlayerName,
+        onPlayerTitleSelect = viewModel::selectPlayerTitle,
+        onLeaderboardModeSelected = viewModel::selectLeaderboardMode,
+        onLeaderboardPeriodSelected = viewModel::selectLeaderboardPeriod,
+        onLeaderboardRefresh = viewModel::refreshLeaderboard,
         onHomeClick = viewModel::goToHome,
         onPauseGame = viewModel::pauseGame,
         onResumeGame = viewModel::resumeGame,
@@ -93,8 +115,11 @@ fun GameScreen(
             if (uiState.isRewardContinueReady) {
                 viewModel.continueGameAfterReward()
             } else {
-                onRewardedContinueRequested(viewModel::onRewardContinueEarned)
+                onRewardedAdRequested(RewardedAction.Continue, viewModel::onRewardContinueEarned)
             }
+        },
+        onDoubleCoinsClick = {
+            onRewardedAdRequested(RewardedAction.DoubleCoins, viewModel::onDoubleCoinsRewardEarned)
         },
         onRetryClick = viewModel::retryGame
     )
@@ -111,16 +136,38 @@ fun GameScreen(
     onHowToPlayClick: () -> Unit,
     onLanguageSelected: (AppLanguage) -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
+    onDailyRewardClaim: () -> Unit,
+    onDailyStreakProtect: () -> Unit,
+    onAchievementClaim: (String) -> Unit,
+    onThemeSelect: (PlayerTheme) -> Unit,
+    onThemeBuy: (PlayerTheme) -> Unit,
+    onThemeTrial: (PlayerTheme) -> Unit,
+    onPlayerNameChange: (String) -> Boolean,
+    onPlayerTitleSelect: (PlayerTitle) -> Unit,
+    onLeaderboardModeSelected: (GameMode) -> Unit,
+    onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
+    onLeaderboardRefresh: () -> Unit,
     onHomeClick: () -> Unit,
     onPauseGame: () -> Unit,
     onResumeGame: () -> Unit,
     onTargetTap: (Long) -> Unit,
     onMissTap: () -> Unit,
     onContinueClick: () -> Unit,
+    onDoubleCoinsClick: () -> Unit,
     onRetryClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val soundHooks = rememberGameSoundHooks(isSoundEnabled = isSoundEnabled)
+    val selectedThemeSpec = themeVisualSpec(uiState.progressionState.activeTheme)
+    val backgroundPulse by rememberInfiniteTransition(label = "screen_background_pulse").animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.42f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 5200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "screen_background_pulse_value"
+    )
     var missFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackPosition by remember { mutableStateOf(uiState.targetPosition) }
@@ -238,7 +285,8 @@ fun GameScreen(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         ReflexGamePalette.homeGradientTop,
-                        ReflexGamePalette.homeGradientBottom
+                        selectedThemeSpec.primary.copy(alpha = 0.38f + backgroundPulse * 0.22f),
+                        selectedThemeSpec.backgroundBottom
                     )
                 )
             )
@@ -248,11 +296,14 @@ fun GameScreen(
             )
     ) {
         if (!uiState.hasGameStarted) {
-            HomeContent(
+        HomeContent(
                 bestScore = uiState.bestScore,
                 bestScoresByMode = uiState.bestScoresByMode,
                 selectedMode = uiState.selectedMode,
                 dailyChallengeState = uiState.dailyChallengeState,
+                progressionState = uiState.progressionState,
+                playerProfile = uiState.playerProfile,
+                leaderboardSnapshot = uiState.leaderboardSnapshot,
                 isSoundEnabled = isSoundEnabled,
                 onStartClick = onStartClick,
                 onModeStartClick = onModeStartClick,
@@ -260,6 +311,17 @@ fun GameScreen(
                 selectedLanguage = selectedLanguage,
                 onLanguageSelected = onLanguageSelected,
                 onSoundToggleClick = { onSoundEnabledChange(!isSoundEnabled) },
+                onDailyRewardClaim = onDailyRewardClaim,
+                onDailyStreakProtect = onDailyStreakProtect,
+                onAchievementClaim = onAchievementClaim,
+                onThemeSelect = onThemeSelect,
+                onThemeBuy = onThemeBuy,
+                onThemeTrial = onThemeTrial,
+                onPlayerNameChange = onPlayerNameChange,
+                onPlayerTitleSelect = onPlayerTitleSelect,
+                onLeaderboardModeSelected = onLeaderboardModeSelected,
+                onLeaderboardPeriodSelected = onLeaderboardPeriodSelected,
+                onLeaderboardRefresh = onLeaderboardRefresh,
                 modifier = Modifier.align(Alignment.Center)
             )
             return@Box
@@ -298,7 +360,11 @@ fun GameScreen(
                     mode = uiState.selectedMode,
                     maxCombo = uiState.maxCombo,
                     accuracyPercent = calculateAccuracyPercent(uiState),
-                    reason = uiState.gameOverReason,
+                    reason = uiState.gameOverReasonRes?.let { stringResource(it) } ?: uiState.gameOverReason,
+                    earnedCoins = uiState.earnedCoinsThisGame,
+                    baseCoins = uiState.baseCoinsThisGame,
+                    totalCoins = uiState.progressionState.coins,
+                    isCoinDoubleClaimed = uiState.isCoinDoubleClaimed,
                     showContinueButton = shouldShowContinueSlot,
                     continueButtonText = continueButtonText,
                     continueHelperText = continueHelperText,
@@ -306,7 +372,20 @@ fun GameScreen(
                     isContinueLoading = continueButtonLoading,
                     onHomeClick = onHomeClick,
                     onChangeModeClick = onHomeClick,
+                    onOpenThemeStoreClick = onHomeClick,
+                    isDoubleCoinsEnabled = !uiState.isCoinDoubleClaimed &&
+                        uiState.baseCoinsThisGame > 0 &&
+                        rewardedAdUiState.isReady &&
+                        !rewardedAdUiState.isShowing,
+                    isDoubleCoinsLoading = rewardedAdUiState.isShowing || rewardedAdUiState.isLoading,
+                    doubleCoinsText = when {
+                        uiState.isCoinDoubleClaimed -> stringResource(R.string.coin_bonus_claimed)
+                        rewardedAdUiState.isReady -> stringResource(R.string.double_coins)
+                        rewardedAdUiState.isLoading -> stringResource(R.string.rewarded_loading)
+                        else -> stringResource(R.string.rewarded_not_ready)
+                    },
                     onContinueClick = onContinueClick,
+                    onDoubleCoinsClick = onDoubleCoinsClick,
                     onRetryClick = onRetryClick
                 )
             }
@@ -315,6 +394,7 @@ fun GameScreen(
         if (showExitGameDialog) {
             ExitGameDialog(
                 selectedLanguage = selectedLanguage,
+                tomorrowRewardCoins = uiState.progressionState.dailyReward.nextRewardCoins,
                 onContinueClick = {
                     showExitGameDialog = false
                     onResumeGame()
@@ -336,11 +416,17 @@ private fun calculateAccuracyPercent(uiState: GameUiState): Int {
 @Composable
 private fun ExitGameDialog(
     selectedLanguage: AppLanguage,
+    tomorrowRewardCoins: Int,
     onContinueClick: () -> Unit,
     onHomeClick: () -> Unit
 ) {
     val title = localizedStringResource(R.string.exit_game_title, selectedLanguage)
     val message = localizedStringResource(R.string.exit_game_message, selectedLanguage)
+    val fomoMessage = localizedStringResource(
+        R.string.daily_reward_exit_fomo,
+        selectedLanguage,
+        tomorrowRewardCoins
+    )
     val continueText = localizedStringResource(R.string.continue_game, selectedLanguage)
     val homeText = localizedStringResource(R.string.back_to_home, selectedLanguage)
 
@@ -355,7 +441,7 @@ private fun ExitGameDialog(
         },
         text = {
             Text(
-                text = message,
+                text = "$message\n\n$fomoMessage",
                 color = ReflexGamePalette.textSecondary
             )
         },
@@ -379,13 +465,18 @@ private fun ExitGameDialog(
 @Composable
 private fun localizedStringResource(
     @StringRes id: Int,
-    selectedLanguage: AppLanguage
+    selectedLanguage: AppLanguage,
+    vararg args: Any
 ): String {
     val context = LocalContext.current
     val localizedContext = remember(context, selectedLanguage) {
         context.createLanguageContext(selectedLanguage)
     }
-    return localizedContext.getString(id)
+    return if (args.isEmpty()) {
+        localizedContext.getString(id)
+    } else {
+        localizedContext.getString(id, *args)
+    }
 }
 
 private fun Context.createLanguageContext(language: AppLanguage): Context {
@@ -430,12 +521,24 @@ private fun HomePreview() {
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
+            onDailyRewardClaim = {},
+            onDailyStreakProtect = {},
+            onAchievementClaim = {},
+            onThemeSelect = {},
+            onThemeBuy = {},
+            onThemeTrial = {},
+            onPlayerNameChange = { true },
+            onPlayerTitleSelect = {},
+            onLeaderboardModeSelected = {},
+            onLeaderboardPeriodSelected = {},
+            onLeaderboardRefresh = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},
+            onDoubleCoinsClick = {},
             onRetryClick = {}
         )
     }
@@ -461,12 +564,24 @@ private fun PlayingPreview() {
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
+            onDailyRewardClaim = {},
+            onDailyStreakProtect = {},
+            onAchievementClaim = {},
+            onThemeSelect = {},
+            onThemeBuy = {},
+            onThemeTrial = {},
+            onPlayerNameChange = { true },
+            onPlayerTitleSelect = {},
+            onLeaderboardModeSelected = {},
+            onLeaderboardPeriodSelected = {},
+            onLeaderboardRefresh = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},
+            onDoubleCoinsClick = {},
             onRetryClick = {}
         )
     }
@@ -496,12 +611,24 @@ private fun GameOverPreview() {
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
+            onDailyRewardClaim = {},
+            onDailyStreakProtect = {},
+            onAchievementClaim = {},
+            onThemeSelect = {},
+            onThemeBuy = {},
+            onThemeTrial = {},
+            onPlayerNameChange = { true },
+            onPlayerTitleSelect = {},
+            onLeaderboardModeSelected = {},
+            onLeaderboardPeriodSelected = {},
+            onLeaderboardRefresh = {},
             onHomeClick = {},
             onPauseGame = {},
             onResumeGame = {},
             onTargetTap = {},
             onMissTap = {},
             onContinueClick = {},
+            onDoubleCoinsClick = {},
             onRetryClick = {}
         )
     }
