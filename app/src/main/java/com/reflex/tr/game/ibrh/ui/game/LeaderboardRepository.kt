@@ -9,6 +9,7 @@ import com.google.firebase.firestore.Query
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
+import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import java.util.Calendar
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -80,10 +81,9 @@ class LocalLeaderboardRepository : LeaderboardRepository {
                 rankTier = rankFor(score = score, level = 1 + score / 20)
             )
         }
-        val displayName = playerName.ifBlank { "Oyuncu" }
         val playerEntry = LeaderboardEntry(
             rank = 0,
-            name = displayName,
+            name = playerName,
             score = playerScore,
             theme = playerTheme,
             rankTier = playerRankTier,
@@ -202,10 +202,10 @@ class FirestoreLeaderboardRepository(
         refreshTick: Int
     ): LeaderboardSnapshot {
         FirebaseGameServices.logEvent(
-            event = FirebaseEvent.LeaderboardRefresh,
+            event = FirebaseEvent.LeaderboardRefreshed,
             params = Bundle().apply {
-                putString("mode", selectedMode.leaderboardCollectionKey)
-                putString("period", selectedPeriod.name.lowercase())
+                putString(FirebaseParam.ModeName.key, selectedMode.leaderboardCollectionKey)
+                putString(FirebaseParam.Period.key, selectedPeriod.name.lowercase())
             }
         )
 
@@ -304,7 +304,7 @@ class FirestoreLeaderboardRepository(
                 .collection("scores")
                 .document(uid)
             val safeName = sanitizeFirestorePlayerName(playerName)
-            firestore.runTransaction { transaction ->
+            val didWrite = firestore.runTransaction { transaction ->
                 val snapshot = transaction.get(document)
                 val remoteScore = snapshot.getLong("score")?.toInt() ?: -1
                 if (score > remoteScore) {
@@ -320,23 +320,28 @@ class FirestoreLeaderboardRepository(
                         payload["createdAt"] = FieldValue.serverTimestamp()
                     }
                     transaction.set(document, payload, com.google.firebase.firestore.SetOptions.merge())
+                    true
+                } else {
+                    false
                 }
             }.await()
-            FirebaseGameServices.logEvent(
-                event = FirebaseEvent.LeaderboardScoreUpload,
-                params = Bundle().apply {
-                    putString("mode", mode.leaderboardCollectionKey)
-                    putInt("score", score)
-                }
-            )
-            Log.d(TAG, "Firestore leaderboard score upload success mode=${mode.leaderboardCollectionKey} score=$score")
-            true
+            if (didWrite) {
+                FirebaseGameServices.logEvent(
+                    event = FirebaseEvent.LeaderboardScoreUpload,
+                    params = Bundle().apply {
+                        putString(FirebaseParam.ModeName.key, mode.leaderboardCollectionKey)
+                        putInt(FirebaseParam.Score.key, score)
+                    }
+                )
+                Log.d(TAG, "Firestore leaderboard score upload success mode=${mode.leaderboardCollectionKey} score=$score")
+            }
+            didWrite
         }.getOrElse { error ->
             FirebaseGameServices.logEvent(
                 event = FirebaseEvent.LeaderboardUploadFailed,
                 params = Bundle().apply {
-                    putString("mode", mode.leaderboardCollectionKey)
-                    putInt("score", score)
+                    putString(FirebaseParam.ModeName.key, mode.leaderboardCollectionKey)
+                    putInt(FirebaseParam.Score.key, score)
                 }
             )
             FirebaseGameServices.recordNonFatal("Leaderboard score upload failed", error)
@@ -391,13 +396,13 @@ class FirestoreLeaderboardRepository(
 }
 
 fun rankFor(score: Int, level: Int): RankTier {
-    val power = score + level * 8
+    val normalizedLevel = level.coerceAtLeast(1)
     return when {
-        power >= 420 -> RankTier.ReflexGod
-        power >= 260 -> RankTier.NeonMaster
-        power >= 170 -> RankTier.Platinum
-        power >= 100 -> RankTier.Gold
-        power >= 45 -> RankTier.Silver
+        normalizedLevel >= 40 -> RankTier.ReflexGod
+        normalizedLevel >= 25 -> RankTier.NeonMaster
+        normalizedLevel >= 15 -> RankTier.Platinum
+        normalizedLevel >= 10 -> RankTier.Gold
+        normalizedLevel >= 5 -> RankTier.Silver
         else -> RankTier.Bronze
     }
 }
@@ -417,7 +422,7 @@ private val GameMode.leaderboardCollectionKey: String
     }
 
 private fun sanitizeFirestorePlayerName(name: String?): String {
-    return name.orEmpty().trim().take(12).ifBlank { "Oyuncu" }
+    return name.orEmpty().trim().take(12)
 }
 
 private fun playerThemeFromStorageKey(key: String): PlayerTheme {

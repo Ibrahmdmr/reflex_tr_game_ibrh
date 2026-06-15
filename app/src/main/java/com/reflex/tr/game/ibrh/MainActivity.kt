@@ -135,6 +135,21 @@ fun AppRoot(
     val isSoundEnabled by gamePreferences.soundEnabledFlow.collectAsStateWithLifecycle(
         initialValue = true
     )
+    val isEffectSoundEnabled by gamePreferences.effectSoundEnabledFlow.collectAsStateWithLifecycle(
+        initialValue = true
+    )
+    val isVibrationEnabled by gamePreferences.vibrationEnabledFlow.collectAsStateWithLifecycle(
+        initialValue = true
+    )
+    val isDailyRewardNotificationEnabled by gamePreferences.dailyRewardNotificationFlow.collectAsStateWithLifecycle(
+        initialValue = false
+    )
+    val isStreakNotificationEnabled by gamePreferences.streakNotificationFlow.collectAsStateWithLifecycle(
+        initialValue = false
+    )
+    val isNewMissionNotificationEnabled by gamePreferences.newMissionNotificationFlow.collectAsStateWithLifecycle(
+        initialValue = false
+    )
     val coroutineScope = rememberCoroutineScope()
     val localizedContext = remember(context, selectedLanguage) {
         context.createLocalizedContext(selectedLanguage)
@@ -155,6 +170,11 @@ fun AppRoot(
                         rewardedAdUiState = rewardedAdUiState,
                         selectedLanguage = selectedLanguage,
                         isSoundEnabled = isSoundEnabled,
+                        isEffectSoundEnabled = isEffectSoundEnabled,
+                        isVibrationEnabled = isVibrationEnabled,
+                        isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
+                        isStreakNotificationEnabled = isStreakNotificationEnabled,
+                        isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
                         onLanguageSelected = { language ->
                             coroutineScope.launch {
                                 gamePreferences.saveLanguage(language)
@@ -163,6 +183,31 @@ fun AppRoot(
                         onSoundEnabledChange = { enabled ->
                             coroutineScope.launch {
                                 gamePreferences.saveSoundEnabled(enabled)
+                            }
+                        },
+                        onEffectSoundEnabledChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveEffectSoundEnabled(enabled)
+                            }
+                        },
+                        onVibrationEnabledChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveVibrationEnabled(enabled)
+                            }
+                        },
+                        onDailyRewardNotificationChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveDailyRewardNotificationEnabled(enabled)
+                            }
+                        },
+                        onStreakNotificationChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveStreakNotificationEnabled(enabled)
+                            }
+                        },
+                        onNewMissionNotificationChange = { enabled ->
+                            coroutineScope.launch {
+                                gamePreferences.saveNewMissionNotificationEnabled(enabled)
                             }
                         },
                         onRewardedAdRequested = onRewardedAdRequested,
@@ -190,6 +235,8 @@ private val RewardedAction.analyticsName: String
         RewardedAction.DoubleCoins -> "double_coin"
         RewardedAction.UnlockTheme -> "theme_unlock"
         RewardedAction.ProtectStreak -> "protect_streak"
+        RewardedAction.CoinChest -> "coin_chest"
+        RewardedAction.DailyChallengeDoubleReward -> "daily_challenge_double_reward"
     }
 
 private fun Context.createLocalizedContext(language: AppLanguage): Context {

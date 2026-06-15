@@ -2,6 +2,8 @@ package com.reflex.tr.game.ibrh.ui.game
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Bundle
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -9,6 +11,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -43,6 +46,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,16 +57,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.ui.game.components.GamePanelCard
 import com.reflex.tr.game.ibrh.ui.game.components.PrimaryGameButton
 import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
@@ -75,6 +84,13 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
+import com.reflex.tr.game.ibrh.firebase.FirebaseParam
+
+private const val THEME_UNLOCK_CELEBRATION_DURATION_MS = 2_000L
+private const val PLAYER_NAME_MAX_LENGTH = 12
+private const val XP_PER_LEVEL = 250
+private const val LEVEL_UP_POPUP_DURATION_MS = 1_800L
+private const val LEVEL_UP_BONUS_COINS = 50
 
 @Composable
 fun HomeContent(
@@ -85,15 +101,29 @@ fun HomeContent(
     progressionState: ProgressionState,
     playerProfile: PlayerProfile,
     leaderboardSnapshot: LeaderboardSnapshot,
+    rewardedAdUiState: RewardedAdUiState,
     isSoundEnabled: Boolean,
+    isEffectSoundEnabled: Boolean,
+    isVibrationEnabled: Boolean,
+    isDailyRewardNotificationEnabled: Boolean,
+    isStreakNotificationEnabled: Boolean,
+    isNewMissionNotificationEnabled: Boolean,
     selectedLanguage: AppLanguage,
     onStartClick: () -> Unit,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
     onLanguageSelected: (AppLanguage) -> Unit,
     onSoundToggleClick: () -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    onEffectSoundEnabledChange: (Boolean) -> Unit,
+    onVibrationEnabledChange: (Boolean) -> Unit,
+    onDailyRewardNotificationChange: (Boolean) -> Unit,
+    onStreakNotificationChange: (Boolean) -> Unit,
+    onNewMissionNotificationChange: (Boolean) -> Unit,
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onCoinChestClick: () -> Unit,
+    onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
@@ -120,6 +150,15 @@ fun HomeContent(
         var showPlayerNameDialog by remember(playerProfile.name, playerProfile.hasCompletedNamePrompt) {
             mutableStateOf(!playerProfile.hasName && !playerProfile.hasCompletedNamePrompt)
         }
+        var dismissedLevelUp by remember { mutableStateOf<Int?>(null) }
+        val levelUp = progressionState.lastLevelUp
+
+        LaunchedEffect(levelUp) {
+            if (levelUp != null && dismissedLevelUp != levelUp) {
+                delay(LEVEL_UP_POPUP_DURATION_MS)
+                dismissedLevelUp = levelUp
+            }
+        }
 
         if (showDailyRewardPopup && (progressionState.dailyReward.canClaim || progressionState.dailyReward.canProtectStreak)) {
             DailyRewardPopup(
@@ -140,6 +179,7 @@ fun HomeContent(
         if (showPlayerNameDialog) {
             PlayerNameDialog(
                 currentName = playerProfile.name,
+                hasCurrentName = playerProfile.hasName,
                 onSave = { name ->
                     val saved = onPlayerNameChange(name)
                     if (saved) showPlayerNameDialog = false
@@ -148,6 +188,14 @@ fun HomeContent(
                 onDismiss = {
                     if (playerProfile.hasName) showPlayerNameDialog = false
                 }
+            )
+        }
+
+        if (levelUp != null && dismissedLevelUp != levelUp) {
+            LevelUpPopup(
+                level = levelUp,
+                coinBonus = LEVEL_UP_BONUS_COINS,
+                onDismiss = { dismissedLevelUp = levelUp }
             )
         }
 
@@ -176,42 +224,75 @@ fun HomeContent(
                             onSoundToggleClick = onSoundToggleClick
                         )
 
+                        if (!selectedHomeTab.showInBottomNav) {
+                            ProfileSubPageBackButton(
+                                onClick = { selectedHomeTab = HomeTab.Profile }
+                            )
+                        }
+
                         when (selectedHomeTab) {
                             HomeTab.Play -> PlayTabContent(
                                 bestScore = bestScore,
                                 bestScoresByMode = bestScoresByMode,
                                 selectedMode = selectedMode,
                                 dailyChallengeState = dailyChallengeState,
+                                rewardedAdUiState = rewardedAdUiState,
                                 progressionState = progressionState,
                                 onModeStartClick = onModeStartClick,
                                 onHowToPlayClick = onHowToPlayClick,
-                                onDailyStreakProtect = onDailyStreakProtect
+                                onDailyStreakProtect = onDailyStreakProtect,
+                                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick
+                            )
+
+                            HomeTab.Rewards -> RewardsTabContent(
+                                dailyChallengeState = dailyChallengeState,
+                                progressionState = progressionState,
+                                rewardedAdUiState = rewardedAdUiState,
+                                onDailyRewardClaim = onDailyRewardClaim,
+                                onDailyStreakProtect = onDailyStreakProtect,
+                                onCoinChestClick = onCoinChestClick,
+                                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
+                                onAchievementClaim = onAchievementClaim
+                            )
+
+                            HomeTab.Achievements -> AchievementsTabContent(
+                                progressionState = progressionState,
+                                onAchievementClaim = onAchievementClaim
                             )
 
                             HomeTab.Profile -> ProfileTabContent(
                                 bestScore = bestScore,
                                 playerProfile = playerProfile,
                                 progressionState = progressionState,
-                                selectedLanguage = selectedLanguage,
                                 onEditNameClick = { showPlayerNameDialog = true },
                                 onTitleSelect = onPlayerTitleSelect,
-                                onLanguageSelected = onLanguageSelected
+                                onQuickMenuSelected = { tab ->
+                                    logHomeTabOpened(
+                                        tab = tab,
+                                        leaderboardSnapshot = leaderboardSnapshot
+                                    )
+                                    selectedHomeTab = tab
+                                }
                             )
 
                             HomeTab.Missions -> MissionsTabContent(
                                 dailyChallengeState = dailyChallengeState,
                                 progressionState = progressionState,
+                                rewardedAdUiState = rewardedAdUiState,
                                 onDailyRewardClaim = onDailyRewardClaim,
                                 onDailyStreakProtect = onDailyStreakProtect,
+                                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                                 onAchievementClaim = onAchievementClaim
                             )
 
                             HomeTab.Shop -> ShopTabContent(
                         progressionState = progressionState,
                         selectedLanguage = selectedLanguage,
+                        rewardedAdUiState = rewardedAdUiState,
                         onThemeSelect = onThemeSelect,
                         onThemeBuy = onThemeBuy,
-                        onThemeTrial = onThemeTrial
+                        onThemeTrial = onThemeTrial,
+                        onCoinChestClick = onCoinChestClick
                             )
 
                             HomeTab.Leaderboard -> LeaderboardTabContent(
@@ -220,12 +301,41 @@ fun HomeContent(
                                 onPeriodSelected = onLeaderboardPeriodSelected,
                                 onRefreshClick = onLeaderboardRefresh
                             )
+
+                            HomeTab.Settings -> SettingsTabContent(
+                                playerProfile = playerProfile,
+                                progressionState = progressionState,
+                                bestScoresByMode = bestScoresByMode,
+                                selectedLanguage = selectedLanguage,
+                                isSoundEnabled = isSoundEnabled,
+                                isEffectSoundEnabled = isEffectSoundEnabled,
+                                isVibrationEnabled = isVibrationEnabled,
+                                isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
+                                isStreakNotificationEnabled = isStreakNotificationEnabled,
+                                isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
+                                onLanguageSelected = onLanguageSelected,
+                                onSoundEnabledChange = onSoundEnabledChange,
+                                onEffectSoundEnabledChange = onEffectSoundEnabledChange,
+                                onVibrationEnabledChange = onVibrationEnabledChange,
+                                onDailyRewardNotificationChange = onDailyRewardNotificationChange,
+                                onStreakNotificationChange = onStreakNotificationChange,
+                                onNewMissionNotificationChange = onNewMissionNotificationChange,
+                                onEditNameClick = { showPlayerNameDialog = true }
+                            )
                         }
                     }
 
                     HomeBottomNavigation(
                         selectedTab = selectedHomeTab,
-                        onTabSelected = { selectedHomeTab = it }
+                        onTabSelected = { tab ->
+                            if (tab != selectedHomeTab) {
+                                logHomeTabOpened(
+                                    tab = tab,
+                                    leaderboardSnapshot = leaderboardSnapshot
+                                )
+                                selectedHomeTab = tab
+                            }
+                        }
                     )
 
                     if (selectedHomeTab == HomeTab.Play) {
@@ -241,12 +351,40 @@ fun HomeContent(
     }
 }
 
-private enum class HomeTab(val titleRes: Int, val icon: String) {
-    Play(R.string.nav_play, "▶"),
-    Profile(R.string.nav_profile, "◆"),
+private enum class HomeTab(
+    val titleRes: Int,
+    val icon: String,
+    val showInBottomNav: Boolean = false
+) {
+    Play(R.string.nav_play, "▶", true),
+    Rewards(R.string.nav_rewards, "★", true),
+    Shop(R.string.nav_shop, "◉", true),
+    Profile(R.string.nav_profile, "◆", true),
+    Leaderboard(R.string.nav_leaderboard, "#"),
+    Achievements(R.string.nav_achievements, "◇"),
     Missions(R.string.nav_missions, "✓"),
-    Shop(R.string.nav_shop, "◉"),
-    Leaderboard(R.string.nav_leaderboard, "#")
+    Settings(R.string.nav_settings, "⚙")
+}
+
+private fun logHomeTabOpened(
+    tab: HomeTab,
+    leaderboardSnapshot: LeaderboardSnapshot
+) {
+    when (tab) {
+        HomeTab.Profile -> FirebaseGameServices.logEvent(FirebaseEvent.ProfileOpened)
+        HomeTab.Shop -> FirebaseGameServices.logEvent(FirebaseEvent.ShopOpened)
+        HomeTab.Leaderboard -> FirebaseGameServices.logEvent(
+            event = FirebaseEvent.LeaderboardOpened,
+            params = Bundle().apply {
+                putString(FirebaseParam.ModeName.key, leaderboardSnapshot.selectedMode.storageKey)
+            }
+        )
+        HomeTab.Play,
+        HomeTab.Rewards,
+        HomeTab.Achievements,
+        HomeTab.Missions,
+        HomeTab.Settings -> Unit
+    }
 }
 
 @Composable
@@ -276,15 +414,50 @@ private fun HomeHeader(
 }
 
 @Composable
+private fun ProfileSubPageBackButton(
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = ArcadeBlue.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.26f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "‹",
+                style = MaterialTheme.typography.titleMedium,
+                color = ArcadeGold
+            )
+            Text(
+                text = stringResource(R.string.back_to_profile),
+                style = MaterialTheme.typography.labelLarge,
+                color = ReflexGamePalette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 private fun PlayTabContent(
     bestScore: Int,
     bestScoresByMode: Map<GameMode, Int>,
     selectedMode: GameMode,
     dailyChallengeState: DailyChallengeState,
+    rewardedAdUiState: RewardedAdUiState,
     progressionState: ProgressionState,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
-    onDailyStreakProtect: () -> Unit
+    onDailyStreakProtect: () -> Unit,
+    onDailyChallengeDoubleRewardClick: () -> Unit
 ) {
     Text(
         text = stringResource(R.string.game_tagline),
@@ -298,11 +471,18 @@ private fun PlayTabContent(
         bestScore = bestScore,
         progressionState = progressionState
     )
+    HomeLevelProgressCard(progressionState = progressionState)
+    AchievementCounterCard(achievements = progressionState.achievements)
     DailyStreakMiniCard(
         state = progressionState.dailyReward,
         onProtectClick = onDailyStreakProtect
     )
-    DailyChallengeCard(state = dailyChallengeState)
+    DailyChallengeCard(
+        state = dailyChallengeState,
+        rewardedAdUiState = rewardedAdUiState,
+        onDoubleRewardClick = onDailyChallengeDoubleRewardClick
+    )
+    ThemeTargetCard(progressionState = progressionState)
     GameModeSection(
         bestScoresByMode = bestScoresByMode,
         selectedMode = selectedMode,
@@ -316,10 +496,9 @@ private fun ProfileTabContent(
     bestScore: Int,
     playerProfile: PlayerProfile,
     progressionState: ProgressionState,
-    selectedLanguage: AppLanguage,
     onEditNameClick: () -> Unit,
     onTitleSelect: (PlayerTitle) -> Unit,
-    onLanguageSelected: (AppLanguage) -> Unit
+    onQuickMenuSelected: (HomeTab) -> Unit
 ) {
     ProfileProgressCard(
         playerProfile = playerProfile,
@@ -333,21 +512,24 @@ private fun ProfileTabContent(
         selectedTheme = progressionState.selectedTheme
     )
     AchievementSummaryCard(achievements = progressionState.achievements)
-    LanguageSelectionSection(
-        selectedLanguage = selectedLanguage,
-        onLanguageSelected = onLanguageSelected
-    )
+    ProfileQuickMenu(onTabSelected = onQuickMenuSelected)
 }
 
 @Composable
 private fun MissionsTabContent(
     dailyChallengeState: DailyChallengeState,
     progressionState: ProgressionState,
+    rewardedAdUiState: RewardedAdUiState,
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit
 ) {
-    DailyChallengeCard(state = dailyChallengeState)
+    DailyChallengeCard(
+        state = dailyChallengeState,
+        rewardedAdUiState = rewardedAdUiState,
+        onDoubleRewardClick = onDailyChallengeDoubleRewardClick
+    )
     WeeklyChallengeCard(state = progressionState.weeklyChallenge)
     DailyRewardCard(
         state = progressionState.dailyReward,
@@ -362,12 +544,356 @@ private fun MissionsTabContent(
 }
 
 @Composable
+private fun RewardsTabContent(
+    dailyChallengeState: DailyChallengeState,
+    progressionState: ProgressionState,
+    rewardedAdUiState: RewardedAdUiState,
+    onDailyRewardClaim: () -> Unit,
+    onDailyStreakProtect: () -> Unit,
+    onCoinChestClick: () -> Unit,
+    onDailyChallengeDoubleRewardClick: () -> Unit,
+    onAchievementClaim: (String) -> Unit
+) {
+    Text(
+        text = stringResource(R.string.reward_center_title),
+        style = MaterialTheme.typography.titleLarge,
+        color = ReflexGamePalette.textPrimary,
+        textAlign = TextAlign.Center
+    )
+    DailyRewardCard(
+        state = progressionState.dailyReward,
+        onClaimClick = onDailyRewardClaim,
+        onProtectClick = onDailyStreakProtect
+    )
+    CoinChestCard(
+        state = progressionState.coinChest,
+        rewardedAdUiState = rewardedAdUiState,
+        onOpenClick = onCoinChestClick
+    )
+    MissionRewardsCard(
+        dailyChallengeState = dailyChallengeState,
+        weeklyChallengeState = progressionState.weeklyChallenge,
+        achievements = progressionState.achievements,
+        rewardedAdUiState = rewardedAdUiState,
+        onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
+        onAchievementClaim = onAchievementClaim
+    )
+}
+
+@Composable
+private fun AchievementsTabContent(
+    progressionState: ProgressionState,
+    onAchievementClaim: (String) -> Unit
+) {
+    val unlockedCount = progressionState.achievements.count { it.unlocked }
+    Text(
+        text = stringResource(R.string.achievements_title),
+        style = MaterialTheme.typography.titleLarge,
+        color = ReflexGamePalette.textPrimary,
+        textAlign = TextAlign.Center
+    )
+    AchievementCounterCard(achievements = progressionState.achievements)
+    AchievementCategory.entries.forEach { category ->
+        val categoryAchievements = progressionState.achievements
+            .filter { it.category == category }
+            .let(::sortedAchievementsForDisplay)
+        if (categoryAchievements.isNotEmpty()) {
+            AchievementCategorySection(
+                category = category,
+                achievements = categoryAchievements,
+                unlockedIds = progressionState.latestUnlockedAchievementIds,
+                onClaimClick = onAchievementClaim
+            )
+        }
+    }
+    if (progressionState.achievements.isEmpty()) {
+        Text(
+            text = stringResource(R.string.achievements_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    } else {
+        Text(
+            text = stringResource(R.string.achievement_summary_value, unlockedCount, progressionState.achievements.size),
+            style = MaterialTheme.typography.labelMedium,
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun SettingsTabContent(
+    playerProfile: PlayerProfile,
+    progressionState: ProgressionState,
+    bestScoresByMode: Map<GameMode, Int>,
+    selectedLanguage: AppLanguage,
+    isSoundEnabled: Boolean,
+    isEffectSoundEnabled: Boolean,
+    isVibrationEnabled: Boolean,
+    isDailyRewardNotificationEnabled: Boolean,
+    isStreakNotificationEnabled: Boolean,
+    isNewMissionNotificationEnabled: Boolean,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    onEffectSoundEnabledChange: (Boolean) -> Unit,
+    onVibrationEnabledChange: (Boolean) -> Unit,
+    onDailyRewardNotificationChange: (Boolean) -> Unit,
+    onStreakNotificationChange: (Boolean) -> Unit,
+    onNewMissionNotificationChange: (Boolean) -> Unit,
+    onEditNameClick: () -> Unit
+) {
+    val rank = rankFor(score = bestScoresByMode.values.maxOrNull() ?: 0, level = progressionState.level)
+    val firebaseUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
+    val uriHandler = LocalUriHandler.current
+    val unlockedAchievements = progressionState.achievements.count { it.unlocked }
+    val totalScore = progressionState.totalHits
+
+    Text(
+        text = stringResource(R.string.settings_title),
+        style = MaterialTheme.typography.titleLarge,
+        color = ReflexGamePalette.textPrimary,
+        textAlign = TextAlign.Center
+    )
+
+    SettingsSectionCard(title = stringResource(R.string.settings_sound_title)) {
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_game_sounds),
+            description = stringResource(R.string.settings_game_sounds_description),
+            checked = isSoundEnabled,
+            onCheckedChange = onSoundEnabledChange
+        )
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_effect_sounds),
+            description = stringResource(R.string.settings_effect_sounds_description),
+            checked = isEffectSoundEnabled,
+            onCheckedChange = onEffectSoundEnabledChange
+        )
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_vibration),
+            description = stringResource(R.string.settings_vibration_description),
+            checked = isVibrationEnabled,
+            onCheckedChange = onVibrationEnabledChange
+        )
+    }
+
+    SettingsSectionCard(title = stringResource(R.string.settings_language_title)) {
+        LanguageSelectionSection(
+            selectedLanguage = selectedLanguage,
+            onLanguageSelected = onLanguageSelected
+        )
+    }
+
+    SettingsSectionCard(title = stringResource(R.string.settings_account_title)) {
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_player_name),
+            value = playerProfile.name.ifBlank { stringResource(R.string.leaderboard_you) }
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_level),
+            value = stringResource(R.string.level_value, progressionState.level)
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_rank),
+            value = stringResource(rank.titleRes)
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_firebase_user_id),
+            value = shortenedFirebaseUserId(firebaseUserId)
+        )
+        SecondaryGameButton(
+            text = stringResource(R.string.profile_change_name),
+            onClick = onEditNameClick
+        )
+    }
+
+    SettingsSectionCard(title = stringResource(R.string.settings_notifications_title)) {
+        Text(
+            text = stringResource(R.string.settings_notifications_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = ReflexGamePalette.textSecondary
+        )
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_daily_reward_reminder),
+            description = stringResource(R.string.settings_daily_reward_reminder_description),
+            checked = isDailyRewardNotificationEnabled,
+            onCheckedChange = onDailyRewardNotificationChange
+        )
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_streak_reminder),
+            description = stringResource(R.string.settings_streak_reminder_description),
+            checked = isStreakNotificationEnabled,
+            onCheckedChange = onStreakNotificationChange
+        )
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_new_mission_notification),
+            description = stringResource(R.string.settings_new_mission_notification_description),
+            checked = isNewMissionNotificationEnabled,
+            onCheckedChange = onNewMissionNotificationChange
+        )
+    }
+
+    SettingsSectionCard(title = stringResource(R.string.settings_data_title)) {
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_app_version),
+            value = BuildConfig.VERSION_NAME
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_total_games),
+            value = progressionState.totalGames.toString()
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_total_score),
+            value = totalScore.toString()
+        )
+        SettingsInfoRow(
+            title = stringResource(R.string.settings_unlocked_achievements),
+            value = stringResource(R.string.achievement_summary_value, unlockedAchievements, progressionState.achievements.size)
+        )
+    }
+
+    SettingsSectionCard(title = stringResource(R.string.settings_support_title)) {
+        SettingsActionButton(
+            text = stringResource(R.string.settings_contact_us),
+            onClick = { runCatching { uriHandler.openUri("mailto:support@reflexavi.app") } }
+        )
+        SettingsActionButton(
+            text = stringResource(R.string.settings_privacy_policy),
+            onClick = { runCatching { uriHandler.openUri("https://reflexavi.app/privacy") } }
+        )
+        SettingsActionButton(
+            text = stringResource(R.string.settings_rate_app),
+            onClick = { runCatching { uriHandler.openUri("market://details?id=${BuildConfig.APPLICATION_ID}") } }
+        )
+    }
+}
+
+@Composable
+private fun SettingsSectionCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.24f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = ArcadeGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = ReflexGamePalette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun SettingsInfoRow(
+    title: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = ReflexGamePalette.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            modifier = Modifier.weight(1.1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = ReflexGamePalette.textPrimary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SettingsActionButton(
+    text: String,
+    onClick: () -> Unit
+) {
+    SecondaryGameButton(
+        text = text,
+        onClick = onClick
+    )
+}
+
+private fun shortenedFirebaseUserId(userId: String): String {
+    if (userId.isBlank()) return "-"
+    return if (userId.length <= 10) {
+        userId
+    } else {
+        "${userId.take(6)}…${userId.takeLast(4)}"
+    }
+}
+
+@Composable
 private fun ShopTabContent(
     progressionState: ProgressionState,
     selectedLanguage: AppLanguage,
+    rewardedAdUiState: RewardedAdUiState,
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
-    onThemeTrial: (PlayerTheme) -> Unit
+    onThemeTrial: (PlayerTheme) -> Unit,
+    onCoinChestClick: () -> Unit
 ) {
     Text(
         text = stringResource(R.string.theme_shop_title),
@@ -379,6 +905,11 @@ private fun ShopTabContent(
         style = MaterialTheme.typography.bodyMedium,
         color = ReflexGamePalette.textSecondary,
         textAlign = TextAlign.Center
+    )
+    CoinChestCard(
+        state = progressionState.coinChest,
+        rewardedAdUiState = rewardedAdUiState,
+        onOpenClick = onCoinChestClick
     )
     ThemeShopSection(
         progressionState = progressionState,
@@ -396,9 +927,6 @@ private fun LeaderboardTabContent(
     onPeriodSelected: (LeaderboardPeriod) -> Unit,
     onRefreshClick: () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        FirebaseGameServices.logEvent(FirebaseEvent.LeaderboardOpen)
-    }
     LeaderboardSection(
         snapshot = leaderboardSnapshot,
         onModeSelected = onModeSelected,
@@ -433,6 +961,83 @@ private fun HomeQuickStats(
             value = bestScore.toString(),
             accent = ArcadeBlue,
             modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun HomeLevelProgressCard(
+    progressionState: ProgressionState,
+    modifier: Modifier = Modifier
+) {
+    val currentLevelXp = (progressionState.level - 1) * XP_PER_LEVEL
+    val nextLevelXp = progressionState.level * XP_PER_LEVEL
+    val levelProgress = ((progressionState.xp - currentLevelXp).toFloat() / XP_PER_LEVEL)
+        .coerceIn(0f, 1f)
+    val remainingXp = (nextLevelXp - progressionState.xp).coerceAtLeast(0)
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ArcadeTeal.copy(alpha = 0.11f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.home_level_progress_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ReflexGamePalette.textPrimary
+                )
+                Text(
+                    text = stringResource(R.string.level_value, progressionState.level),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeTeal
+                )
+            }
+            LinearProgressIndicator(
+                progress = { levelProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(999.dp)),
+                color = ArcadeTeal,
+                trackColor = Color.White.copy(alpha = 0.08f)
+            )
+            Text(
+                text = stringResource(R.string.xp_to_next_level_value, remainingXp),
+                style = MaterialTheme.typography.labelSmall,
+                color = ReflexGamePalette.textSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementCounterCard(
+    achievements: List<AchievementState>,
+    modifier: Modifier = Modifier
+) {
+    val unlockedCount = achievements.count { it.unlocked }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ArcadeGold.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.28f))
+    ) {
+        Text(
+            text = stringResource(R.string.home_achievement_counter, unlockedCount, achievements.size),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = ReflexGamePalette.textPrimary,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -513,38 +1118,132 @@ private fun AchievementSummaryCard(
 }
 
 @Composable
-private fun HomeBottomNavigation(
-    selectedTab: HomeTab,
+private fun ProfileQuickMenu(
     onTabSelected: (HomeTab) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.06f),
+        color = ReflexGamePalette.cardGlassStrong,
         shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.24f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProfileQuickMenuCard(
+                    title = stringResource(R.string.leaderboard_title),
+                    icon = "#",
+                    accent = ArcadeBlue,
+                    onClick = { onTabSelected(HomeTab.Leaderboard) },
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileQuickMenuCard(
+                    title = stringResource(R.string.achievements_title),
+                    icon = "◇",
+                    accent = ArcadeGold,
+                    onClick = { onTabSelected(HomeTab.Achievements) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProfileQuickMenuCard(
+                    title = stringResource(R.string.nav_missions),
+                    icon = "✓",
+                    accent = ArcadeTeal,
+                    onClick = { onTabSelected(HomeTab.Missions) },
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileQuickMenuCard(
+                    title = stringResource(R.string.nav_settings),
+                    icon = "⚙",
+                    accent = ArcadeCoral,
+                    onClick = { onTabSelected(HomeTab.Settings) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileQuickMenuCard(
+    title: String,
+    icon: String,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        color = accent.copy(alpha = 0.11f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.28f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.titleSmall,
+                color = accent
+            )
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium,
+                color = ReflexGamePalette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeBottomNavigation(
+    selectedTab: HomeTab,
+    onTabSelected: (HomeTab) -> Unit
+) {
+    val bottomTabs = HomeTab.entries.filter { it.showInBottomNav }
+    val selectedBottomTab = if (selectedTab.showInBottomNav) selectedTab else HomeTab.Profile
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.06f),
+        shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.18f))
     ) {
         Row(
-            modifier = Modifier.padding(5.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            HomeTab.entries.forEach { tab ->
-                val selected = tab == selectedTab
+            bottomTabs.forEach { tab ->
+                val selected = tab == selectedBottomTab
                 Surface(
                     modifier = Modifier
                         .weight(1f)
                         .clickable { onTabSelected(tab) },
-                    color = if (selected) ArcadeBlue.copy(alpha = 0.24f) else Color.Transparent,
-                    shape = RoundedCornerShape(15.dp),
+                    color = if (selected) ArcadeBlue.copy(alpha = 0.20f) else Color.Transparent,
+                    shape = RoundedCornerShape(13.dp),
                     border = if (selected) {
-                        BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.5f))
+                        BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.52f))
                     } else {
                         null
                     }
                 ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = tab.icon,
@@ -553,6 +1252,7 @@ private fun HomeBottomNavigation(
                         )
                         Text(
                             text = stringResource(tab.titleRes),
+                            modifier = Modifier.padding(start = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (selected) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary,
                             textAlign = TextAlign.Center,
@@ -781,6 +1481,8 @@ internal fun GameModeCard(
 @Composable
 private fun DailyChallengeCard(
     state: DailyChallengeState,
+    rewardedAdUiState: RewardedAdUiState = RewardedAdUiState(),
+    onDoubleRewardClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val accent = if (state.completed) ArcadeTeal else ArcadeGold
@@ -806,72 +1508,290 @@ private fun DailyChallengeCard(
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (state.completed) "✓" else "!",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accent
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.daily_challenge_title),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (state.completed) {
+                            stringResource(R.string.daily_challenge_completed_title)
+                        } else {
+                            stringResource(state.type.titleRes)
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (state.completed) {
+                            stringResource(R.string.daily_challenge_completed_description)
+                        } else {
+                            stringResource(state.type.descriptionRes)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Surface(
+                    color = accent.copy(alpha = if (state.completed) 0.2f else 0.14f),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.24f))
+                ) {
+                    Text(
+                        text = if (state.completed) {
+                            stringResource(R.string.daily_challenge_completed_badge)
+                        } else {
+                            stringResource(R.string.daily_challenge_progress, state.progress, state.target)
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (state.completed && state.rewardClaimed && !state.doubleRewardClaimed) {
+                SecondaryGameButton(
+                    text = when {
+                        rewardedAdUiState.isReady -> stringResource(R.string.daily_challenge_double_reward)
+                        rewardedAdUiState.isLoading || rewardedAdUiState.isShowing -> stringResource(R.string.rewarded_loading)
+                        else -> stringResource(R.string.rewarded_not_ready)
+                    },
+                    enabled = rewardedAdUiState.isReady && !rewardedAdUiState.isShowing,
+                    onClick = onDoubleRewardClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MissionRewardsCard(
+    dailyChallengeState: DailyChallengeState,
+    weeklyChallengeState: ChallengeState,
+    achievements: List<AchievementState>,
+    rewardedAdUiState: RewardedAdUiState,
+    onDailyChallengeDoubleRewardClick: () -> Unit,
+    onAchievementClaim: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val completedAchievements = achievements
+        .filter { it.unlocked }
+        .sortedWith(compareBy<AchievementState> { it.claimed }.thenBy { it.id })
+    val hasCompletedReward = dailyChallengeState.completed ||
+        weeklyChallengeState.completed ||
+        completedAchievements.isNotEmpty()
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.34f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(ArcadeTeal.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✓",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ArcadeTeal
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.mission_rewards_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(R.string.mission_rewards_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            MissionRewardRow(
+                icon = if (dailyChallengeState.completed) "✓" else "!",
+                title = stringResource(R.string.daily_challenge_title),
+                detail = when {
+                    dailyChallengeState.doubleRewardClaimed -> stringResource(R.string.mission_reward_daily_doubled)
+                    dailyChallengeState.rewardClaimed -> stringResource(
+                        R.string.mission_reward_daily_claimed,
+                        dailyChallengeState.rewardCoins
+                    )
+                    else -> stringResource(
+                        R.string.daily_challenge_progress,
+                        dailyChallengeState.progress,
+                        dailyChallengeState.target
+                    )
+                },
+                accent = if (dailyChallengeState.completed) ArcadeTeal else ArcadeGold
+            ) {
+                if (dailyChallengeState.completed && dailyChallengeState.rewardClaimed && !dailyChallengeState.doubleRewardClaimed) {
+                    SecondaryGameButton(
+                        text = when {
+                            rewardedAdUiState.isReady -> stringResource(R.string.daily_challenge_double_reward)
+                            rewardedAdUiState.isLoading || rewardedAdUiState.isShowing -> stringResource(R.string.rewarded_loading)
+                            else -> stringResource(R.string.rewarded_not_ready)
+                        },
+                        enabled = rewardedAdUiState.isReady && !rewardedAdUiState.isShowing,
+                        onClick = onDailyChallengeDoubleRewardClick,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            MissionRewardRow(
+                icon = if (weeklyChallengeState.completed) "✓" else "#",
+                title = stringResource(R.string.weekly_challenge_title),
+                detail = if (weeklyChallengeState.completed) {
+                    stringResource(R.string.mission_reward_weekly_completed, weeklyChallengeState.rewardCoins)
+                } else {
+                    stringResource(
+                        R.string.weekly_challenge_progress,
+                        weeklyChallengeState.progress,
+                        weeklyChallengeState.target,
+                        weeklyChallengeState.rewardCoins
+                    )
+                },
+                accent = if (weeklyChallengeState.completed) ArcadeTeal else ArcadeBlue
+            )
+
+            completedAchievements.forEach { achievement ->
+                MissionRewardRow(
+                    icon = if (achievement.claimed) "✓" else "★",
+                    title = stringResource(achievement.titleRes),
+                    detail = if (achievement.claimed) {
+                        stringResource(R.string.mission_reward_claimed_value, achievement.rewardCoins)
+                    } else {
+                        stringResource(R.string.mission_reward_ready_value, achievement.rewardCoins)
+                    },
+                    accent = if (achievement.claimed) ArcadeTeal else ArcadeGold
+                ) {
+                    if (!achievement.claimed) {
+                        SecondaryGameButton(
+                            text = stringResource(R.string.claim_reward),
+                            onClick = { onAchievementClaim(achievement.id) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            if (!hasCompletedReward) {
+                Text(
+                    text = stringResource(R.string.mission_rewards_empty),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MissionRewardRow(
+    icon: String,
+    title: String,
+    detail: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    action: @Composable (() -> Unit)? = null
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.22f)),
+                    .background(accent.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (state.completed) "✓" else "!",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = icon,
+                    style = MaterialTheme.typography.labelLarge,
                     color = accent
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.daily_challenge_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accent
-                )
-                Text(
-                    text = if (state.completed) {
-                        stringResource(R.string.daily_challenge_completed_title)
-                    } else {
-                        stringResource(state.type.titleRes)
-                    },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = if (state.completed) {
-                        stringResource(R.string.daily_challenge_completed_description)
-                    } else {
-                        stringResource(state.type.descriptionRes)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReflexGamePalette.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Surface(
-                color = accent.copy(alpha = if (state.completed) 0.2f else 0.14f),
-                shape = RoundedCornerShape(999.dp),
-                border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.24f))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = if (state.completed) {
-                        stringResource(R.string.daily_challenge_completed_badge)
-                    } else {
-                        stringResource(R.string.daily_challenge_progress, state.progress, state.target)
-                    },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium,
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
                     color = ReflexGamePalette.textPrimary,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
+        action?.invoke()
     }
 }
 
@@ -1041,6 +1961,13 @@ private fun DailyRewardCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = ReflexGamePalette.textSecondary
                     )
+                    Text(
+                        text = stringResource(R.string.daily_reward_next_value, state.nextRewardCoins),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
             DailyRewardProgressLine(state = state)
@@ -1128,6 +2055,7 @@ private fun ProfileProgressCard(
     val currentLevelXp = ((progressionState.level - 1) * 250)
     val nextLevelXp = progressionState.level * 250
     val levelProgress = ((progressionState.xp - currentLevelXp).toFloat() / 250f).coerceIn(0f, 1f)
+    val remainingXp = (nextLevelXp - progressionState.xp).coerceAtLeast(0)
     val rank = rankFor(score = bestScore, level = progressionState.level)
     val achievementCount = progressionState.achievements.count { it.unlocked }
     Surface(
@@ -1191,6 +2119,11 @@ private fun ProfileProgressCard(
             )
             Text(
                 text = stringResource(R.string.xp_value, progressionState.xp, nextLevelXp),
+                style = MaterialTheme.typography.labelMedium,
+                color = ReflexGamePalette.textSecondary
+            )
+            Text(
+                text = stringResource(R.string.xp_to_next_level_value, remainingXp),
                 style = MaterialTheme.typography.labelMedium,
                 color = ReflexGamePalette.textSecondary
             )
@@ -1338,6 +2271,49 @@ private fun AchievementSection(
             style = MaterialTheme.typography.titleMedium,
             color = ReflexGamePalette.textPrimary
         )
+        if (achievements.isEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ReflexGamePalette.cardGlassStrong,
+                shape = RoundedCornerShape(15.dp),
+                border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
+            ) {
+                Text(
+                    text = stringResource(R.string.achievements_empty),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            sortedAchievementsForDisplay(achievements).forEach { achievement ->
+                AchievementCard(
+                    achievement = achievement,
+                    highlighted = achievement.id in unlockedIds,
+                    onClaimClick = { onClaimClick(achievement.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementCategorySection(
+    category: AchievementCategory,
+    achievements: List<AchievementState>,
+    unlockedIds: List<String>,
+    onClaimClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(category.titleRes),
+            style = MaterialTheme.typography.titleSmall,
+            color = ArcadeGold
+        )
         achievements.forEach { achievement ->
             AchievementCard(
                 achievement = achievement,
@@ -1395,7 +2371,7 @@ private fun AchievementCard(
                     SecondaryGameButton(
                         text = stringResource(R.string.claim_reward),
                         onClick = onClaimClick,
-                        modifier = Modifier.width(116.dp)
+                        modifier = Modifier.width(132.dp)
                     )
                 }
             }
@@ -1410,7 +2386,8 @@ private fun AchievementCard(
             )
             Text(
                 text = stringResource(
-                    R.string.achievement_progress_value,
+                    R.string.achievement_progress_percent_value,
+                    achievement.progressPercent,
                     achievement.progress.coerceAtMost(achievement.target),
                     achievement.target,
                     achievement.rewardCoins
@@ -1420,6 +2397,56 @@ private fun AchievementCard(
             )
         }
     }
+}
+
+private fun sortedAchievementsForDisplay(
+    achievements: List<AchievementState>
+): List<AchievementState> {
+    return achievements.sortedWith(
+        compareBy<AchievementState> {
+            when {
+                it.unlocked && !it.claimed -> 0
+                !it.claimed -> 1
+                else -> 2
+            }
+        }.thenBy { it.category.ordinal }
+            .thenBy { it.target }
+            .thenBy { it.id }
+    )
+}
+
+@Composable
+private fun LevelUpPopup(
+    level: Int,
+    coinBonus: Int,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = stringResource(R.string.ok),
+                    color = ArcadeGold
+                )
+            }
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.level_up_value, level),
+                color = ReflexGamePalette.textPrimary
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.level_up_bonus_message, coinBonus),
+                color = ReflexGamePalette.textSecondary
+            )
+        },
+        containerColor = ReflexGamePalette.cardGlassStrong,
+        titleContentColor = ReflexGamePalette.textPrimary,
+        textContentColor = ReflexGamePalette.textSecondary
+    )
 }
 
 @Composable
@@ -1495,19 +2522,36 @@ private fun LeaderboardSection(
                 color = if (snapshot.isOffline) ArcadeGold else ArcadeTeal
             )
         }
-        Text(
-            text = if (snapshot.motivationRes == R.string.leaderboard_motivation_pass_player) {
-                stringResource(
-                    snapshot.motivationRes,
-                    snapshot.motivationPlayerName,
-                    snapshot.motivationScoreGap
+        if (snapshot.entries.isEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ReflexGamePalette.cardGlassStrong,
+                shape = RoundedCornerShape(15.dp),
+                border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
+            ) {
+                Text(
+                    text = stringResource(R.string.leaderboard_empty),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center
                 )
-            } else {
-                stringResource(snapshot.motivationRes)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = ArcadeGold
-        )
+            }
+        } else {
+            Text(
+                text = if (snapshot.motivationRes == R.string.leaderboard_motivation_pass_player) {
+                    stringResource(
+                        snapshot.motivationRes,
+                        snapshot.motivationPlayerName,
+                        snapshot.motivationScoreGap
+                    )
+                } else {
+                    stringResource(snapshot.motivationRes)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = ArcadeGold
+            )
+        }
         snapshot.entries.forEach { entry ->
             val accent = when {
                 entry.isPlayer -> ArcadeGold
@@ -1526,7 +2570,7 @@ private fun LeaderboardSection(
                     horizontalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
                     Text(
-                        text = "#${entry.rank}",
+                        text = stringResource(R.string.leaderboard_rank_value, entry.rank),
                         modifier = Modifier.width(34.dp),
                         style = MaterialTheme.typography.titleSmall,
                         color = if (entry.rank <= 3 || entry.isPlayer) ArcadeGold else ReflexGamePalette.textSecondary
@@ -1540,7 +2584,11 @@ private fun LeaderboardSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (entry.isPlayer) {
-                                stringResource(R.string.leaderboard_you_named, entry.name)
+                                if (entry.name.isBlank()) {
+                                    stringResource(R.string.leaderboard_you)
+                                } else {
+                                    stringResource(R.string.leaderboard_you_named, entry.name)
+                                }
                             } else {
                                 entry.name
                             },
@@ -1692,16 +2740,22 @@ private fun WeeklyChallengeCard(
 @Composable
 private fun PlayerNameDialog(
     currentName: String,
+    hasCurrentName: Boolean,
     onSave: (String) -> Boolean,
     onDismiss: () -> Unit
 ) {
-    var name by remember(currentName) { mutableStateOf(currentName.ifBlank { randomPlayerNameSuggestion() }) }
+    val playerNameSuggestions = stringArrayResource(R.array.player_name_suggestions).toList()
+    var name by remember(currentName, hasCurrentName) {
+        mutableStateOf(if (hasCurrentName) currentName else playerNameSuggestions.random())
+    }
     var hasError by remember { mutableStateOf(false) }
     val titleText = stringResource(R.string.player_name_dialog_title)
     val descriptionText = stringResource(R.string.player_name_dialog_description)
     val hintText = stringResource(R.string.player_name_dialog_hint)
     val saveText = stringResource(R.string.player_name_save)
     val errorText = stringResource(R.string.player_name_error)
+    val randomNameText = stringResource(R.string.player_name_random)
+    val suggestionsText = stringResource(R.string.player_name_suggestions)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1713,7 +2767,10 @@ private fun PlayerNameDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     text = descriptionText,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1722,13 +2779,19 @@ private fun PlayerNameDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = {
-                        name = it.take(12)
+                        name = it.take(PLAYER_NAME_MAX_LENGTH)
                         hasError = false
                     },
                     singleLine = true,
                     isError = hasError,
                     label = {
                         Text(text = hintText)
+                    },
+                    supportingText = {
+                        Text(
+                            text = stringResource(R.string.player_name_character_count, name.length, PLAYER_NAME_MAX_LENGTH),
+                            color = ReflexGamePalette.textSecondary
+                        )
                     }
                 )
                 if (hasError) {
@@ -1738,21 +2801,60 @@ private fun PlayerNameDialog(
                         color = ArcadeCoral
                     )
                 }
+                Text(
+                    text = suggestionsText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textSecondary
+                )
+                playerNameSuggestions.chunked(3).forEach { rowSuggestions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowSuggestions.forEach { suggestion ->
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        name = suggestion
+                                        hasError = false
+                                    },
+                                color = if (name == suggestion) ArcadeTeal.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(999.dp),
+                                border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = if (name == suggestion) 0.52f else 0.22f))
+                            ) {
+                                Text(
+                                    text = suggestion,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = ReflexGamePalette.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+                SecondaryGameButton(
+                    text = randomNameText,
+                    onClick = {
+                        name = playerNameSuggestions.random()
+                        hasError = false
+                    }
+                )
             }
         },
         confirmButton = {
             PrimaryGameButton(
                 text = saveText,
                 onClick = {
-                    hasError = !onSave(name)
+                    val candidate = name.trim().take(PLAYER_NAME_MAX_LENGTH)
+                    hasError = candidate.isBlank() || !onSave(candidate)
                 }
             )
         }
     )
-}
-
-private fun randomPlayerNameSuggestion(): String {
-    return listOf("Nova", "Blitz", "Echo", "Pulse", "Shadow", "CyberX").random()
 }
 
 @Composable
@@ -1823,6 +2925,175 @@ private fun dailyRewardText(state: DailyRewardState): String {
 }
 
 @Composable
+private fun ThemeTargetCard(
+    progressionState: ProgressionState,
+    modifier: Modifier = Modifier
+) {
+    val targetTheme = PlayerTheme.entries
+        .filterNot { it in progressionState.unlockedThemes }
+        .filter { it.coinPrice > 0 }
+        .minByOrNull { it.coinPrice }
+
+    if (targetTheme == null) {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            color = ReflexGamePalette.cardGlassStrong,
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
+        ) {
+            Text(
+                text = stringResource(R.string.theme_target_all_unlocked_empty),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ReflexGamePalette.textPrimary,
+                textAlign = TextAlign.Center
+            )
+        }
+        return
+    }
+
+    val currentCoins = progressionState.coins.coerceAtLeast(0)
+    val progress = (currentCoins.toFloat() / targetTheme.coinPrice.toFloat()).coerceIn(0f, 1f)
+    val cappedCoins = currentCoins.coerceAtMost(targetTheme.coinPrice)
+    val completionPercent = (progress * 100f).toInt().coerceIn(0, 100)
+    val accent = themeAccentColor(targetTheme)
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.theme_target_title),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(targetTheme.titleRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.theme_target_completion, completionPercent),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(999.dp)),
+                color = accent,
+                trackColor = Color.White.copy(alpha = 0.08f)
+            )
+            Text(
+                text = stringResource(R.string.theme_target_progress, cappedCoins, targetTheme.coinPrice),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoinChestCard(
+    state: CoinChestState,
+    rewardedAdUiState: RewardedAdUiState,
+    onOpenClick: () -> Unit
+) {
+    val canOpen = state.canOpen && rewardedAdUiState.isReady && !rewardedAdUiState.isShowing
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.38f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeGold.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ArcadeGold
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.coin_chest_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.coin_chest_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val lastRewardText = if (state.lastRewardCoins > 0) {
+                    " • ${stringResource(R.string.coin_chest_last_reward, state.lastRewardCoins)}"
+                } else {
+                    ""
+                }
+                Text(
+                    text = stringResource(R.string.coin_chest_remaining, state.remainingOpens, state.maxOpensPerDay) + lastRewardText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (state.canOpen) ArcadeGold else ReflexGamePalette.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SecondaryGameButton(
+                text = when {
+                    !state.canOpen -> stringResource(R.string.coin_chest_limit_reached)
+                    rewardedAdUiState.isLoading || rewardedAdUiState.isShowing -> stringResource(R.string.rewarded_loading)
+                    !rewardedAdUiState.isReady -> stringResource(R.string.rewarded_not_ready)
+                    else -> stringResource(R.string.coin_chest_open)
+                },
+                enabled = canOpen,
+                onClick = onOpenClick
+            )
+        }
+    }
+}
+
+@Composable
 private fun ThemeShopSection(
     progressionState: ProgressionState,
     selectedLanguage: AppLanguage,
@@ -1833,42 +3104,164 @@ private fun ThemeShopSection(
 ) {
     var unlockedThemePopup by remember { mutableStateOf<PlayerTheme?>(null) }
 
-    unlockedThemePopup?.let { theme ->
-        ThemeUnlockDialog(
-            theme = theme,
-            selectedLanguage = selectedLanguage,
-            onDismiss = { unlockedThemePopup = null },
-            onSelectClick = {
-                onThemeSelect(theme)
-                unlockedThemePopup = null
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.theme_shop_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = ReflexGamePalette.textPrimary
+            )
+            PlayerTheme.entries.forEach { theme ->
+                ThemeCard(
+                    theme = theme,
+                    selected = progressionState.activeTheme == theme,
+                    trialActive = progressionState.trialTheme == theme,
+                    unlocked = theme in progressionState.unlockedThemes,
+                    canBuy = progressionState.coins >= theme.coinPrice,
+                    currentCoins = progressionState.coins,
+                    onSelect = { onThemeSelect(theme) },
+                    onBuy = {
+                        onThemeBuy(theme)
+                        if (progressionState.coins >= theme.coinPrice) {
+                            unlockedThemePopup = theme
+                        }
+                    },
+                    onTrial = { onThemeTrial(theme) }
+                )
             }
-        )
+        }
+
+        unlockedThemePopup?.let { theme ->
+            ThemeUnlockCelebration(
+                theme = theme,
+                selectedLanguage = selectedLanguage,
+                onDismiss = { unlockedThemePopup = null },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 38.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeUnlockCelebration(
+    theme: PlayerTheme,
+    selectedLanguage: AppLanguage,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spec = themeVisualSpec(theme)
+    val title = localizedHomeStringResource(R.string.theme_unlocked_popup_title, selectedLanguage)
+    val pulse by rememberInfiniteTransition(label = "theme_unlock_glow").animateFloat(
+        initialValue = 0.82f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 420),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "theme_unlock_glow_value"
+    )
+    val confettiProgress by rememberInfiniteTransition(label = "theme_unlock_confetti").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 820),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "theme_unlock_confetti_value"
+    )
+
+    LaunchedEffect(theme) {
+        delay(THEME_UNLOCK_CELEBRATION_DURATION_MS)
+        onDismiss()
     }
 
-    Column(
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, spec.primary.copy(alpha = 0.72f))
     ) {
-        Text(
-            text = stringResource(R.string.theme_shop_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = ReflexGamePalette.textPrimary
-        )
-        PlayerTheme.entries.forEach { theme ->
-            ThemeCard(
-                theme = theme,
-                selected = progressionState.activeTheme == theme,
-                trialActive = progressionState.trialTheme == theme,
-                unlocked = theme in progressionState.unlockedThemes,
-                canBuy = progressionState.coins >= theme.coinPrice,
-                onSelect = { onThemeSelect(theme) },
-                onBuy = {
-                    onThemeBuy(theme)
-                    if (progressionState.coins >= theme.coinPrice) {
-                        unlockedThemePopup = theme
-                    }
-                },
-                onTrial = { onThemeTrial(theme) }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(118.dp)
+                .graphicsLayer {
+                    shadowElevation = 18f + pulse * 10f
+                    scaleX = 0.98f + pulse * 0.02f
+                    scaleY = 0.98f + pulse * 0.02f
+                }
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            spec.primary.copy(alpha = 0.28f),
+                            spec.secondary.copy(alpha = 0.12f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .padding(14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            ThemeUnlockConfetti(
+                primaryColor = spec.primary,
+                secondaryColor = spec.secondary,
+                progress = confettiProgress,
+                modifier = Modifier.fillMaxSize()
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(spec.primary.copy(alpha = 0.22f))
+                        .border(1.dp, spec.primary.copy(alpha = 0.62f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "★",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = spec.primary
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeUnlockConfetti(
+    primaryColor: Color,
+    secondaryColor: Color,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val colors = listOf(primaryColor, secondaryColor, ArcadeGold, ArcadeTeal)
+        repeat(18) { index ->
+            val xSeed = ((index * 37) % 100) / 100f
+            val ySeed = ((index * 19) % 70) / 100f
+            val x = size.width * xSeed
+            val y = (size.height * (ySeed + progress * 0.82f)) % size.height
+            drawCircle(
+                color = colors[index % colors.size].copy(alpha = 0.78f),
+                radius = (2 + index % 3).dp.toPx(),
+                center = Offset(x, y)
             )
         }
     }
@@ -1881,12 +3274,21 @@ private fun ThemeCard(
     trialActive: Boolean,
     unlocked: Boolean,
     canBuy: Boolean,
+    currentCoins: Int,
     onSelect: () -> Unit,
     onBuy: () -> Unit,
     onTrial: () -> Unit
 ) {
     val spec = themeVisualSpec(theme)
     val accent = spec.primary
+    val isPrestigeTheme = theme == PlayerTheme.MatrixGreen
+    val safeCoinCount = currentCoins.coerceAtLeast(0)
+    val remainingCoins = (theme.coinPrice - safeCoinCount).coerceAtLeast(0)
+    val unlockProgress = if (theme.coinPrice > 0) {
+        (safeCoinCount.toFloat() / theme.coinPrice.toFloat()).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
     val rarityGlow = when (theme.rarity) {
         ThemeRarity.Common -> 0.18f
         ThemeRarity.Rare -> 0.28f
@@ -1951,6 +3353,22 @@ private fun ThemeCard(
                             )
                         }
                     }
+                    if (isPrestigeTheme) {
+                        Surface(
+                            color = ArcadeGold.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(999.dp),
+                            border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
+                        ) {
+                            Text(
+                                text = stringResource(R.string.theme_prestige_label),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ArcadeGold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                     Text(
                         text = stringResource(theme.descriptionRes),
                         style = MaterialTheme.typography.bodySmall,
@@ -1963,13 +3381,32 @@ private fun ThemeCard(
                             trialActive -> stringResource(R.string.theme_trial_active)
                             selected -> stringResource(R.string.theme_selected)
                             unlocked -> stringResource(R.string.theme_unlocked)
-                            else -> stringResource(R.string.theme_price, theme.coinPrice)
+                            canBuy -> stringResource(R.string.theme_price_affordable, theme.coinPrice)
+                            else -> stringResource(R.string.theme_price_locked, theme.coinPrice)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (canBuy || unlocked || selected || trialActive) accent else ReflexGamePalette.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (isPrestigeTheme && !unlocked) {
+                        Text(
+                            text = stringResource(R.string.theme_target_remaining, remainingCoins),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ArcadeGold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        LinearProgressIndicator(
+                            progress = { unlockProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(999.dp)),
+                            color = accent,
+                            trackColor = Color.White.copy(alpha = 0.08f)
+                        )
+                    }
                 }
                 Column(
                     modifier = Modifier.width(132.dp),
@@ -1979,7 +3416,8 @@ private fun ThemeCard(
                         text = when {
                             selected -> stringResource(R.string.theme_selected)
                             unlocked -> stringResource(R.string.select_theme)
-                            else -> stringResource(R.string.buy_theme)
+                            canBuy -> stringResource(R.string.buy_theme)
+                            else -> stringResource(R.string.theme_locked)
                         },
                         enabled = when {
                             selected -> false
@@ -2066,50 +3504,6 @@ private fun ThemePreview(
             overflow = TextOverflow.Ellipsis
         )
     }
-}
-
-@Composable
-private fun ThemeUnlockDialog(
-    theme: PlayerTheme,
-    selectedLanguage: AppLanguage,
-    onDismiss: () -> Unit,
-    onSelectClick: () -> Unit
-) {
-    val spec = themeVisualSpec(theme)
-    val title = localizedHomeStringResource(R.string.theme_unlocked_popup_title, selectedLanguage)
-    val themeTitle = localizedHomeStringResource(theme.titleRes, selectedLanguage)
-    val message = localizedHomeStringResource(
-        id = R.string.theme_unlocked_popup_message,
-        selectedLanguage = selectedLanguage,
-        themeTitle
-    )
-    val selectText = localizedHomeStringResource(R.string.select_theme, selectedLanguage)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        title = {
-            Text(
-                text = title,
-                color = spec.primary
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemePreview(theme = theme, pulse = 1f)
-                Text(
-                    text = message,
-                    color = ReflexGamePalette.textSecondary
-                )
-            }
-        },
-        confirmButton = {
-            PrimaryGameButton(
-                text = selectText,
-                onClick = onSelectClick
-            )
-        }
-    )
 }
 
 @Composable

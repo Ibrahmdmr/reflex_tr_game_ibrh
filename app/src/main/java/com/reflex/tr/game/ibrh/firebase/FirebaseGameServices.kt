@@ -115,10 +115,39 @@ enum class FirebaseEvent(val eventName: String) {
     GameStart("game_start"),
     GameOver("game_over"),
     RewardedAdWatched("rewarded_ad_watched"),
+    ModeSelected("mode_selected"),
+    ThemeSelected("theme_selected"),
     ThemePurchased("theme_purchased"),
-    LeaderboardOpen("leaderboard_open"),
-    LeaderboardRefresh("leaderboard_refresh"),
+    DailyRewardClaimed("daily_reward_claimed"),
+    StreakProtected("streak_protected"),
+    ChallengeCompleted("challenge_completed"),
+    ChallengeRewardDoubled("challenge_reward_doubled"),
+    LeaderboardOpened("leaderboard_opened"),
+    LeaderboardRefreshed("leaderboard_refreshed"),
+    ProfileOpened("profile_opened"),
+    ShopOpened("shop_opened"),
     LeaderboardScoreUpload("leaderboard_score_upload"),
     LeaderboardUploadFailed("leaderboard_upload_failed"),
-    PlayerNameChanged("player_name_changed")
+    PlayerNameChanged("player_name_changed"),
+    AchievementUnlocked("achievement_unlocked"),
+    AchievementClaimed("achievement_claimed"),
+    LevelUp("level_up"),
+    RankChanged("rank_changed")
+}
+
+enum class FirebaseParam(val key: String) {
+    ModeName("mode_name"),
+    ThemeName("theme_name"),
+    CoinAmount("coin_amount"),
+    ChallengeName("challenge_name"),
+    StreakDay("streak_day"),
+    Score("score"),
+    MaxCombo("max_combo"),
+    NewBest("new_best"),
+    NameLength("name_length"),
+    Period("period"),
+    Placement("placement"),
+    AchievementId("achievement_id"),
+    Level("level"),
+    RankName("rank_name")
 }

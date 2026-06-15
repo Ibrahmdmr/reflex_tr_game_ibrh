@@ -278,7 +278,7 @@ fun PrimaryGameButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
@@ -314,7 +314,8 @@ fun SecondaryGameButton(
         )
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isLoading) {
@@ -326,8 +327,9 @@ fun SecondaryGameButton(
             }
             Text(
                 text = text,
+                modifier = Modifier.padding(horizontal = 4.dp),
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )

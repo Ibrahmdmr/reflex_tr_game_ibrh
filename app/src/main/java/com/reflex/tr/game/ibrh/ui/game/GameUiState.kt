@@ -76,7 +76,9 @@ enum class RewardedAction {
     Continue,
     DoubleCoins,
     UnlockTheme,
-    ProtectStreak
+    ProtectStreak,
+    CoinChest,
+    DailyChallengeDoubleReward
 }
 
 enum class ThemeRarity(@StringRes val titleRes: Int) {
@@ -105,70 +107,70 @@ enum class PlayerTheme(
         storageKey = "cyber_blue",
         titleRes = R.string.theme_cyber_blue,
         descriptionRes = R.string.theme_cyber_blue_description,
-        coinPrice = 500,
+        coinPrice = 600,
         rarity = ThemeRarity.Rare
     ),
     PurpleStorm(
         storageKey = "purple_storm",
         titleRes = R.string.theme_purple_storm,
         descriptionRes = R.string.theme_purple_storm_description,
-        coinPrice = 1200,
+        coinPrice = 1500,
         rarity = ThemeRarity.Rare
     ),
     IceNeon(
         storageKey = "ice_neon",
         titleRes = R.string.theme_ice_neon,
         descriptionRes = R.string.theme_ice_neon_description,
-        coinPrice = 2500,
+        coinPrice = 3500,
         rarity = ThemeRarity.Epic
     ),
     LavaCore(
         storageKey = "lava_core",
         titleRes = R.string.theme_lava_core,
         descriptionRes = R.string.theme_lava_core_description,
-        coinPrice = 4000,
+        coinPrice = 6500,
         rarity = ThemeRarity.Epic
     ),
     ToxicPulse(
         storageKey = "toxic_pulse",
         titleRes = R.string.theme_toxic_pulse,
         descriptionRes = R.string.theme_toxic_pulse_description,
-        coinPrice = 6500,
+        coinPrice = 10000,
         rarity = ThemeRarity.Epic
     ),
     MatrixGreen(
         storageKey = "matrix_green",
         titleRes = R.string.theme_matrix_green,
         descriptionRes = R.string.theme_matrix_green_description,
-        coinPrice = 100000,
+        coinPrice = 90000,
         rarity = ThemeRarity.Mythic
     ),
     GoldFire(
         storageKey = "gold_fire",
         titleRes = R.string.theme_gold_fire,
         descriptionRes = R.string.theme_gold_fire_description,
-        coinPrice = 15000,
+        coinPrice = 18000,
         rarity = ThemeRarity.Mythic
     ),
     ShadowBlack(
         storageKey = "shadow_black",
         titleRes = R.string.theme_shadow_black,
         descriptionRes = R.string.theme_shadow_black_description,
-        coinPrice = 18000,
+        coinPrice = 26000,
         rarity = ThemeRarity.Legendary
     ),
     GalaxyWave(
         storageKey = "galaxy_wave",
         titleRes = R.string.theme_galaxy_wave,
         descriptionRes = R.string.theme_galaxy_wave_description,
-        coinPrice = 25000,
+        coinPrice = 42000,
         rarity = ThemeRarity.Mythic
     ),
     RainbowFlux(
         storageKey = "rainbow_flux",
         titleRes = R.string.theme_rainbow_flux,
         descriptionRes = R.string.theme_rainbow_flux_description,
-        coinPrice = 30000,
+        coinPrice = 60000,
         rarity = ThemeRarity.Legendary
     )
 }
@@ -179,6 +181,35 @@ enum class DailyRewardType {
 }
 
 val DailyRewardCoinPlan = listOf(50, 75, 100, 150, 200, 300, 500)
+val CoinChestRewardPlan = listOf(50, 75, 100, 150, 250)
+const val OneMoreGameBonusCoins = 25
+private const val OneMoreGameBonusOfferLimit = 3
+
+data class OneMoreGameBonusState(
+    val dateKey: String = "",
+    val gamesPlayedToday: Int = 0,
+    val bonusClaimedToday: Boolean = false,
+    val rewardCoins: Int = OneMoreGameBonusCoins
+) {
+    val shouldShowGameOverOffer: Boolean
+        get() = !bonusClaimedToday && gamesPlayedToday in 1 until OneMoreGameBonusOfferLimit
+
+    val shouldRewardNextCompletedGame: Boolean
+        get() = shouldShowGameOverOffer
+}
+
+data class CoinChestState(
+    val openedToday: Int = 0,
+    val maxOpensPerDay: Int = 3,
+    val lastOpenedDate: String = "",
+    val lastRewardCoins: Int = 0
+) {
+    val remainingOpens: Int
+        get() = (maxOpensPerDay - openedToday).coerceAtLeast(0)
+
+    val canOpen: Boolean
+        get() = remainingOpens > 0
+}
 
 data class DailyRewardState(
     val streakDay: Int = 1,
@@ -203,10 +234,13 @@ data class ProgressionState(
     val totalGames: Int = 0,
     val totalHits: Int = 0,
     val lifetimeMaxCombo: Int = 0,
+    val rewardedAdWatchCount: Int = 0,
     val selectedTheme: PlayerTheme = PlayerTheme.NeonRed,
     val unlockedThemes: Set<PlayerTheme> = setOf(PlayerTheme.NeonRed),
     val trialTheme: PlayerTheme? = null,
     val trialGamesRemaining: Int = 0,
+    val coinChest: CoinChestState = CoinChestState(),
+    val oneMoreGameBonus: OneMoreGameBonusState = OneMoreGameBonusState(),
     val dailyReward: DailyRewardState = DailyRewardState(),
     val achievements: List<AchievementState> = emptyList(),
     val weeklyChallenge: ChallengeState = ChallengeState.defaultWeekly(),
@@ -218,18 +252,26 @@ data class ProgressionState(
 }
 
 enum class AchievementType {
-    PlayGames,
+    BreakRecord,
     ScoreInSingleGame,
-    HitTargets,
+    PlayGames,
     ReachCombo,
-    FakeTargetScore,
-    ColorReflexScore,
-    BreakRecord
+    RewardedAds,
+    ThemesUnlocked
+}
+
+enum class AchievementCategory(@StringRes val titleRes: Int) {
+    Score(R.string.achievement_category_score),
+    Game(R.string.achievement_category_game),
+    Combo(R.string.achievement_category_combo),
+    Ads(R.string.achievement_category_ads),
+    Theme(R.string.achievement_category_theme)
 }
 
 data class AchievementState(
     val id: String,
     val type: AchievementType,
+    val category: AchievementCategory,
     @StringRes val titleRes: Int,
     @StringRes val descriptionRes: Int,
     val target: Int,
@@ -295,14 +337,14 @@ enum class RankTier(@StringRes val titleRes: Int) {
 }
 
 data class PlayerProfile(
-    val name: String = "Oyuncu",
+    val name: String = "",
     val title: PlayerTitle = PlayerTitle.ReflexHunter,
     val weeklyBestScore: Int = 0,
     val weeklyBestScoresByMode: Map<GameMode, Int> = GameMode.entries.associateWith { 0 },
     val hasCompletedNamePrompt: Boolean = false
 ) {
     val hasName: Boolean
-        get() = name.isNotBlank() && name != "Oyuncu"
+        get() = name.isNotBlank()
 }
 
 enum class LeaderboardPeriod {
@@ -331,7 +373,10 @@ data class DailyChallengeState(
     val target: Int,
     val progress: Int,
     val completed: Boolean,
-    val createdDate: String
+    val createdDate: String,
+    val rewardCoins: Int = 100,
+    val rewardClaimed: Boolean = false,
+    val doubleRewardClaimed: Boolean = false
 ) {
     companion object {
         fun default(): DailyChallengeState {
@@ -341,7 +386,8 @@ data class DailyChallengeState(
                 target = DailyChallenge.Score20.targetValue,
                 progress = 0,
                 completed = false,
-                createdDate = ""
+                createdDate = "",
+                rewardCoins = 100
             )
         }
     }
@@ -400,6 +446,7 @@ data class GameUiState(
     val baseCoinsThisGame: Int = 0,
     val isCoinDoubleClaimed: Boolean = false,
     val pendingRewardedAction: RewardedAction? = null,
+    val oneMoreGameBonusEarnedThisGame: Int = 0,
     val isPaused: Boolean = false,
     val isResumeGracePeriod: Boolean = false,
     val isGameOver: Boolean = false,

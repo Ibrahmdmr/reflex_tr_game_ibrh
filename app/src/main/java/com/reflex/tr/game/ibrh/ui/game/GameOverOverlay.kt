@@ -54,6 +54,7 @@ fun GameOverOverlay(
     earnedCoins: Int,
     baseCoins: Int,
     totalCoins: Int,
+    oneMoreGameBonusMessage: String?,
     isCoinDoubleClaimed: Boolean,
     showContinueButton: Boolean,
     continueButtonText: String,
@@ -77,6 +78,11 @@ fun GameOverOverlay(
         label = "new_record_scale"
     )
     val scrollState = rememberScrollState()
+    val isNearRecord = isNearRecordScore(
+        score = score,
+        bestScore = bestScore,
+        isNewBestScore = isNewBestScore
+    )
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val isCompactHeight = maxHeight <= 720.dp
@@ -118,7 +124,8 @@ fun GameOverOverlay(
                         score = score,
                         bestScore = bestScore,
                         isNewBestScore = isNewBestScore,
-                        showContinueButton = showContinueButton
+                        showContinueButton = showContinueButton,
+                        isNearRecord = isNearRecord
                     ),
                     style = MaterialTheme.typography.headlineSmall,
                     color = ReflexGamePalette.textPrimary,
@@ -126,6 +133,17 @@ fun GameOverOverlay(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                if (isNearRecord) {
+                    Text(
+                        text = stringResource(R.string.game_over_near_record_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ArcadeGold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Text(
                     text = stringResource(mode.titleRes),
@@ -165,6 +183,25 @@ fun GameOverOverlay(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                if (!oneMoreGameBonusMessage.isNullOrBlank()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = ArcadeGold.copy(alpha = 0.13f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
+                    ) {
+                        Text(
+                            text = oneMoreGameBonusMessage,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ArcadeGold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 Row(
@@ -294,16 +331,28 @@ private fun gameOverHeadline(
     score: Int,
     bestScore: Int,
     isNewBestScore: Boolean,
-    showContinueButton: Boolean
+    showContinueButton: Boolean,
+    isNearRecord: Boolean
 ): String {
     return when {
         isNewBestScore -> stringResource(R.string.game_over_title)
-        showContinueButton && bestScore > 0 && score >= (bestScore - 3).coerceAtLeast(0) ->
-            stringResource(R.string.continue_almost_record_title)
+        isNearRecord -> stringResource(R.string.continue_almost_record_title)
         showContinueButton -> stringResource(R.string.continue_offer_title)
         else -> stringResource(R.string.game_over_title)
     }
 }
+
+private fun isNearRecordScore(
+    score: Int,
+    bestScore: Int,
+    isNewBestScore: Boolean
+): Boolean {
+    if (isNewBestScore || bestScore <= 0 || score >= bestScore) return false
+    val thresholdScore = (bestScore * NEAR_RECORD_THRESHOLD_PERCENT + 99) / 100
+    return score >= thresholdScore
+}
+
+private const val NEAR_RECORD_THRESHOLD_PERCENT = 80
 
 @Composable
 private fun CoinEarnedCard(

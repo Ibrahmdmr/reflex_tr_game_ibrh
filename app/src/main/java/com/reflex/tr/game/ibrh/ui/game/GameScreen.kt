@@ -17,10 +17,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -62,8 +65,18 @@ fun GameScreen(
     rewardedAdUiState: RewardedAdUiState = RewardedAdUiState(),
     selectedLanguage: AppLanguage = AppLanguage.Turkish,
     isSoundEnabled: Boolean = true,
+    isEffectSoundEnabled: Boolean = true,
+    isVibrationEnabled: Boolean = true,
+    isDailyRewardNotificationEnabled: Boolean = false,
+    isStreakNotificationEnabled: Boolean = false,
+    isNewMissionNotificationEnabled: Boolean = false,
     onLanguageSelected: (AppLanguage) -> Unit = {},
     onSoundEnabledChange: (Boolean) -> Unit = {},
+    onEffectSoundEnabledChange: (Boolean) -> Unit = {},
+    onVibrationEnabledChange: (Boolean) -> Unit = {},
+    onDailyRewardNotificationChange: (Boolean) -> Unit = {},
+    onStreakNotificationChange: (Boolean) -> Unit = {},
+    onNewMissionNotificationChange: (Boolean) -> Unit = {},
     onRewardedAdRequested: (RewardedAction, onRewardEarned: () -> Unit) -> Unit = { _, onRewardEarned ->
         onRewardEarned()
     },
@@ -84,14 +97,33 @@ fun GameScreen(
         rewardedAdUiState = rewardedAdUiState,
         selectedLanguage = selectedLanguage,
         isSoundEnabled = isSoundEnabled,
+        isEffectSoundEnabled = isEffectSoundEnabled,
+        isVibrationEnabled = isVibrationEnabled,
+        isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
+        isStreakNotificationEnabled = isStreakNotificationEnabled,
+        isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
         onStartClick = viewModel::startGame,
         onModeStartClick = viewModel::selectMode,
         onHowToPlayClick = onHowToPlayClick,
         onLanguageSelected = onLanguageSelected,
         onSoundEnabledChange = onSoundEnabledChange,
+        onEffectSoundEnabledChange = onEffectSoundEnabledChange,
+        onVibrationEnabledChange = onVibrationEnabledChange,
+        onDailyRewardNotificationChange = onDailyRewardNotificationChange,
+        onStreakNotificationChange = onStreakNotificationChange,
+        onNewMissionNotificationChange = onNewMissionNotificationChange,
         onDailyRewardClaim = viewModel::claimDailyReward,
         onDailyStreakProtect = {
             onRewardedAdRequested(RewardedAction.ProtectStreak, viewModel::protectDailyRewardStreak)
+        },
+        onCoinChestClick = {
+            onRewardedAdRequested(RewardedAction.CoinChest, viewModel::onCoinChestRewardEarned)
+        },
+        onDailyChallengeDoubleRewardClick = {
+            onRewardedAdRequested(
+                RewardedAction.DailyChallengeDoubleReward,
+                viewModel::onDailyChallengeDoubleRewardEarned
+            )
         },
         onAchievementClaim = viewModel::claimAchievementReward,
         onThemeSelect = viewModel::selectTheme,
@@ -131,13 +163,25 @@ fun GameScreen(
     rewardedAdUiState: RewardedAdUiState,
     selectedLanguage: AppLanguage,
     isSoundEnabled: Boolean,
+    isEffectSoundEnabled: Boolean = true,
+    isVibrationEnabled: Boolean = true,
+    isDailyRewardNotificationEnabled: Boolean = false,
+    isStreakNotificationEnabled: Boolean = false,
+    isNewMissionNotificationEnabled: Boolean = false,
     onStartClick: () -> Unit,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
     onLanguageSelected: (AppLanguage) -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
+    onEffectSoundEnabledChange: (Boolean) -> Unit = {},
+    onVibrationEnabledChange: (Boolean) -> Unit = {},
+    onDailyRewardNotificationChange: (Boolean) -> Unit = {},
+    onStreakNotificationChange: (Boolean) -> Unit = {},
+    onNewMissionNotificationChange: (Boolean) -> Unit = {},
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onCoinChestClick: () -> Unit = {},
+    onDailyChallengeDoubleRewardClick: () -> Unit = {},
     onAchievementClaim: (String) -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
@@ -157,7 +201,7 @@ fun GameScreen(
     onRetryClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val soundHooks = rememberGameSoundHooks(isSoundEnabled = isSoundEnabled)
+    val soundHooks = rememberGameSoundHooks(isSoundEnabled = isSoundEnabled && isEffectSoundEnabled)
     val selectedThemeSpec = themeVisualSpec(uiState.progressionState.activeTheme)
     val backgroundPulse by rememberInfiniteTransition(label = "screen_background_pulse").animateFloat(
         initialValue = 0.18f,
@@ -197,7 +241,9 @@ fun GameScreen(
     LaunchedEffect(uiState.lives, uiState.hasGameStarted) {
         if (uiState.hasGameStarted && uiState.lives < previousLives) {
             missFeedbackTrigger += 1
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (isVibrationEnabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
             soundHooks.onMiss()
         }
         previousLives = uiState.lives
@@ -215,7 +261,9 @@ fun GameScreen(
             if (tappedTarget?.role == GameTargetRole.Correct) {
                 hitFeedbackPosition = tappedTarget.position
                 hitFeedbackTrigger += 1
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (isVibrationEnabled) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
                 soundHooks.onHit()
                 val nextCombo = uiState.combo + 1
                 if (nextCombo == 2 || nextCombo == 5 || nextCombo == 10) {
@@ -277,6 +325,13 @@ fun GameScreen(
             stringResource(R.string.rewarded_loading_helper)
         else -> null
     }
+    val oneMoreGameBonusMessage = when {
+        uiState.oneMoreGameBonusEarnedThisGame > 0 ->
+            stringResource(R.string.one_more_game_bonus_claimed, uiState.oneMoreGameBonusEarnedThisGame)
+        uiState.progressionState.oneMoreGameBonus.shouldShowGameOverOffer ->
+            stringResource(R.string.one_more_game_bonus_offer)
+        else -> null
+    }
 
     Box(
         modifier = Modifier
@@ -304,6 +359,7 @@ fun GameScreen(
                 progressionState = uiState.progressionState,
                 playerProfile = uiState.playerProfile,
                 leaderboardSnapshot = uiState.leaderboardSnapshot,
+                rewardedAdUiState = rewardedAdUiState,
                 isSoundEnabled = isSoundEnabled,
                 onStartClick = onStartClick,
                 onModeStartClick = onModeStartClick,
@@ -311,8 +367,21 @@ fun GameScreen(
                 selectedLanguage = selectedLanguage,
                 onLanguageSelected = onLanguageSelected,
                 onSoundToggleClick = { onSoundEnabledChange(!isSoundEnabled) },
+                isEffectSoundEnabled = isEffectSoundEnabled,
+                isVibrationEnabled = isVibrationEnabled,
+                isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
+                isStreakNotificationEnabled = isStreakNotificationEnabled,
+                isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
+                onSoundEnabledChange = onSoundEnabledChange,
+                onEffectSoundEnabledChange = onEffectSoundEnabledChange,
+                onVibrationEnabledChange = onVibrationEnabledChange,
+                onDailyRewardNotificationChange = onDailyRewardNotificationChange,
+                onStreakNotificationChange = onStreakNotificationChange,
+                onNewMissionNotificationChange = onNewMissionNotificationChange,
                 onDailyRewardClaim = onDailyRewardClaim,
                 onDailyStreakProtect = onDailyStreakProtect,
+                onCoinChestClick = onCoinChestClick,
+                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                 onAchievementClaim = onAchievementClaim,
                 onThemeSelect = onThemeSelect,
                 onThemeBuy = onThemeBuy,
@@ -364,6 +433,7 @@ fun GameScreen(
                     earnedCoins = uiState.earnedCoinsThisGame,
                     baseCoins = uiState.baseCoinsThisGame,
                     totalCoins = uiState.progressionState.coins,
+                    oneMoreGameBonusMessage = oneMoreGameBonusMessage,
                     isCoinDoubleClaimed = uiState.isCoinDoubleClaimed,
                     showContinueButton = shouldShowContinueSlot,
                     continueButtonText = continueButtonText,
@@ -440,10 +510,17 @@ private fun ExitGameDialog(
             )
         },
         text = {
-            Text(
-                text = "$message\n\n$fomoMessage",
-                color = ReflexGamePalette.textSecondary
-            )
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = message,
+                    color = ReflexGamePalette.textSecondary
+                )
+                Text(
+                    text = fomoMessage,
+                    modifier = Modifier.padding(top = 12.dp),
+                    color = ReflexGamePalette.textSecondary
+                )
+            }
         },
         confirmButton = {
             PrimaryGameButton(
@@ -600,7 +677,7 @@ private fun GameOverPreview() {
                 timeLeftSeconds = 0,
                 hasGameStarted = true,
                 isGameOver = true,
-                gameOverReason = "Canların tükendi.",
+                gameOverReasonRes = R.string.game_over_reason_no_lives,
                 canContinueWithReward = true
             ),
             rewardedAdUiState = RewardedAdUiState(isReady = true),

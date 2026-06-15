@@ -13,6 +13,11 @@ private const val GAME_PREFERENCES_NAME = "game_preferences"
 private const val BEST_SCORE_KEY = "best_score"
 private const val LANGUAGE_KEY = "language"
 private const val SOUND_ENABLED_KEY = "sound_enabled"
+private const val EFFECT_SOUND_ENABLED_KEY = "effect_sound_enabled"
+private const val VIBRATION_ENABLED_KEY = "vibration_enabled"
+private const val NOTIFICATION_DAILY_REWARD_KEY = "notification_daily_reward"
+private const val NOTIFICATION_STREAK_KEY = "notification_streak"
+private const val NOTIFICATION_NEW_MISSION_KEY = "notification_new_mission"
 private const val LANGUAGE_TURKISH = "tr"
 private const val LANGUAGE_ENGLISH = "en"
 private const val DAILY_CHALLENGE_ID_KEY = "daily_challenge_id"
@@ -21,15 +26,25 @@ private const val DAILY_CHALLENGE_TARGET_KEY = "daily_challenge_target"
 private const val DAILY_CHALLENGE_PROGRESS_KEY = "daily_challenge_progress"
 private const val DAILY_CHALLENGE_COMPLETED_KEY = "daily_challenge_completed"
 private const val DAILY_CHALLENGE_CREATED_DATE_KEY = "daily_challenge_created_date"
+private const val DAILY_CHALLENGE_REWARD_CLAIMED_KEY = "daily_challenge_reward_claimed"
+private const val DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY = "daily_challenge_double_reward_claimed"
+private const val DAILY_CHALLENGE_REWARD_COINS_KEY = "daily_challenge_reward_coins"
 private const val COINS_KEY = "coins"
 private const val XP_KEY = "xp"
 private const val TOTAL_GAMES_KEY = "total_games"
 private const val TOTAL_HITS_KEY = "total_hits"
 private const val LIFETIME_MAX_COMBO_KEY = "lifetime_max_combo"
+private const val REWARDED_AD_WATCH_COUNT_KEY = "rewarded_ad_watch_count"
 private const val SELECTED_THEME_KEY = "selected_theme"
 private const val UNLOCKED_THEMES_KEY = "unlocked_themes"
 private const val DAILY_REWARD_LAST_CLAIM_DATE_KEY = "daily_reward_last_claim_date"
 private const val DAILY_REWARD_STREAK_KEY = "daily_reward_streak"
+private const val COIN_CHEST_OPEN_DATE_KEY = "coin_chest_open_date"
+private const val COIN_CHEST_OPEN_COUNT_KEY = "coin_chest_open_count"
+private const val COIN_CHEST_LAST_REWARD_KEY = "coin_chest_last_reward"
+private const val ONE_MORE_GAME_BONUS_DATE_KEY = "one_more_game_bonus_date"
+private const val ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY = "one_more_game_bonus_played_count"
+private const val ONE_MORE_GAME_BONUS_CLAIMED_KEY = "one_more_game_bonus_claimed"
 private const val ACHIEVEMENT_CLAIMED_IDS_KEY = "achievement_claimed_ids"
 private const val WEEKLY_CHALLENGE_PROGRESS_KEY = "weekly_challenge_progress"
 private const val WEEKLY_CHALLENGE_CREATED_DATE_KEY = "weekly_challenge_created_date"
@@ -39,7 +54,7 @@ private const val PLAYER_TITLE_KEY = "player_title"
 private const val PLAYER_WEEKLY_SCORE_KEY = "player_weekly_score"
 private const val PLAYER_WEEKLY_SCORE_DATE_KEY = "player_weekly_score_date"
 private const val DAY_IN_MILLIS = 24L * 60L * 60L * 1000L
-private const val DEFAULT_PLAYER_NAME = "Oyuncu"
+private const val DEFAULT_PLAYER_NAME = ""
 
 enum class AppLanguage(val code: String) {
     Turkish(LANGUAGE_TURKISH),
@@ -60,10 +75,20 @@ class GamePreferences(private val context: Context) {
     private val bestScoresState = MutableStateFlow(loadBestScores())
     private val languageState = MutableStateFlow(loadLanguage())
     private val soundEnabledState = MutableStateFlow(loadSoundEnabled())
+    private val effectSoundEnabledState = MutableStateFlow(loadEffectSoundEnabled())
+    private val vibrationEnabledState = MutableStateFlow(loadVibrationEnabled())
+    private val dailyRewardNotificationState = MutableStateFlow(loadDailyRewardNotificationEnabled())
+    private val streakNotificationState = MutableStateFlow(loadStreakNotificationEnabled())
+    private val newMissionNotificationState = MutableStateFlow(loadNewMissionNotificationEnabled())
 
     val bestScoresFlow: Flow<Map<GameMode, Int>> = bestScoresState.asStateFlow()
     val languageFlow: Flow<AppLanguage> = languageState.asStateFlow()
     val soundEnabledFlow: Flow<Boolean> = soundEnabledState.asStateFlow()
+    val effectSoundEnabledFlow: Flow<Boolean> = effectSoundEnabledState.asStateFlow()
+    val vibrationEnabledFlow: Flow<Boolean> = vibrationEnabledState.asStateFlow()
+    val dailyRewardNotificationFlow: Flow<Boolean> = dailyRewardNotificationState.asStateFlow()
+    val streakNotificationFlow: Flow<Boolean> = streakNotificationState.asStateFlow()
+    val newMissionNotificationFlow: Flow<Boolean> = newMissionNotificationState.asStateFlow()
 
     suspend fun saveBestScore(mode: GameMode, score: Int) {
         val key = mode.bestScorePreferenceKey()
@@ -93,6 +118,46 @@ class GamePreferences(private val context: Context) {
         soundEnabledState.value = enabled
     }
 
+    suspend fun saveEffectSoundEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(EFFECT_SOUND_ENABLED_KEY, enabled)
+            .apply()
+
+        effectSoundEnabledState.value = enabled
+    }
+
+    suspend fun saveVibrationEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(VIBRATION_ENABLED_KEY, enabled)
+            .apply()
+
+        vibrationEnabledState.value = enabled
+    }
+
+    suspend fun saveDailyRewardNotificationEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(NOTIFICATION_DAILY_REWARD_KEY, enabled)
+            .apply()
+
+        dailyRewardNotificationState.value = enabled
+    }
+
+    suspend fun saveStreakNotificationEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(NOTIFICATION_STREAK_KEY, enabled)
+            .apply()
+
+        streakNotificationState.value = enabled
+    }
+
+    suspend fun saveNewMissionNotificationEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(NOTIFICATION_NEW_MISSION_KEY, enabled)
+            .apply()
+
+        newMissionNotificationState.value = enabled
+    }
+
     fun getDailyChallengeState(): DailyChallengeState {
         val today = todayDateKey()
         val savedDate = sharedPreferences.getString(DAILY_CHALLENGE_CREATED_DATE_KEY, null)
@@ -107,7 +172,10 @@ class GamePreferences(private val context: Context) {
                 target = sharedPreferences.getInt(DAILY_CHALLENGE_TARGET_KEY, type.targetValue),
                 progress = sharedPreferences.getInt(DAILY_CHALLENGE_PROGRESS_KEY, 0),
                 completed = sharedPreferences.getBoolean(DAILY_CHALLENGE_COMPLETED_KEY, false),
-                createdDate = today
+                createdDate = today,
+                rewardCoins = sharedPreferences.getInt(DAILY_CHALLENGE_REWARD_COINS_KEY, 100),
+                rewardClaimed = sharedPreferences.getBoolean(DAILY_CHALLENGE_REWARD_CLAIMED_KEY, false),
+                doubleRewardClaimed = sharedPreferences.getBoolean(DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY, false)
             )
         }
 
@@ -118,7 +186,8 @@ class GamePreferences(private val context: Context) {
             target = nextType.targetValue,
             progress = 0,
             completed = false,
-            createdDate = today
+            createdDate = today,
+            rewardCoins = 100
         )
         saveDailyChallengeState(newState)
         return newState
@@ -132,6 +201,9 @@ class GamePreferences(private val context: Context) {
             .putInt(DAILY_CHALLENGE_PROGRESS_KEY, state.progress.coerceIn(0, state.target))
             .putBoolean(DAILY_CHALLENGE_COMPLETED_KEY, state.completed)
             .putString(DAILY_CHALLENGE_CREATED_DATE_KEY, state.createdDate)
+            .putInt(DAILY_CHALLENGE_REWARD_COINS_KEY, state.rewardCoins.coerceAtLeast(0))
+            .putBoolean(DAILY_CHALLENGE_REWARD_CLAIMED_KEY, state.rewardClaimed)
+            .putBoolean(DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY, state.doubleRewardClaimed)
             .apply()
     }
 
@@ -143,8 +215,11 @@ class GamePreferences(private val context: Context) {
             totalGames = sharedPreferences.getInt(TOTAL_GAMES_KEY, 0).coerceAtLeast(0),
             totalHits = sharedPreferences.getInt(TOTAL_HITS_KEY, 0).coerceAtLeast(0),
             lifetimeMaxCombo = sharedPreferences.getInt(LIFETIME_MAX_COMBO_KEY, 0).coerceAtLeast(0),
+            rewardedAdWatchCount = sharedPreferences.getInt(REWARDED_AD_WATCH_COUNT_KEY, 0).coerceAtLeast(0),
             selectedTheme = loadSelectedTheme(),
             unlockedThemes = loadUnlockedThemes(),
+            coinChest = loadCoinChestState(),
+            oneMoreGameBonus = loadOneMoreGameBonusState(),
             dailyReward = loadDailyRewardState(),
             achievements = loadAchievements(),
             weeklyChallenge = loadWeeklyChallenge()
@@ -210,12 +285,14 @@ class GamePreferences(private val context: Context) {
     }
 
     fun saveProgressionState(state: ProgressionState) {
+        val oneMoreGameBonus = oneMoreGameBonusForToday(state.oneMoreGameBonus)
         sharedPreferences.edit()
             .putInt(COINS_KEY, state.coins.coerceAtLeast(0))
             .putInt(XP_KEY, state.xp.coerceAtLeast(0))
             .putInt(TOTAL_GAMES_KEY, state.totalGames.coerceAtLeast(0))
             .putInt(TOTAL_HITS_KEY, state.totalHits.coerceAtLeast(0))
             .putInt(LIFETIME_MAX_COMBO_KEY, state.lifetimeMaxCombo.coerceAtLeast(0))
+            .putInt(REWARDED_AD_WATCH_COUNT_KEY, state.rewardedAdWatchCount.coerceAtLeast(0))
             .putString(SELECTED_THEME_KEY, state.selectedTheme.storageKey)
             .putString(
                 UNLOCKED_THEMES_KEY,
@@ -225,6 +302,12 @@ class GamePreferences(private val context: Context) {
                 ACHIEVEMENT_CLAIMED_IDS_KEY,
                 state.achievements.filter { it.claimed }.joinToString(separator = ",") { it.id }
             )
+            .putString(COIN_CHEST_OPEN_DATE_KEY, state.coinChest.lastOpenedDate)
+            .putInt(COIN_CHEST_OPEN_COUNT_KEY, state.coinChest.openedToday.coerceIn(0, state.coinChest.maxOpensPerDay))
+            .putInt(COIN_CHEST_LAST_REWARD_KEY, state.coinChest.lastRewardCoins.coerceAtLeast(0))
+            .putString(ONE_MORE_GAME_BONUS_DATE_KEY, oneMoreGameBonus.dateKey)
+            .putInt(ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY, oneMoreGameBonus.gamesPlayedToday.coerceAtLeast(0))
+            .putBoolean(ONE_MORE_GAME_BONUS_CLAIMED_KEY, oneMoreGameBonus.bonusClaimedToday)
             .putInt(WEEKLY_CHALLENGE_PROGRESS_KEY, state.weeklyChallenge.progress.coerceIn(0, state.weeklyChallenge.target))
             .putString(WEEKLY_CHALLENGE_CREATED_DATE_KEY, state.weeklyChallenge.createdDate)
             .apply()
@@ -272,6 +355,26 @@ class GamePreferences(private val context: Context) {
         return sharedPreferences.getBoolean(SOUND_ENABLED_KEY, true)
     }
 
+    private fun loadEffectSoundEnabled(): Boolean {
+        return sharedPreferences.getBoolean(EFFECT_SOUND_ENABLED_KEY, true)
+    }
+
+    private fun loadVibrationEnabled(): Boolean {
+        return sharedPreferences.getBoolean(VIBRATION_ENABLED_KEY, true)
+    }
+
+    private fun loadDailyRewardNotificationEnabled(): Boolean {
+        return sharedPreferences.getBoolean(NOTIFICATION_DAILY_REWARD_KEY, false)
+    }
+
+    private fun loadStreakNotificationEnabled(): Boolean {
+        return sharedPreferences.getBoolean(NOTIFICATION_STREAK_KEY, false)
+    }
+
+    private fun loadNewMissionNotificationEnabled(): Boolean {
+        return sharedPreferences.getBoolean(NOTIFICATION_NEW_MISSION_KEY, false)
+    }
+
     private fun chooseDailyChallengeType(previousType: DailyChallenge?): DailyChallenge {
         val availableTypes = DailyChallenge.entries.filterNot { it == previousType }
         val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
@@ -295,6 +398,49 @@ class GamePreferences(private val context: Context) {
             ?.toSet()
             .orEmpty()
         return unlocked + PlayerTheme.NeonRed
+    }
+
+    private fun loadCoinChestState(): CoinChestState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(COIN_CHEST_OPEN_DATE_KEY, "").orEmpty()
+        val openedToday = if (savedDate == today) {
+            sharedPreferences.getInt(COIN_CHEST_OPEN_COUNT_KEY, 0)
+        } else {
+            0
+        }
+        val lastReward = if (savedDate == today) {
+            sharedPreferences.getInt(COIN_CHEST_LAST_REWARD_KEY, 0)
+        } else {
+            0
+        }
+        return CoinChestState(
+            openedToday = openedToday.coerceIn(0, 3),
+            lastOpenedDate = savedDate.takeIf { it == today }.orEmpty(),
+            lastRewardCoins = lastReward.coerceAtLeast(0)
+        )
+    }
+
+    private fun loadOneMoreGameBonusState(): OneMoreGameBonusState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(ONE_MORE_GAME_BONUS_DATE_KEY, "").orEmpty()
+        if (savedDate != today) {
+            return OneMoreGameBonusState(dateKey = today)
+        }
+        return OneMoreGameBonusState(
+            dateKey = today,
+            gamesPlayedToday = sharedPreferences.getInt(ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY, 0)
+                .coerceAtLeast(0),
+            bonusClaimedToday = sharedPreferences.getBoolean(ONE_MORE_GAME_BONUS_CLAIMED_KEY, false)
+        )
+    }
+
+    private fun oneMoreGameBonusForToday(state: OneMoreGameBonusState): OneMoreGameBonusState {
+        val today = todayDateKey()
+        return if (state.dateKey == today) {
+            state
+        } else {
+            OneMoreGameBonusState(dateKey = today)
+        }
     }
 
     private fun loadDailyRewardState(): DailyRewardState {
@@ -339,41 +485,48 @@ class GamePreferences(private val context: Context) {
             .filter { it.isNotBlank() }
             .toSet()
         val totalGames = sharedPreferences.getInt(TOTAL_GAMES_KEY, 0)
-        val totalHits = sharedPreferences.getInt(TOTAL_HITS_KEY, 0)
         val maxCombo = sharedPreferences.getInt(LIFETIME_MAX_COMBO_KEY, 0)
+        val rewardedAds = sharedPreferences.getInt(REWARDED_AD_WATCH_COUNT_KEY, 0)
+        val unlockedPaidThemes = loadUnlockedThemes().count { it.coinPrice > 0 }
         val bestScores = loadBestScores()
         val globalBest = bestScores.values.maxOrNull() ?: 0
-        val fakeBest = bestScores[GameMode.FakeTarget] ?: 0
-        val colorBest = bestScores[GameMode.ColorReflex] ?: 0
 
         return defaultAchievements().map { achievement ->
             val progress = when (achievement.type) {
-                AchievementType.PlayGames -> totalGames
-                AchievementType.ScoreInSingleGame -> globalBest
-                AchievementType.HitTargets -> totalHits
-                AchievementType.ReachCombo -> maxCombo
-                AchievementType.FakeTargetScore -> fakeBest
-                AchievementType.ColorReflexScore -> colorBest
                 AchievementType.BreakRecord -> if (globalBest > 0) 1 else 0
+                AchievementType.ScoreInSingleGame -> globalBest
+                AchievementType.PlayGames -> totalGames
+                AchievementType.ReachCombo -> maxCombo
+                AchievementType.RewardedAds -> rewardedAds
+                AchievementType.ThemesUnlocked -> unlockedPaidThemes
             }.coerceAtMost(achievement.target)
             achievement.copy(
                 progress = progress,
                 unlocked = progress >= achievement.target,
-                claimed = achievement.id in claimedIds
+                claimed = achievement.id in claimedIds && progress >= achievement.target
             )
         }
     }
 
     private fun defaultAchievements(): List<AchievementState> {
+        val allPaidThemesTarget = PlayerTheme.entries.count { it.coinPrice > 0 }
         return listOf(
-            AchievementState("first_game", AchievementType.PlayGames, com.reflex.tr.game.ibrh.R.string.achievement_first_game_title, com.reflex.tr.game.ibrh.R.string.achievement_first_game_description, 1, 0, 50, 40, false, false),
-            AchievementState("score_50", AchievementType.ScoreInSingleGame, com.reflex.tr.game.ibrh.R.string.achievement_score_50_title, com.reflex.tr.game.ibrh.R.string.achievement_score_50_description, 50, 0, 180, 120, false, false),
-            AchievementState("hit_100", AchievementType.HitTargets, com.reflex.tr.game.ibrh.R.string.achievement_hit_100_title, com.reflex.tr.game.ibrh.R.string.achievement_hit_100_description, 100, 0, 220, 150, false, false),
-            AchievementState("combo_master", AchievementType.ReachCombo, com.reflex.tr.game.ibrh.R.string.achievement_combo_master_title, com.reflex.tr.game.ibrh.R.string.achievement_combo_master_description, 10, 0, 160, 120, false, false),
-            AchievementState("fake_master", AchievementType.FakeTargetScore, com.reflex.tr.game.ibrh.R.string.achievement_fake_master_title, com.reflex.tr.game.ibrh.R.string.achievement_fake_master_description, 20, 0, 200, 140, false, false),
-            AchievementState("color_champion", AchievementType.ColorReflexScore, com.reflex.tr.game.ibrh.R.string.achievement_color_champion_title, com.reflex.tr.game.ibrh.R.string.achievement_color_champion_description, 20, 0, 200, 140, false, false),
-            AchievementState("play_10", AchievementType.PlayGames, com.reflex.tr.game.ibrh.R.string.achievement_play_10_title, com.reflex.tr.game.ibrh.R.string.achievement_play_10_description, 10, 0, 260, 180, false, false),
-            AchievementState("record_breaker", AchievementType.BreakRecord, com.reflex.tr.game.ibrh.R.string.achievement_record_breaker_title, com.reflex.tr.game.ibrh.R.string.achievement_record_breaker_description, 1, 0, 120, 90, false, false)
+            AchievementState("record_breaker", AchievementType.BreakRecord, AchievementCategory.Score, com.reflex.tr.game.ibrh.R.string.achievement_first_record_title, com.reflex.tr.game.ibrh.R.string.achievement_first_record_description, 1, 0, 75, 50, false, false),
+            AchievementState("score_25", AchievementType.ScoreInSingleGame, AchievementCategory.Score, com.reflex.tr.game.ibrh.R.string.achievement_score_25_title, com.reflex.tr.game.ibrh.R.string.achievement_score_25_description, 25, 0, 100, 70, false, false),
+            AchievementState("score_50", AchievementType.ScoreInSingleGame, AchievementCategory.Score, com.reflex.tr.game.ibrh.R.string.achievement_score_50_title, com.reflex.tr.game.ibrh.R.string.achievement_score_50_description, 50, 0, 180, 120, false, false),
+            AchievementState("score_100", AchievementType.ScoreInSingleGame, AchievementCategory.Score, com.reflex.tr.game.ibrh.R.string.achievement_score_100_title, com.reflex.tr.game.ibrh.R.string.achievement_score_100_description, 100, 0, 350, 220, false, false),
+            AchievementState("play_10", AchievementType.PlayGames, AchievementCategory.Game, com.reflex.tr.game.ibrh.R.string.achievement_play_10_title, com.reflex.tr.game.ibrh.R.string.achievement_play_10_description, 10, 0, 160, 100, false, false),
+            AchievementState("play_50", AchievementType.PlayGames, AchievementCategory.Game, com.reflex.tr.game.ibrh.R.string.achievement_play_50_title, com.reflex.tr.game.ibrh.R.string.achievement_play_50_description, 50, 0, 350, 220, false, false),
+            AchievementState("play_100", AchievementType.PlayGames, AchievementCategory.Game, com.reflex.tr.game.ibrh.R.string.achievement_play_100_title, com.reflex.tr.game.ibrh.R.string.achievement_play_100_description, 100, 0, 700, 420, false, false),
+            AchievementState("combo_5", AchievementType.ReachCombo, AchievementCategory.Combo, com.reflex.tr.game.ibrh.R.string.achievement_combo_5_title, com.reflex.tr.game.ibrh.R.string.achievement_combo_5_description, 5, 0, 120, 80, false, false),
+            AchievementState("combo_master", AchievementType.ReachCombo, AchievementCategory.Combo, com.reflex.tr.game.ibrh.R.string.achievement_combo_master_title, com.reflex.tr.game.ibrh.R.string.achievement_combo_master_description, 10, 0, 240, 150, false, false),
+            AchievementState("combo_20", AchievementType.ReachCombo, AchievementCategory.Combo, com.reflex.tr.game.ibrh.R.string.achievement_combo_20_title, com.reflex.tr.game.ibrh.R.string.achievement_combo_20_description, 20, 0, 500, 300, false, false),
+            AchievementState("rewarded_ad_1", AchievementType.RewardedAds, AchievementCategory.Ads, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_1_title, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_1_description, 1, 0, 75, 50, false, false),
+            AchievementState("rewarded_ad_10", AchievementType.RewardedAds, AchievementCategory.Ads, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_10_title, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_10_description, 10, 0, 250, 160, false, false),
+            AchievementState("rewarded_ad_50", AchievementType.RewardedAds, AchievementCategory.Ads, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_50_title, com.reflex.tr.game.ibrh.R.string.achievement_rewarded_ad_50_description, 50, 0, 1000, 600, false, false),
+            AchievementState("theme_unlock_1", AchievementType.ThemesUnlocked, AchievementCategory.Theme, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_1_title, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_1_description, 1, 0, 150, 100, false, false),
+            AchievementState("theme_unlock_5", AchievementType.ThemesUnlocked, AchievementCategory.Theme, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_5_title, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_5_description, 5, 0, 600, 360, false, false),
+            AchievementState("theme_unlock_all", AchievementType.ThemesUnlocked, AchievementCategory.Theme, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_all_title, com.reflex.tr.game.ibrh.R.string.achievement_theme_unlock_all_description, allPaidThemesTarget, 0, 1500, 900, false, false)
         )
     }
 
