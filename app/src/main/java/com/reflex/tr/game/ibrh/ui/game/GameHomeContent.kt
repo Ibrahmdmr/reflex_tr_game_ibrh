@@ -3,7 +3,6 @@ package com.reflex.tr.game.ibrh.ui.game
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
-import com.google.firebase.auth.FirebaseAuth
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
@@ -934,7 +933,6 @@ private fun SettingsTabContent(
     onEditNameClick: () -> Unit
 ) {
     val rank = rankFor(score = bestScoresByMode.values.maxOrNull() ?: 0, level = progressionState.level)
-    val firebaseUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val uriHandler = LocalUriHandler.current
     val unlockedAchievements = progressionState.achievements.count { it.unlocked }
     val totalScore = progressionState.totalHits
@@ -986,10 +984,6 @@ private fun SettingsTabContent(
         SettingsInfoRow(
             title = stringResource(R.string.settings_rank),
             value = stringResource(rank.titleRes)
-        )
-        SettingsInfoRow(
-            title = stringResource(R.string.settings_firebase_user_id),
-            value = shortenedFirebaseUserId(firebaseUserId)
         )
         SecondaryGameButton(
             text = stringResource(R.string.profile_change_name),
@@ -1163,15 +1157,6 @@ private fun SettingsActionButton(
         text = text,
         onClick = onClick
     )
-}
-
-private fun shortenedFirebaseUserId(userId: String): String {
-    if (userId.isBlank()) return "-"
-    return if (userId.length <= 10) {
-        userId
-    } else {
-        "${userId.take(6)}…${userId.takeLast(4)}"
-    }
 }
 
 @Composable

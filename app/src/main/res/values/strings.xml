@@ -353,7 +353,6 @@
     <string name="settings_player_name">Oyuncu adı</string>
     <string name="settings_level">Seviye</string>
     <string name="settings_rank">Rütbe</string>
-    <string name="settings_firebase_user_id">Firebase User ID</string>
     <string name="settings_notifications_title">Bildirim Hazırlığı</string>
     <string name="settings_notifications_description">Bildirim sistemi hazır olduğunda bu tercihler kullanılacak.</string>
     <string name="settings_daily_reward_reminder">Günlük ödül hatırlatması</string>

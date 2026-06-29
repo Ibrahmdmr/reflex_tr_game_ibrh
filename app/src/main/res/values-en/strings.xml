@@ -353,7 +353,6 @@
     <string name="settings_player_name">Player name</string>
     <string name="settings_level">Level</string>
     <string name="settings_rank">Rank</string>
-    <string name="settings_firebase_user_id">Firebase User ID</string>
     <string name="settings_notifications_title">Notification Setup</string>
     <string name="settings_notifications_description">These preferences will be used when notifications are enabled.</string>
     <string name="settings_daily_reward_reminder">Daily reward reminder</string>
