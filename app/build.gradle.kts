@@ -18,8 +18,8 @@ android {
         applicationId = "com.reflex.tr.game.ibrh"
         minSdk = 25
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.0.7"
+        versionCode = 12
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
