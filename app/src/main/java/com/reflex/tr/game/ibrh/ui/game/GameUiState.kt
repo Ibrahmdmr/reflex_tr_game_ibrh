@@ -50,6 +50,12 @@ enum class GameMode(
     )
 }
 
+data class DailyFeaturedModeState(
+    val dateKey: String = "",
+    val mode: GameMode = GameMode.Classic,
+    val coinBonusPercent: Int = 20
+)
+
 enum class DailyChallenge(
     @StringRes val titleRes: Int,
     @StringRes val descriptionRes: Int,
@@ -78,7 +84,30 @@ enum class RewardedAction {
     UnlockTheme,
     ProtectStreak,
     CoinChest,
-    DailyChallengeDoubleReward
+    DailyChallengeDoubleReward,
+    Boost
+}
+
+enum class GameBoost(
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
+    val coinPrice: Int
+) {
+    ExtraTime(
+        titleRes = R.string.boost_extra_time_title,
+        descriptionRes = R.string.boost_extra_time_description,
+        coinPrice = 120
+    ),
+    ExtraLife(
+        titleRes = R.string.boost_extra_life_title,
+        descriptionRes = R.string.boost_extra_life_description,
+        coinPrice = 150
+    ),
+    ComboStart(
+        titleRes = R.string.boost_combo_start_title,
+        descriptionRes = R.string.boost_combo_start_description,
+        coinPrice = 180
+    )
 }
 
 enum class ThemeRarity(@StringRes val titleRes: Int) {
@@ -184,6 +213,95 @@ val DailyRewardCoinPlan = listOf(50, 75, 100, 150, 200, 300, 500)
 val CoinChestRewardPlan = listOf(50, 75, 100, 150, 250)
 const val OneMoreGameBonusCoins = 25
 private const val OneMoreGameBonusOfferLimit = 3
+const val SeasonDurationDays = 30
+const val SeasonMaxLevel = 30
+const val SeasonXpPerLevel = 200
+
+enum class SeasonRewardKind(@StringRes val titleRes: Int) {
+    Coins(R.string.season_reward_coin),
+    ThemeShard(R.string.season_reward_theme_shard),
+    ProfileBadge(R.string.season_reward_profile_badge),
+    BigCoinChest(R.string.season_reward_big_coin_chest),
+    NeonAvatar(R.string.season_reward_neon_avatar),
+    GoldFrame(R.string.season_reward_gold_frame),
+    MatrixDiscount(R.string.season_reward_matrix_discount),
+    LeaderboardBadge(R.string.season_reward_leaderboard_badge)
+}
+
+data class SeasonRewardState(
+    val level: Int,
+    val kind: SeasonRewardKind,
+    val coinReward: Int,
+    val premium: Boolean,
+    val claimed: Boolean
+)
+
+data class SeasonState(
+    val seasonNumber: Int = 1,
+    val startDateKey: String = "",
+    val xp: Int = 0,
+    val remainingDays: Int = SeasonDurationDays,
+    val claimedRewardLevels: Set<Int> = emptySet(),
+    val preservedBadgeLevels: Set<Int> = emptySet()
+) {
+    val level: Int
+        get() = (xp / SeasonXpPerLevel + 1).coerceIn(1, SeasonMaxLevel)
+
+    val progressPercent: Int
+        get() {
+            if (level >= SeasonMaxLevel) return 100
+            return (((xp % SeasonXpPerLevel) * 100f) / SeasonXpPerLevel).toInt().coerceIn(0, 100)
+        }
+
+    val nextReward: SeasonRewardState
+        get() = seasonRewardForLevel(
+            level = (1..SeasonMaxLevel).firstOrNull { it !in claimedRewardLevels } ?: SeasonMaxLevel,
+            claimedLevels = claimedRewardLevels
+        )
+
+    val rewards: List<SeasonRewardState>
+        get() = (1..SeasonMaxLevel).map { level ->
+            seasonRewardForLevel(level = level, claimedLevels = claimedRewardLevels)
+        }
+}
+
+fun seasonRewardForLevel(
+    level: Int,
+    claimedLevels: Set<Int> = emptySet()
+): SeasonRewardState {
+    val premiumKind = when (level) {
+        5 -> SeasonRewardKind.NeonAvatar
+        10 -> SeasonRewardKind.GoldFrame
+        15 -> SeasonRewardKind.MatrixDiscount
+        20 -> SeasonRewardKind.LeaderboardBadge
+        25 -> SeasonRewardKind.NeonAvatar
+        30 -> SeasonRewardKind.LeaderboardBadge
+        else -> null
+    }
+    val kind = premiumKind ?: when {
+        level % 6 == 0 -> SeasonRewardKind.BigCoinChest
+        level % 3 == 0 -> SeasonRewardKind.ProfileBadge
+        level % 2 == 0 -> SeasonRewardKind.ThemeShard
+        else -> SeasonRewardKind.Coins
+    }
+    val coins = when (kind) {
+        SeasonRewardKind.BigCoinChest -> 500 + level * 20
+        SeasonRewardKind.Coins -> 100 + level * 15
+        SeasonRewardKind.ThemeShard -> 75 + level * 10
+        SeasonRewardKind.ProfileBadge -> 125 + level * 10
+        SeasonRewardKind.NeonAvatar,
+        SeasonRewardKind.GoldFrame,
+        SeasonRewardKind.MatrixDiscount,
+        SeasonRewardKind.LeaderboardBadge -> 250 + level * 20
+    }
+    return SeasonRewardState(
+        level = level,
+        kind = kind,
+        coinReward = coins,
+        premium = premiumKind != null,
+        claimed = level in claimedLevels
+    )
+}
 
 data class OneMoreGameBonusState(
     val dateKey: String = "",
@@ -242,6 +360,7 @@ data class ProgressionState(
     val coinChest: CoinChestState = CoinChestState(),
     val oneMoreGameBonus: OneMoreGameBonusState = OneMoreGameBonusState(),
     val dailyReward: DailyRewardState = DailyRewardState(),
+    val season: SeasonState = SeasonState(),
     val achievements: List<AchievementState> = emptyList(),
     val weeklyChallenge: ChallengeState = ChallengeState.defaultWeekly(),
     val latestUnlockedAchievementIds: List<String> = emptyList(),
@@ -432,6 +551,8 @@ data class GameUiState(
     val targetLifetimeKey: Int = 0,
     val hasGameStarted: Boolean = false,
     val selectedMode: GameMode = GameMode.Classic,
+    val dailyFeaturedMode: DailyFeaturedModeState = DailyFeaturedModeState(),
+    val activeBoost: GameBoost? = null,
     val targets: List<GameTarget> = emptyList(),
     val activeColor: ReflexTargetColor = ReflexTargetColor.Red,
     val combo: Int = 0,

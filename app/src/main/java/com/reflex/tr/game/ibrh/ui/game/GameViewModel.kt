@@ -41,6 +41,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private const val LEVEL_UP_COIN_BONUS = 50
         private const val REWARDED_AD_XP_REWARD = 20
         private const val DAILY_CHALLENGE_XP_REWARD = 60
+        private const val DAILY_MODE_COIN_BONUS_PERCENT = 20
+        private const val SEASON_XP_GAME_PLAYED = 35
+        private const val SEASON_XP_CHALLENGE_COMPLETED = 90
+        private const val SEASON_XP_DAILY_STREAK = 70
+        private const val SEASON_XP_ACHIEVEMENT_CLAIM = 120
+        private const val SEASON_XP_REWARDED_AD = 30
         private val REASON_TIME_UP = R.string.game_over_reason_time_up
         private val REASON_NO_LIVES = R.string.game_over_reason_no_lives
     }
@@ -74,13 +80,40 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startGame() {
-        trackGameStart(_uiState.value.selectedMode)
-        launchNewGame(mode = _uiState.value.selectedMode)
+        val refreshedState = refreshDailyFeaturedMode()
+        trackGameStart(refreshedState.selectedMode)
+        launchNewGame(mode = refreshedState.selectedMode)
     }
 
     fun startGame(mode: GameMode) {
+        refreshDailyFeaturedMode()
         trackGameStart(mode)
         launchNewGame(mode = mode)
+    }
+
+    fun startGameWithCoinBoost(boost: GameBoost): Boolean {
+        val state = _uiState.value
+        if (state.progressionState.coins < boost.coinPrice) return false
+
+        val updatedProgression = state.progressionState.copy(
+            coins = state.progressionState.coins - boost.coinPrice
+        )
+        gamePreferences.saveProgressionState(updatedProgression)
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        val refreshedState = refreshDailyFeaturedMode()
+        trackGameStart(refreshedState.selectedMode)
+        launchNewGame(mode = refreshedState.selectedMode, boost = boost)
+        return true
+    }
+
+    fun startGameWithRewardedBoost(boost: GameBoost) {
+        val updatedProgression = recordRewardedAdWatched(_uiState.value.progressionState)
+        gamePreferences.saveProgressionState(updatedProgression)
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        logNewAchievementUnlocks(updatedProgression)
+        val refreshedState = refreshDailyFeaturedMode()
+        trackGameStart(refreshedState.selectedMode)
+        launchNewGame(mode = refreshedState.selectedMode, boost = boost)
     }
 
     fun selectMode(mode: GameMode) {
@@ -464,7 +497,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             achievements = updatedAchievements,
             latestUnlockedAchievementIds = emptyList()
         )
-        val updatedProgression = addXpWithLevelRewards(rewardProgression, achievement.rewardXp)
+        val updatedProgression = addSeasonXp(
+            addXpWithLevelRewards(rewardProgression, achievement.rewardXp),
+            SEASON_XP_ACHIEVEMENT_CLAIM
+        )
         _uiState.update { it.copy(progressionState = updatedProgression) }
         gamePreferences.saveProgressionState(updatedProgression)
         FirebaseGameServices.logEvent(
@@ -474,6 +510,27 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 putInt(FirebaseParam.CoinAmount.key, achievement.rewardCoins)
             }
         )
+    }
+
+    fun claimSeasonReward(level: Int) {
+        val state = _uiState.value
+        val season = state.progressionState.season
+        if (level !in 1..SeasonMaxLevel || level > season.level || level in season.claimedRewardLevels) return
+
+        val reward = seasonRewardForLevel(level, season.claimedRewardLevels)
+        val badgeReward = reward.kind == SeasonRewardKind.ProfileBadge ||
+            reward.kind == SeasonRewardKind.NeonAvatar ||
+            reward.kind == SeasonRewardKind.GoldFrame ||
+            reward.kind == SeasonRewardKind.LeaderboardBadge
+        val updatedProgression = state.progressionState.copy(
+            coins = state.progressionState.coins + reward.coinReward,
+            season = season.copy(
+                claimedRewardLevels = season.claimedRewardLevels + level,
+                preservedBadgeLevels = if (badgeReward) season.preservedBadgeLevels + level else season.preservedBadgeLevels
+            )
+        )
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
     }
 
     fun buyTheme(theme: PlayerTheme) {
@@ -555,7 +612,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(shouldRequestInterstitialAd = false) }
     }
 
-    private fun launchNewGame(mode: GameMode) {
+    private fun launchNewGame(mode: GameMode, boost: GameBoost? = null) {
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
         rewardContinueGraceJob?.cancel()
@@ -576,6 +633,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bestScore = _uiState.value.bestScore,
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
             progressionState = currentProgression,
+            activeBoost = boost,
+            lives = initialState.lives + if (boost == GameBoost.ExtraLife) 1 else 0,
+            timeLeftSeconds = initialState.timeLeftSeconds + if (boost == GameBoost.ExtraTime) 5 else 0,
+            combo = if (boost == GameBoost.ComboStart) 5 else initialState.combo,
+            maxCombo = if (boost == GameBoost.ComboStart) 5 else initialState.maxCombo,
             earnedCoinsThisGame = 0,
             baseCoinsThisGame = 0,
             isCoinDoubleClaimed = false,
@@ -761,6 +823,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 0
             }
+            val dailyModeBonusCoins = calculateDailyModeBonusCoins(
+                baseCoins = earnedCoins,
+                playedMode = it.selectedMode,
+                dailyFeaturedMode = it.dailyFeaturedMode
+            )
+            val totalEarnedCoins = earnedCoins + oneMoreBonusCoins + dailyModeBonusCoins
             val updatedOneMoreGameBonus = advanceOneMoreGameBonusAfterCompletedGame(
                 state = progressionBeforeGame.oneMoreGameBonus,
                 bonusAwarded = oneMoreBonusCoins > 0
@@ -770,7 +838,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 score = it.score,
                 hits = it.successfulHits,
                 maxCombo = it.maxCombo,
-                earnedCoins = earnedCoins + oneMoreBonusCoins,
+                earnedCoins = totalEarnedCoins,
                 isNewBestScore = isNewModeBest
             ).copy(oneMoreGameBonus = updatedOneMoreGameBonus)
             val trialAwareProgression = if (updatedProgression.trialGamesRemaining > 0) {
@@ -814,8 +882,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 progressionState = trialAwareProgression,
                 playerProfile = updatedProfile,
                 leaderboardSnapshot = updatedLeaderboard,
+                activeBoost = null,
                 baseCoinsThisGame = earnedCoins,
-                earnedCoinsThisGame = earnedCoins + oneMoreBonusCoins,
+                earnedCoinsThisGame = totalEarnedCoins,
                 isCoinDoubleClaimed = false,
                 oneMoreGameBonusEarnedThisGame = oneMoreBonusCoins,
                 canContinueWithReward = !it.hasUsedRewardContinue,
@@ -894,6 +963,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(score = 0, mode = mode),
             targetPosition = targets.firstCorrectPosition(),
             selectedMode = mode,
+            dailyFeaturedMode = createDailyFeaturedMode(),
             bestScore = bestScores[mode] ?: 0,
             bestScoresByMode = bestScores,
             targets = targets,
@@ -1083,7 +1153,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 coins = state.progressionState.coins + challenge.rewardCoins
             ),
             DAILY_CHALLENGE_XP_REWARD
-        )
+        ).let { addSeasonXp(it, SEASON_XP_CHALLENGE_COMPLETED) }
         _uiState.update {
             it.copy(
                 dailyChallengeState = updatedChallenge,
@@ -1169,7 +1239,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             completed = weeklyProgress >= progression.weeklyChallenge.target
         )
 
-        return addXpWithLevelRewards(
+        return addSeasonXp(addXpWithLevelRewards(
             progression.copy(
             coins = progression.coins + earnedCoins,
             totalGames = nextTotalGames,
@@ -1178,7 +1248,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             weeklyChallenge = weeklyChallenge
             ),
             earnedXp
-        ).let {
+        ), SEASON_XP_GAME_PLAYED).let {
             updateAchievementProgress(
                 progression = it,
                 score = score,
@@ -1188,14 +1258,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun recordRewardedAdWatched(progression: ProgressionState): ProgressionState {
-        return updateAchievementProgress(
+        return addSeasonXp(updateAchievementProgress(
             addXpWithLevelRewards(
                 progression.copy(
                     rewardedAdWatchCount = progression.rewardedAdWatchCount + 1
                 ),
                 REWARDED_AD_XP_REWARD
             )
-        )
+        ), SEASON_XP_REWARDED_AD)
     }
 
     private fun updateAchievementProgress(
@@ -1283,6 +1353,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun addSeasonXp(
+        progression: ProgressionState,
+        xpAmount: Int
+    ): ProgressionState {
+        if (xpAmount <= 0) return progression
+        val season = progression.season
+        val maxXp = (SeasonMaxLevel - 1) * SeasonXpPerLevel
+        return progression.copy(
+            season = season.copy(
+                xp = (season.xp + xpAmount).coerceIn(0, maxXp)
+            )
+        )
+    }
+
     private fun calculateLevel(xp: Int): Int {
         return (xp / XP_PER_LEVEL + 1).coerceAtLeast(1)
     }
@@ -1300,6 +1384,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun todayDateKey(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
+    }
+
+    private fun createDailyFeaturedMode(dateKey: String = todayDateKey()): DailyFeaturedModeState {
+        val modes = GameMode.entries
+        val index = Math.floorMod(dateKey.hashCode(), modes.size)
+        return DailyFeaturedModeState(
+            dateKey = dateKey,
+            mode = modes[index],
+            coinBonusPercent = DAILY_MODE_COIN_BONUS_PERCENT
+        )
+    }
+
+    private fun refreshDailyFeaturedMode(): GameUiState {
+        return _uiState.updateAndGet { state ->
+            val today = todayDateKey()
+            if (state.dailyFeaturedMode.dateKey == today) {
+                state
+            } else {
+                state.copy(dailyFeaturedMode = createDailyFeaturedMode(today))
+            }
+        }
+    }
+
+    private fun calculateDailyModeBonusCoins(
+        baseCoins: Int,
+        playedMode: GameMode,
+        dailyFeaturedMode: DailyFeaturedModeState
+    ): Int {
+        if (baseCoins <= 0 || playedMode != dailyFeaturedMode.mode) return 0
+        return (baseCoins * dailyFeaturedMode.coinBonusPercent / 100).coerceAtLeast(1)
     }
 
     private fun refreshProfileAndLeaderboard(showLoading: Boolean = false) {
@@ -1411,7 +1525,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val nextStreakDay = reward.streakDay + 1
         val nextDayInCycle = ((nextStreakDay - 1) % DailyRewardCoinPlan.size) + 1
 
-        return addXpWithLevelRewards(
+        return addSeasonXp(addXpWithLevelRewards(
             progression.copy(
             coins = progression.coins + reward.rewardCoins,
             dailyReward = reward.copy(
@@ -1424,7 +1538,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
             ),
             if (reward.isSuperReward) 75 else 25
-        )
+        ), SEASON_XP_DAILY_STREAK)
     }
 
     private fun moveTargets() {

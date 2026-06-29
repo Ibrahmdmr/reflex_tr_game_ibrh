@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
 import com.google.firebase.auth.FirebaseAuth
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -97,6 +98,7 @@ fun HomeContent(
     bestScore: Int,
     bestScoresByMode: Map<GameMode, Int>,
     selectedMode: GameMode,
+    dailyFeaturedMode: DailyFeaturedModeState,
     dailyChallengeState: DailyChallengeState,
     progressionState: ProgressionState,
     playerProfile: PlayerProfile,
@@ -121,6 +123,7 @@ fun HomeContent(
     onStreakNotificationChange: (Boolean) -> Unit,
     onNewMissionNotificationChange: (Boolean) -> Unit,
     onDailyRewardClaim: () -> Unit,
+    onSeasonRewardClaim: (Int) -> Unit,
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
@@ -152,6 +155,14 @@ fun HomeContent(
         }
         var dismissedLevelUp by remember { mutableStateOf<Int?>(null) }
         val levelUp = progressionState.lastLevelUp
+
+        BackHandler(enabled = selectedHomeTab != HomeTab.Play) {
+            selectedHomeTab = if (selectedHomeTab.showInBottomNav) {
+                HomeTab.Play
+            } else {
+                HomeTab.Profile
+            }
+        }
 
         LaunchedEffect(levelUp) {
             if (levelUp != null && dismissedLevelUp != levelUp) {
@@ -235,6 +246,7 @@ fun HomeContent(
                                 bestScore = bestScore,
                                 bestScoresByMode = bestScoresByMode,
                                 selectedMode = selectedMode,
+                                dailyFeaturedMode = dailyFeaturedMode,
                                 dailyChallengeState = dailyChallengeState,
                                 rewardedAdUiState = rewardedAdUiState,
                                 progressionState = progressionState,
@@ -258,6 +270,11 @@ fun HomeContent(
                             HomeTab.Achievements -> AchievementsTabContent(
                                 progressionState = progressionState,
                                 onAchievementClaim = onAchievementClaim
+                            )
+
+                            HomeTab.Season -> SeasonTabContent(
+                                season = progressionState.season,
+                                onClaimClick = onSeasonRewardClaim
                             )
 
                             HomeTab.Profile -> ProfileTabContent(
@@ -363,6 +380,7 @@ private enum class HomeTab(
     Leaderboard(R.string.nav_leaderboard, "#"),
     Achievements(R.string.nav_achievements, "◇"),
     Missions(R.string.nav_missions, "✓"),
+    Season(R.string.season_title, "S"),
     Settings(R.string.nav_settings, "⚙")
 }
 
@@ -382,6 +400,7 @@ private fun logHomeTabOpened(
         HomeTab.Play,
         HomeTab.Rewards,
         HomeTab.Achievements,
+        HomeTab.Season,
         HomeTab.Missions,
         HomeTab.Settings -> Unit
     }
@@ -451,6 +470,7 @@ private fun PlayTabContent(
     bestScore: Int,
     bestScoresByMode: Map<GameMode, Int>,
     selectedMode: GameMode,
+    dailyFeaturedMode: DailyFeaturedModeState,
     dailyChallengeState: DailyChallengeState,
     rewardedAdUiState: RewardedAdUiState,
     progressionState: ProgressionState,
@@ -472,6 +492,11 @@ private fun PlayTabContent(
         progressionState = progressionState
     )
     HomeLevelProgressCard(progressionState = progressionState)
+    SeasonMiniCard(season = progressionState.season)
+    DailyModeCard(
+        state = dailyFeaturedMode,
+        onPlayClick = onModeStartClick
+    )
     AchievementCounterCard(achievements = progressionState.achievements)
     DailyStreakMiniCard(
         state = progressionState.dailyReward,
@@ -492,6 +517,275 @@ private fun PlayTabContent(
 }
 
 @Composable
+private fun DailyModeCard(
+    state: DailyFeaturedModeState,
+    onPlayClick: (GameMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val accent = modeAccentColor(state.mode)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            accent.copy(alpha = 0.16f),
+                            ReflexGamePalette.neonPurple.copy(alpha = 0.10f)
+                        )
+                    )
+                )
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.22f))
+                        .border(1.dp, accent.copy(alpha = 0.46f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = modeIcon(state.mode),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accent,
+                        maxLines = 1
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.daily_mode_title),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(state.mode.titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(state.mode.descriptionRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Surface(
+                    color = accent.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.42f))
+                ) {
+                    Text(
+                        text = stringResource(R.string.daily_mode_bonus),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ReflexGamePalette.textPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPlayClick(state.mode) },
+                color = accent.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
+            ) {
+                Text(
+                    text = stringResource(R.string.daily_mode_play),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonMiniCard(
+    season: SeasonState,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.season_card_title, season.seasonNumber, season.level),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.season_days_left, season.remainingDays),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeGold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            LinearProgressIndicator(
+                progress = { season.progressPercent / 100f },
+                modifier = Modifier.fillMaxWidth(),
+                color = ArcadeGold,
+                trackColor = Color.White.copy(alpha = 0.12f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SeasonTabContent(
+    season: SeasonState,
+    onClaimClick: (Int) -> Unit
+) {
+    Text(
+        text = stringResource(R.string.season_title),
+        style = MaterialTheme.typography.titleLarge,
+        color = ReflexGamePalette.textPrimary,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.season_card_title, season.seasonNumber, season.level),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ReflexGamePalette.textPrimary
+                )
+                Text(
+                    text = stringResource(R.string.season_days_left, season.remainingDays),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ArcadeGold
+                )
+            }
+            LinearProgressIndicator(
+                progress = { season.progressPercent / 100f },
+                modifier = Modifier.fillMaxWidth(),
+                color = ArcadeGold,
+                trackColor = Color.White.copy(alpha = 0.12f)
+            )
+            Text(
+                text = stringResource(R.string.season_next_reward, stringResource(season.nextReward.kind.titleRes)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+    season.rewards.forEach { reward ->
+        SeasonRewardCard(
+            reward = reward,
+            unlocked = reward.level <= season.level,
+            onClaimClick = onClaimClick
+        )
+    }
+}
+
+@Composable
+private fun SeasonRewardCard(
+    reward: SeasonRewardState,
+    unlocked: Boolean,
+    onClaimClick: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (reward.premium) ArcadeGold.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, if (reward.premium) ArcadeGold.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = reward.level.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = if (reward.premium) ArcadeGold else ReflexGamePalette.textPrimary
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(reward.kind.titleRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.season_reward_coin_value, reward.coinReward),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SecondaryGameButton(
+                text = when {
+                    reward.claimed -> stringResource(R.string.claimed)
+                    unlocked -> stringResource(R.string.claim_reward)
+                    else -> stringResource(R.string.season_locked)
+                },
+                enabled = unlocked && !reward.claimed,
+                onClick = { onClaimClick(reward.level) },
+                modifier = Modifier.width(120.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProfileTabContent(
     bestScore: Int,
     playerProfile: PlayerProfile,
@@ -507,11 +801,6 @@ private fun ProfileTabContent(
         onEditNameClick = onEditNameClick,
         onTitleSelect = onTitleSelect
     )
-    CoinWalletCard(
-        coins = progressionState.coins,
-        selectedTheme = progressionState.selectedTheme
-    )
-    AchievementSummaryCard(achievements = progressionState.achievements)
     ProfileQuickMenu(onTabSelected = onQuickMenuSelected)
 }
 
@@ -1131,12 +1420,21 @@ private fun ProfileQuickMenu(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            ProfileQuickMenuCard(
+                title = stringResource(R.string.season_title),
+                description = stringResource(R.string.profile_quick_season_description),
+                icon = "S",
+                accent = ArcadeGold,
+                onClick = { onTabSelected(HomeTab.Season) },
+                modifier = Modifier.fillMaxWidth()
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ProfileQuickMenuCard(
                     title = stringResource(R.string.leaderboard_title),
+                    description = stringResource(R.string.profile_quick_leaderboard_description),
                     icon = "#",
                     accent = ArcadeBlue,
                     onClick = { onTabSelected(HomeTab.Leaderboard) },
@@ -1144,6 +1442,7 @@ private fun ProfileQuickMenu(
                 )
                 ProfileQuickMenuCard(
                     title = stringResource(R.string.achievements_title),
+                    description = stringResource(R.string.profile_quick_achievements_description),
                     icon = "◇",
                     accent = ArcadeGold,
                     onClick = { onTabSelected(HomeTab.Achievements) },
@@ -1156,6 +1455,7 @@ private fun ProfileQuickMenu(
             ) {
                 ProfileQuickMenuCard(
                     title = stringResource(R.string.nav_missions),
+                    description = stringResource(R.string.profile_quick_missions_description),
                     icon = "✓",
                     accent = ArcadeTeal,
                     onClick = { onTabSelected(HomeTab.Missions) },
@@ -1163,6 +1463,7 @@ private fun ProfileQuickMenu(
                 )
                 ProfileQuickMenuCard(
                     title = stringResource(R.string.nav_settings),
+                    description = stringResource(R.string.profile_quick_settings_description),
                     icon = "⚙",
                     accent = ArcadeCoral,
                     onClick = { onTabSelected(HomeTab.Settings) },
@@ -1176,6 +1477,7 @@ private fun ProfileQuickMenu(
 @Composable
 private fun ProfileQuickMenuCard(
     title: String,
+    description: String,
     icon: String,
     accent: Color,
     onClick: () -> Unit,
@@ -1197,13 +1499,26 @@ private fun ProfileQuickMenuCard(
                 style = MaterialTheme.typography.titleSmall,
                 color = accent
             )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelMedium,
-                color = ReflexGamePalette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = "›",
+                style = MaterialTheme.typography.titleSmall,
+                color = accent
             )
         }
     }
@@ -2185,6 +2500,16 @@ private fun ProfileProgressCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            Text(
+                text = stringResource(
+                    R.string.selected_theme_value,
+                    stringResource(progressionState.selectedTheme.titleRes)
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             if (progressionState.dailyReward.loyalBadgeUnlocked) {
                 Surface(
                     color = ArcadeGold.copy(alpha = 0.16f),

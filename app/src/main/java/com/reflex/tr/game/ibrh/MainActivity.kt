@@ -237,6 +237,7 @@ private val RewardedAction.analyticsName: String
         RewardedAction.ProtectStreak -> "protect_streak"
         RewardedAction.CoinChest -> "coin_chest"
         RewardedAction.DailyChallengeDoubleReward -> "daily_challenge_double_reward"
+        RewardedAction.Boost -> "boost"
     }
 
 private fun Context.createLocalizedContext(language: AppLanguage): Context {
@@ -260,11 +261,14 @@ fun AppRootPreview() {
                 selectedLanguage = AppLanguage.Turkish,
                 isSoundEnabled = true,
                 onStartClick = {},
+                onBoostCoinClick = { true },
+                onBoostAdClick = {},
                 onModeStartClick = {},
                 onHowToPlayClick = {},
                 onLanguageSelected = {},
                 onSoundEnabledChange = {},
                 onDailyRewardClaim = {},
+                onSeasonRewardClaim = {},
                 onDailyStreakProtect = {},
                 onAchievementClaim = {},
                 onThemeSelect = {},

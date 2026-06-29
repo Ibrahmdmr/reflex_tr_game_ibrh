@@ -48,6 +48,11 @@ private const val ONE_MORE_GAME_BONUS_CLAIMED_KEY = "one_more_game_bonus_claimed
 private const val ACHIEVEMENT_CLAIMED_IDS_KEY = "achievement_claimed_ids"
 private const val WEEKLY_CHALLENGE_PROGRESS_KEY = "weekly_challenge_progress"
 private const val WEEKLY_CHALLENGE_CREATED_DATE_KEY = "weekly_challenge_created_date"
+private const val SEASON_NUMBER_KEY = "season_number"
+private const val SEASON_START_DATE_KEY = "season_start_date"
+private const val SEASON_XP_KEY = "season_xp"
+private const val SEASON_CLAIMED_LEVELS_KEY = "season_claimed_levels"
+private const val SEASON_BADGE_LEVELS_KEY = "season_badge_levels"
 private const val PLAYER_NAME_KEY = "player_name"
 private const val PLAYER_NAME_PROMPT_COMPLETED_KEY = "player_name_prompt_completed"
 private const val PLAYER_TITLE_KEY = "player_title"
@@ -221,6 +226,7 @@ class GamePreferences(private val context: Context) {
             coinChest = loadCoinChestState(),
             oneMoreGameBonus = loadOneMoreGameBonusState(),
             dailyReward = loadDailyRewardState(),
+            season = loadSeasonState(),
             achievements = loadAchievements(),
             weeklyChallenge = loadWeeklyChallenge()
         )
@@ -310,6 +316,11 @@ class GamePreferences(private val context: Context) {
             .putBoolean(ONE_MORE_GAME_BONUS_CLAIMED_KEY, oneMoreGameBonus.bonusClaimedToday)
             .putInt(WEEKLY_CHALLENGE_PROGRESS_KEY, state.weeklyChallenge.progress.coerceIn(0, state.weeklyChallenge.target))
             .putString(WEEKLY_CHALLENGE_CREATED_DATE_KEY, state.weeklyChallenge.createdDate)
+            .putInt(SEASON_NUMBER_KEY, state.season.seasonNumber.coerceAtLeast(1))
+            .putString(SEASON_START_DATE_KEY, state.season.startDateKey.ifBlank { todayDateKey() })
+            .putInt(SEASON_XP_KEY, state.season.xp.coerceAtLeast(0))
+            .putString(SEASON_CLAIMED_LEVELS_KEY, state.season.claimedRewardLevels.joinToString(","))
+            .putString(SEASON_BADGE_LEVELS_KEY, state.season.preservedBadgeLevels.joinToString(","))
             .apply()
     }
 
@@ -441,6 +452,33 @@ class GamePreferences(private val context: Context) {
         } else {
             OneMoreGameBonusState(dateKey = today)
         }
+    }
+
+    private fun loadSeasonState(): SeasonState {
+        val today = todayDateKey()
+        val savedStart = sharedPreferences.getString(SEASON_START_DATE_KEY, "").orEmpty()
+        if (savedStart.isBlank()) {
+            return SeasonState(startDateKey = today, remainingDays = SeasonDurationDays)
+        }
+        val elapsedDays = daysBetween(savedStart, today).coerceAtLeast(0)
+        val preservedBadges = sharedPreferences.getString(SEASON_BADGE_LEVELS_KEY, "").orEmpty().toIntSet()
+        if (elapsedDays >= SeasonDurationDays) {
+            return SeasonState(
+                seasonNumber = sharedPreferences.getInt(SEASON_NUMBER_KEY, 1).coerceAtLeast(1) + 1,
+                startDateKey = today,
+                xp = 0,
+                remainingDays = SeasonDurationDays,
+                preservedBadgeLevels = preservedBadges
+            )
+        }
+        return SeasonState(
+            seasonNumber = sharedPreferences.getInt(SEASON_NUMBER_KEY, 1).coerceAtLeast(1),
+            startDateKey = savedStart,
+            xp = sharedPreferences.getInt(SEASON_XP_KEY, 0).coerceAtLeast(0),
+            remainingDays = (SeasonDurationDays - elapsedDays).coerceIn(0, SeasonDurationDays),
+            claimedRewardLevels = sharedPreferences.getString(SEASON_CLAIMED_LEVELS_KEY, "").orEmpty().toIntSet(),
+            preservedBadgeLevels = preservedBadges
+        )
     }
 
     private fun loadDailyRewardState(): DailyRewardState {
@@ -585,4 +623,11 @@ private fun GameMode.bestScorePreferenceKey(): String {
 
 private fun GameMode.weeklyScorePreferenceKey(): String {
     return "weekly_score_${storageKey}"
+}
+
+private fun String.toIntSet(): Set<Int> {
+    return split(",")
+        .mapNotNull { value -> value.trim().toIntOrNull() }
+        .filter { it > 0 }
+        .toSet()
 }

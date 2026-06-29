@@ -16,11 +16,15 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -43,6 +47,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -103,6 +109,12 @@ fun GameScreen(
         isStreakNotificationEnabled = isStreakNotificationEnabled,
         isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
         onStartClick = viewModel::startGame,
+        onBoostCoinClick = viewModel::startGameWithCoinBoost,
+        onBoostAdClick = { boost ->
+            onRewardedAdRequested(RewardedAction.Boost) {
+                viewModel.startGameWithRewardedBoost(boost)
+            }
+        },
         onModeStartClick = viewModel::selectMode,
         onHowToPlayClick = onHowToPlayClick,
         onLanguageSelected = onLanguageSelected,
@@ -113,6 +125,7 @@ fun GameScreen(
         onStreakNotificationChange = onStreakNotificationChange,
         onNewMissionNotificationChange = onNewMissionNotificationChange,
         onDailyRewardClaim = viewModel::claimDailyReward,
+        onSeasonRewardClaim = viewModel::claimSeasonReward,
         onDailyStreakProtect = {
             onRewardedAdRequested(RewardedAction.ProtectStreak, viewModel::protectDailyRewardStreak)
         },
@@ -179,8 +192,11 @@ fun GameScreen(
     onStreakNotificationChange: (Boolean) -> Unit = {},
     onNewMissionNotificationChange: (Boolean) -> Unit = {},
     onDailyRewardClaim: () -> Unit,
+    onSeasonRewardClaim: (Int) -> Unit,
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit = {},
+    onBoostCoinClick: (GameBoost) -> Boolean,
+    onBoostAdClick: (GameBoost) -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit = {},
     onAchievementClaim: (String) -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
@@ -217,6 +233,7 @@ fun GameScreen(
     var hitFeedbackPosition by remember { mutableStateOf(uiState.targetPosition) }
     var previousLives by remember { mutableIntStateOf(uiState.lives) }
     var showExitGameDialog by remember { mutableStateOf(false) }
+    var showBoostSheet by remember { mutableStateOf(false) }
     val isGameplayInputEnabled =
         !uiState.isPaused &&
             !uiState.isResumeGracePeriod &&
@@ -355,13 +372,14 @@ fun GameScreen(
                 bestScore = uiState.bestScore,
                 bestScoresByMode = uiState.bestScoresByMode,
                 selectedMode = uiState.selectedMode,
+                dailyFeaturedMode = uiState.dailyFeaturedMode,
                 dailyChallengeState = uiState.dailyChallengeState,
                 progressionState = uiState.progressionState,
                 playerProfile = uiState.playerProfile,
                 leaderboardSnapshot = uiState.leaderboardSnapshot,
                 rewardedAdUiState = rewardedAdUiState,
                 isSoundEnabled = isSoundEnabled,
-                onStartClick = onStartClick,
+                onStartClick = { showBoostSheet = true },
                 onModeStartClick = onModeStartClick,
                 onHowToPlayClick = onHowToPlayClick,
                 selectedLanguage = selectedLanguage,
@@ -379,6 +397,7 @@ fun GameScreen(
                 onStreakNotificationChange = onStreakNotificationChange,
                 onNewMissionNotificationChange = onNewMissionNotificationChange,
                 onDailyRewardClaim = onDailyRewardClaim,
+                onSeasonRewardClaim = onSeasonRewardClaim,
                 onDailyStreakProtect = onDailyStreakProtect,
                 onCoinChestClick = onCoinChestClick,
                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
@@ -393,6 +412,26 @@ fun GameScreen(
                 onLeaderboardRefresh = onLeaderboardRefresh,
                 modifier = Modifier.align(Alignment.Center)
             )
+            if (showBoostSheet) {
+                BoostSelectionBottomSheet(
+                    coins = uiState.progressionState.coins,
+                    rewardedAdUiState = rewardedAdUiState,
+                    onStartWithoutBoost = {
+                        showBoostSheet = false
+                        onStartClick()
+                    },
+                    onCoinBoostClick = { boost ->
+                        if (onBoostCoinClick(boost)) {
+                            showBoostSheet = false
+                        }
+                    },
+                    onAdBoostClick = { boost ->
+                        showBoostSheet = false
+                        onBoostAdClick(boost)
+                    },
+                    onDismiss = { showBoostSheet = false }
+                )
+            }
             return@Box
         }
 
@@ -475,6 +514,161 @@ fun GameScreen(
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun BoostSelectionBottomSheet(
+    coins: Int,
+    rewardedAdUiState: RewardedAdUiState,
+    onStartWithoutBoost: () -> Unit,
+    onCoinBoostClick: (GameBoost) -> Unit,
+    onAdBoostClick: (GameBoost) -> Unit,
+    onDismiss: () -> Unit
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99040A18))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = {}),
+            color = ReflexGamePalette.cardGlassStrong,
+            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            border = BorderStroke(1.dp, ReflexGamePalette.neonPurple.copy(alpha = 0.42f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.boost_sheet_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.boost_sheet_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                GameBoost.entries.forEach { boost ->
+                    BoostOptionRow(
+                        boost = boost,
+                        coins = coins,
+                        rewardedAdUiState = rewardedAdUiState,
+                        onCoinBoostClick = onCoinBoostClick,
+                        onAdBoostClick = onAdBoostClick
+                    )
+                }
+                SecondaryGameButton(
+                    text = stringResource(R.string.boost_start_without),
+                    onClick = onStartWithoutBoost,
+                    modifier = Modifier.height(48.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoostOptionRow(
+    boost: GameBoost,
+    coins: Int,
+    rewardedAdUiState: RewardedAdUiState,
+    onCoinBoostClick: (GameBoost) -> Unit,
+    onAdBoostClick: (GameBoost) -> Unit
+) {
+    val canBuyWithCoins = coins >= boost.coinPrice
+    val canUseAd = rewardedAdUiState.isReady && !rewardedAdUiState.isShowing
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = boostIcon(boost),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(boost.titleRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(boost.descriptionRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SecondaryGameButton(
+                    text = stringResource(R.string.boost_buy_with_coins, boost.coinPrice),
+                    onClick = { onCoinBoostClick(boost) },
+                    enabled = canBuyWithCoins,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                )
+                SecondaryGameButton(
+                    text = when {
+                        rewardedAdUiState.isShowing || rewardedAdUiState.isLoading -> stringResource(R.string.rewarded_loading)
+                        rewardedAdUiState.hasLoadFailed || !rewardedAdUiState.isReady -> stringResource(R.string.rewarded_not_ready)
+                        else -> stringResource(R.string.boost_use_ad)
+                    },
+                    onClick = { onAdBoostClick(boost) },
+                    enabled = canUseAd,
+                    isLoading = rewardedAdUiState.isShowing || rewardedAdUiState.isLoading,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun boostIcon(boost: GameBoost): String {
+    return when (boost) {
+        GameBoost.ExtraTime -> "+5"
+        GameBoost.ExtraLife -> "+1"
+        GameBoost.ComboStart -> "x5"
     }
 }
 
@@ -594,11 +788,14 @@ private fun HomePreview() {
             selectedLanguage = AppLanguage.Turkish,
             isSoundEnabled = true,
             onStartClick = {},
+            onBoostCoinClick = { true },
+            onBoostAdClick = {},
             onModeStartClick = {},
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
             onDailyRewardClaim = {},
+            onSeasonRewardClaim = {},
             onDailyStreakProtect = {},
             onAchievementClaim = {},
             onThemeSelect = {},
@@ -637,11 +834,14 @@ private fun PlayingPreview() {
             selectedLanguage = AppLanguage.Turkish,
             isSoundEnabled = true,
             onStartClick = {},
+            onBoostCoinClick = { true },
+            onBoostAdClick = {},
             onModeStartClick = {},
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
             onDailyRewardClaim = {},
+            onSeasonRewardClaim = {},
             onDailyStreakProtect = {},
             onAchievementClaim = {},
             onThemeSelect = {},
@@ -684,11 +884,14 @@ private fun GameOverPreview() {
             selectedLanguage = AppLanguage.Turkish,
             isSoundEnabled = true,
             onStartClick = {},
+            onBoostCoinClick = { true },
+            onBoostAdClick = {},
             onModeStartClick = {},
             onHowToPlayClick = {},
             onLanguageSelected = {},
             onSoundEnabledChange = {},
             onDailyRewardClaim = {},
+            onSeasonRewardClaim = {},
             onDailyStreakProtect = {},
             onAchievementClaim = {},
             onThemeSelect = {},
