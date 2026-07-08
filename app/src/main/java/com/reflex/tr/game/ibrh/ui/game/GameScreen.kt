@@ -25,10 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,6 +73,8 @@ fun GameScreen(
     isDailyRewardNotificationEnabled: Boolean = false,
     isStreakNotificationEnabled: Boolean = false,
     isNewMissionNotificationEnabled: Boolean = false,
+    isNotificationPermissionGranted: Boolean = true,
+    isOnboardingCompleted: Boolean = true,
     onLanguageSelected: (AppLanguage) -> Unit = {},
     onSoundEnabledChange: (Boolean) -> Unit = {},
     onEffectSoundEnabledChange: (Boolean) -> Unit = {},
@@ -83,10 +82,18 @@ fun GameScreen(
     onDailyRewardNotificationChange: (Boolean) -> Unit = {},
     onStreakNotificationChange: (Boolean) -> Unit = {},
     onNewMissionNotificationChange: (Boolean) -> Unit = {},
+    onOpenOnboarding: () -> Unit = {},
     onRewardedAdRequested: (RewardedAction, onRewardEarned: () -> Unit) -> Unit = { _, onRewardEarned ->
         onRewardEarned()
     },
     onInterstitialAdRequested: () -> Boolean = { false },
+    onInAppReviewRequested: (
+        totalGames: Int,
+        isNewBestScore: Boolean,
+        score: Int,
+        maxCombo: Int
+    ) -> Unit = { _, _, _, _ -> },
+    onRateAppClick: () -> Unit = {},
     onHowToPlayClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -95,6 +102,17 @@ fun GameScreen(
         if (uiState.shouldRequestInterstitialAd) {
             val wasShown = onInterstitialAdRequested()
             viewModel.onInterstitialAdRequestHandled(wasShown)
+        }
+    }
+
+    LaunchedEffect(uiState.isGameOver, uiState.progressionState.totalGames) {
+        if (uiState.isGameOver) {
+            onInAppReviewRequested(
+                uiState.progressionState.totalGames,
+                uiState.isNewBestScore,
+                uiState.score,
+                uiState.maxCombo
+            )
         }
     }
 
@@ -108,6 +126,8 @@ fun GameScreen(
         isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
         isStreakNotificationEnabled = isStreakNotificationEnabled,
         isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
+        isNotificationPermissionGranted = isNotificationPermissionGranted,
+        isOnboardingCompleted = isOnboardingCompleted,
         onStartClick = viewModel::startGame,
         onBoostCoinClick = viewModel::startGameWithCoinBoost,
         onBoostAdClick = { boost ->
@@ -124,13 +144,23 @@ fun GameScreen(
         onDailyRewardNotificationChange = onDailyRewardNotificationChange,
         onStreakNotificationChange = onStreakNotificationChange,
         onNewMissionNotificationChange = onNewMissionNotificationChange,
+        onOpenOnboarding = onOpenOnboarding,
         onDailyRewardClaim = viewModel::claimDailyReward,
+        onDailyRewardDialogShown = viewModel::markDailyRewardDialogShown,
+        onDailyChallengeClaim = viewModel::claimDailyChallengeReward,
         onSeasonRewardClaim = viewModel::claimSeasonReward,
+        onSeasonXpBoostClick = {
+            onRewardedAdRequested(RewardedAction.SeasonXpBoost, viewModel::activateSeasonXpBoost)
+        },
+        onSeasonMissionClaim = viewModel::claimSeasonMission,
         onDailyStreakProtect = {
             onRewardedAdRequested(RewardedAction.ProtectStreak, viewModel::protectDailyRewardStreak)
         },
         onCoinChestClick = {
             onRewardedAdRequested(RewardedAction.CoinChest, viewModel::onCoinChestRewardEarned)
+        },
+        onShopCoinRewardClick = {
+            onRewardedAdRequested(RewardedAction.ShopCoinReward, viewModel::onShopCoinRewardEarned)
         },
         onDailyChallengeDoubleRewardClick = {
             onRewardedAdRequested(
@@ -151,6 +181,10 @@ fun GameScreen(
         onLeaderboardModeSelected = viewModel::selectLeaderboardMode,
         onLeaderboardPeriodSelected = viewModel::selectLeaderboardPeriod,
         onLeaderboardRefresh = viewModel::refreshLeaderboard,
+        onLeaderboardOpenedForMission = viewModel::onLeaderboardOpenedForMission,
+        onShopOpenedForMission = viewModel::onShopOpenedForMission,
+        onStorePreviewModeChange = viewModel::setStorePreviewMode,
+        onRateAppClick = onRateAppClick,
         onHomeClick = viewModel::goToHome,
         onPauseGame = viewModel::pauseGame,
         onResumeGame = viewModel::resumeGame,
@@ -181,6 +215,8 @@ fun GameScreen(
     isDailyRewardNotificationEnabled: Boolean = false,
     isStreakNotificationEnabled: Boolean = false,
     isNewMissionNotificationEnabled: Boolean = false,
+    isNotificationPermissionGranted: Boolean = true,
+    isOnboardingCompleted: Boolean = true,
     onStartClick: () -> Unit,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
@@ -191,10 +227,16 @@ fun GameScreen(
     onDailyRewardNotificationChange: (Boolean) -> Unit = {},
     onStreakNotificationChange: (Boolean) -> Unit = {},
     onNewMissionNotificationChange: (Boolean) -> Unit = {},
+    onOpenOnboarding: () -> Unit = {},
     onDailyRewardClaim: () -> Unit,
+    onDailyRewardDialogShown: () -> Unit = {},
+    onDailyChallengeClaim: () -> Unit = {},
     onSeasonRewardClaim: (Int) -> Unit,
+    onSeasonXpBoostClick: () -> Unit = {},
+    onSeasonMissionClaim: (String) -> Unit = {},
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit = {},
+    onShopCoinRewardClick: () -> Unit = {},
     onBoostCoinClick: (GameBoost) -> Boolean,
     onBoostAdClick: (GameBoost) -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit = {},
@@ -207,6 +249,10 @@ fun GameScreen(
     onLeaderboardModeSelected: (GameMode) -> Unit,
     onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
     onLeaderboardRefresh: () -> Unit,
+    onLeaderboardOpenedForMission: () -> Unit = {},
+    onShopOpenedForMission: () -> Unit = {},
+    onStorePreviewModeChange: (Boolean) -> Unit = {},
+    onRateAppClick: () -> Unit = {},
     onHomeClick: () -> Unit,
     onPauseGame: () -> Unit,
     onResumeGame: () -> Unit,
@@ -342,14 +388,6 @@ fun GameScreen(
             stringResource(R.string.rewarded_loading_helper)
         else -> null
     }
-    val oneMoreGameBonusMessage = when {
-        uiState.oneMoreGameBonusEarnedThisGame > 0 ->
-            stringResource(R.string.one_more_game_bonus_claimed, uiState.oneMoreGameBonusEarnedThisGame)
-        uiState.progressionState.oneMoreGameBonus.shouldShowGameOverOffer ->
-            stringResource(R.string.one_more_game_bonus_offer)
-        else -> null
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -375,6 +413,7 @@ fun GameScreen(
                 dailyFeaturedMode = uiState.dailyFeaturedMode,
                 dailyChallengeState = uiState.dailyChallengeState,
                 progressionState = uiState.progressionState,
+                shouldAutoShowDailyRewardDialog = uiState.shouldAutoShowDailyRewardDialog,
                 playerProfile = uiState.playerProfile,
                 leaderboardSnapshot = uiState.leaderboardSnapshot,
                 rewardedAdUiState = rewardedAdUiState,
@@ -390,16 +429,25 @@ fun GameScreen(
                 isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
                 isStreakNotificationEnabled = isStreakNotificationEnabled,
                 isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
+                isNotificationPermissionGranted = isNotificationPermissionGranted,
+                isOnboardingCompleted = isOnboardingCompleted,
+                isStorePreviewMode = uiState.isStorePreviewMode,
                 onSoundEnabledChange = onSoundEnabledChange,
                 onEffectSoundEnabledChange = onEffectSoundEnabledChange,
                 onVibrationEnabledChange = onVibrationEnabledChange,
                 onDailyRewardNotificationChange = onDailyRewardNotificationChange,
                 onStreakNotificationChange = onStreakNotificationChange,
                 onNewMissionNotificationChange = onNewMissionNotificationChange,
+                onOpenOnboarding = onOpenOnboarding,
                 onDailyRewardClaim = onDailyRewardClaim,
+                onDailyRewardDialogShown = onDailyRewardDialogShown,
+                onDailyChallengeClaim = onDailyChallengeClaim,
                 onSeasonRewardClaim = onSeasonRewardClaim,
+                onSeasonXpBoostClick = onSeasonXpBoostClick,
+                onSeasonMissionClaim = onSeasonMissionClaim,
                 onDailyStreakProtect = onDailyStreakProtect,
                 onCoinChestClick = onCoinChestClick,
+                onShopCoinRewardClick = onShopCoinRewardClick,
                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                 onAchievementClaim = onAchievementClaim,
                 onThemeSelect = onThemeSelect,
@@ -410,6 +458,10 @@ fun GameScreen(
                 onLeaderboardModeSelected = onLeaderboardModeSelected,
                 onLeaderboardPeriodSelected = onLeaderboardPeriodSelected,
                 onLeaderboardRefresh = onLeaderboardRefresh,
+                onLeaderboardOpenedForMission = onLeaderboardOpenedForMission,
+                onShopOpenedForMission = onShopOpenedForMission,
+                onStorePreviewModeChange = onStorePreviewModeChange,
+                onRateAppClick = onRateAppClick,
                 modifier = Modifier.align(Alignment.Center)
             )
             if (showBoostSheet) {
@@ -458,7 +510,7 @@ fun GameScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xAA050A1A)),
+                    .background(GameDialogScrimColor),
                 contentAlignment = Alignment.Center
             ) {
                 GameOverOverlay(
@@ -472,7 +524,7 @@ fun GameScreen(
                     earnedCoins = uiState.earnedCoinsThisGame,
                     baseCoins = uiState.baseCoinsThisGame,
                     totalCoins = uiState.progressionState.coins,
-                    oneMoreGameBonusMessage = oneMoreGameBonusMessage,
+                    seasonXp = uiState.progressionState.season.xp,
                     isCoinDoubleClaimed = uiState.isCoinDoubleClaimed,
                     showContinueButton = shouldShowContinueSlot,
                     continueButtonText = continueButtonText,
@@ -530,7 +582,7 @@ private fun BoostSelectionBottomSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x99040A18))
+            .background(GameDialogScrimColor)
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter
     ) {
@@ -694,28 +746,9 @@ private fun ExitGameDialog(
     val continueText = localizedStringResource(R.string.continue_game, selectedLanguage)
     val homeText = localizedStringResource(R.string.back_to_home, selectedLanguage)
 
-    AlertDialog(
+    PolishedGameDialog(
         onDismissRequest = onContinueClick,
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        title = {
-            Text(
-                text = title,
-                color = ReflexGamePalette.textPrimary
-            )
-        },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    text = message,
-                    color = ReflexGamePalette.textSecondary
-                )
-                Text(
-                    text = fomoMessage,
-                    modifier = Modifier.padding(top = 12.dp),
-                    color = ReflexGamePalette.textSecondary
-                )
-            }
-        },
+        title = title,
         confirmButton = {
             PrimaryGameButton(
                 text = continueText,
@@ -730,7 +763,20 @@ private fun ExitGameDialog(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-    )
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.fillMaxWidth(),
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = fomoMessage,
+            modifier = Modifier.fillMaxWidth(),
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable

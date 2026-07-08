@@ -9,6 +9,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -73,6 +76,7 @@ fun GamePlayContent(
     val targetSize = uiState.targetSizeDp.dp
     val themeSpec = themeVisualSpec(uiState.progressionState.activeTheme)
     val comboTier = comboTierFor(uiState.combo)
+    val firstFiveHintRes = firstFiveExperienceHintRes(uiState)
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -140,11 +144,19 @@ fun GamePlayContent(
                     BestScoreBadge(bestScore = uiState.bestScore)
                 }
 
+                firstFiveHintRes?.let { hintRes ->
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FirstFiveExperienceHint(text = stringResource(hintRes))
+                }
+
                 if (uiState.selectedMode == GameMode.ColorReflex) {
+                    if (firstFiveHintRes == null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                     ColorTaskBadge(activeColor = uiState.activeColor)
                     Spacer(modifier = Modifier.height(12.dp))
                 } else {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(if (firstFiveHintRes == null) 16.dp else 10.dp))
                 }
 
                 BoxWithConstraints(
@@ -231,6 +243,42 @@ fun GamePlayContent(
     }
 }
 
+@StringRes
+private fun firstFiveExperienceHintRes(uiState: GameUiState): Int? {
+    if (
+        !uiState.hasGameStarted ||
+        uiState.isGameOver ||
+        uiState.progressionState.totalGames >= FirstFiveExperienceGameLimit
+    ) {
+        return null
+    }
+
+    return when ((uiState.score / 2) % 3) {
+        0 -> R.string.first_five_hint_tap_fast
+        1 -> R.string.first_five_hint_keep_combo
+        else -> R.string.first_five_hint_wrong_target
+    }
+}
+
+@Composable
+private fun FirstFiveExperienceHint(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = ArcadeTeal.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.32f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = ReflexGamePalette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 private data class ComboTier(
     @StringRes val labelRes: Int?,
     val glowBoost: Float,
@@ -291,6 +339,28 @@ private fun AnimatedArenaBackground(
                 shape = RoundedCornerShape(28.dp)
             )
     ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val driftPx = drift * size.minDimension
+            repeat(4) { index ->
+                val y = size.height * (0.18f + index * 0.22f) + driftPx * (0.34f + index * 0.08f)
+                drawLine(
+                    color = spec.primary.copy(alpha = 0.045f + comboBoost * 0.035f),
+                    start = androidx.compose.ui.geometry.Offset(-size.width * 0.18f, y),
+                    end = androidx.compose.ui.geometry.Offset(size.width * 1.18f, y - size.height * 0.2f),
+                    strokeWidth = 2.5f + comboBoost * 2.5f,
+                    cap = StrokeCap.Round
+                )
+            }
+            repeat(6) { index ->
+                val x = size.width * (((index * 29) % 100) / 100f) + driftPx * 0.18f
+                val y = size.height * (((index * 47) % 100) / 100f) - driftPx * 0.12f
+                drawCircle(
+                    color = spec.secondary.copy(alpha = 0.08f + pulse * 0.1f + comboBoost * 0.08f),
+                    radius = size.minDimension * (0.012f + (index % 3) * 0.005f),
+                    center = androidx.compose.ui.geometry.Offset(x, y)
+                )
+            }
+        }
         repeat(10) { index ->
             val x = ((index * 37) % 100) / 100f
             val y = ((index * 61) % 100) / 100f
@@ -376,10 +446,10 @@ private fun ColorTaskBadge(activeColor: ReflexTargetColor) {
 
 private fun ReflexTargetColor.toTaskColor(): Color {
     return when (this) {
-        ReflexTargetColor.Red -> ReflexGamePalette.targetCore
-        ReflexTargetColor.Blue -> ArcadeBlue
-        ReflexTargetColor.Gold -> ArcadeGold
-        ReflexTargetColor.Teal -> ArcadeTeal
+        ReflexTargetColor.Red -> Color(0xFFFF335F)
+        ReflexTargetColor.Blue -> Color(0xFF39A8FF)
+        ReflexTargetColor.Gold -> Color(0xFFFFD84D)
+        ReflexTargetColor.Teal -> Color(0xFF22F2A6)
     }
 }
 

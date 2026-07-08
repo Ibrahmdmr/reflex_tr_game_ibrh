@@ -40,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -100,6 +99,7 @@ fun HomeContent(
     dailyFeaturedMode: DailyFeaturedModeState,
     dailyChallengeState: DailyChallengeState,
     progressionState: ProgressionState,
+    shouldAutoShowDailyRewardDialog: Boolean,
     playerProfile: PlayerProfile,
     leaderboardSnapshot: LeaderboardSnapshot,
     rewardedAdUiState: RewardedAdUiState,
@@ -109,6 +109,9 @@ fun HomeContent(
     isDailyRewardNotificationEnabled: Boolean,
     isStreakNotificationEnabled: Boolean,
     isNewMissionNotificationEnabled: Boolean,
+    isNotificationPermissionGranted: Boolean,
+    isOnboardingCompleted: Boolean,
+    isStorePreviewMode: Boolean,
     selectedLanguage: AppLanguage,
     onStartClick: () -> Unit,
     onModeStartClick: (GameMode) -> Unit,
@@ -121,10 +124,16 @@ fun HomeContent(
     onDailyRewardNotificationChange: (Boolean) -> Unit,
     onStreakNotificationChange: (Boolean) -> Unit,
     onNewMissionNotificationChange: (Boolean) -> Unit,
+    onOpenOnboarding: () -> Unit,
     onDailyRewardClaim: () -> Unit,
+    onDailyRewardDialogShown: () -> Unit,
+    onDailyChallengeClaim: () -> Unit,
     onSeasonRewardClaim: (Int) -> Unit,
+    onSeasonXpBoostClick: () -> Unit,
+    onSeasonMissionClaim: (String) -> Unit,
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit,
+    onShopCoinRewardClick: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
@@ -135,6 +144,10 @@ fun HomeContent(
     onLeaderboardModeSelected: (GameMode) -> Unit,
     onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
     onLeaderboardRefresh: () -> Unit,
+    onLeaderboardOpenedForMission: () -> Unit,
+    onShopOpenedForMission: () -> Unit,
+    onStorePreviewModeChange: (Boolean) -> Unit,
+    onRateAppClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -143,14 +156,21 @@ fun HomeContent(
         val panelPadding = if (isCompactHeight) 10.dp else 14.dp
         val contentSpacing = if (isCompactHeight) 8.dp else 10.dp
         var selectedHomeTab by remember { mutableStateOf(HomeTab.Play) }
-        var showDailyRewardPopup by remember(
-            progressionState.dailyReward.canClaim,
-            progressionState.dailyReward.canProtectStreak
-        ) {
-            mutableStateOf(progressionState.dailyReward.canClaim || progressionState.dailyReward.canProtectStreak)
+        var showDailyRewardPopup by remember(progressionState.dailyReward.canClaim) {
+            mutableStateOf(shouldAutoShowDailyRewardDialog)
         }
-        var showPlayerNameDialog by remember(playerProfile.name, playerProfile.hasCompletedNamePrompt) {
-            mutableStateOf(!playerProfile.hasName && !playerProfile.hasCompletedNamePrompt)
+        LaunchedEffect(shouldAutoShowDailyRewardDialog) {
+            if (shouldAutoShowDailyRewardDialog && progressionState.dailyReward.canClaim) {
+                showDailyRewardPopup = true
+                onDailyRewardDialogShown()
+            }
+        }
+        var showPlayerNameDialog by remember(
+            playerProfile.name,
+            playerProfile.hasCompletedNamePrompt,
+            showDailyRewardPopup
+        ) {
+            mutableStateOf(!showDailyRewardPopup && !playerProfile.hasName && !playerProfile.hasCompletedNamePrompt)
         }
         var dismissedLevelUp by remember { mutableStateOf<Int?>(null) }
         val levelUp = progressionState.lastLevelUp
@@ -170,7 +190,7 @@ fun HomeContent(
             }
         }
 
-        if (showDailyRewardPopup && (progressionState.dailyReward.canClaim || progressionState.dailyReward.canProtectStreak)) {
+        if (showDailyRewardPopup) {
             DailyRewardPopup(
                 state = progressionState.dailyReward,
                 selectedLanguage = selectedLanguage,
@@ -186,7 +206,7 @@ fun HomeContent(
             )
         }
 
-        if (showPlayerNameDialog) {
+        if (!showDailyRewardPopup && showPlayerNameDialog) {
             PlayerNameDialog(
                 currentName = playerProfile.name,
                 hasCurrentName = playerProfile.hasName,
@@ -201,7 +221,7 @@ fun HomeContent(
             )
         }
 
-        if (levelUp != null && dismissedLevelUp != levelUp) {
+        if (!showDailyRewardPopup && levelUp != null && dismissedLevelUp != levelUp) {
             LevelUpPopup(
                 level = levelUp,
                 coinBonus = LEVEL_UP_BONUS_COINS,
@@ -224,7 +244,8 @@ fun HomeContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = false)
-                            .verticalScroll(contentScrollState),
+                            .verticalScroll(contentScrollState)
+                            .padding(bottom = 14.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(contentSpacing)
                     ) {
@@ -249,9 +270,12 @@ fun HomeContent(
                                 dailyChallengeState = dailyChallengeState,
                                 rewardedAdUiState = rewardedAdUiState,
                                 progressionState = progressionState,
+                                isOnboardingCompleted = isOnboardingCompleted,
                                 onModeStartClick = onModeStartClick,
                                 onHowToPlayClick = onHowToPlayClick,
                                 onDailyStreakProtect = onDailyStreakProtect,
+                                onDailyRewardCardClick = { showDailyRewardPopup = true },
+                                onDailyChallengeClaim = onDailyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick
                             )
 
@@ -261,7 +285,9 @@ fun HomeContent(
                                 rewardedAdUiState = rewardedAdUiState,
                                 onDailyRewardClaim = onDailyRewardClaim,
                                 onDailyStreakProtect = onDailyStreakProtect,
+                                onDailyRewardCardClick = { showDailyRewardPopup = true },
                                 onCoinChestClick = onCoinChestClick,
+                                onDailyChallengeClaim = onDailyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                                 onAchievementClaim = onAchievementClaim
                             )
@@ -273,7 +299,10 @@ fun HomeContent(
 
                             HomeTab.Season -> SeasonTabContent(
                                 season = progressionState.season,
-                                onClaimClick = onSeasonRewardClaim
+                                rewardedAdUiState = rewardedAdUiState,
+                                onClaimClick = onSeasonRewardClaim,
+                                onBoostClick = onSeasonXpBoostClick,
+                                onMissionClaim = onSeasonMissionClaim
                             )
 
                             HomeTab.Profile -> ProfileTabContent(
@@ -287,6 +316,8 @@ fun HomeContent(
                                         tab = tab,
                                         leaderboardSnapshot = leaderboardSnapshot
                                     )
+                                    if (tab == HomeTab.Leaderboard) onLeaderboardOpenedForMission()
+                                    if (tab == HomeTab.Shop) onShopOpenedForMission()
                                     selectedHomeTab = tab
                                 }
                             )
@@ -297,6 +328,8 @@ fun HomeContent(
                                 rewardedAdUiState = rewardedAdUiState,
                                 onDailyRewardClaim = onDailyRewardClaim,
                                 onDailyStreakProtect = onDailyStreakProtect,
+                                onDailyRewardCardClick = { showDailyRewardPopup = true },
+                                onDailyChallengeClaim = onDailyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                                 onAchievementClaim = onAchievementClaim
                             )
@@ -308,7 +341,8 @@ fun HomeContent(
                         onThemeSelect = onThemeSelect,
                         onThemeBuy = onThemeBuy,
                         onThemeTrial = onThemeTrial,
-                        onCoinChestClick = onCoinChestClick
+                        onCoinChestClick = onCoinChestClick,
+                        onShopCoinRewardClick = onShopCoinRewardClick
                             )
 
                             HomeTab.Leaderboard -> LeaderboardTabContent(
@@ -329,6 +363,8 @@ fun HomeContent(
                                 isDailyRewardNotificationEnabled = isDailyRewardNotificationEnabled,
                                 isStreakNotificationEnabled = isStreakNotificationEnabled,
                                 isNewMissionNotificationEnabled = isNewMissionNotificationEnabled,
+                                isNotificationPermissionGranted = isNotificationPermissionGranted,
+                                isStorePreviewMode = isStorePreviewMode,
                                 onLanguageSelected = onLanguageSelected,
                                 onSoundEnabledChange = onSoundEnabledChange,
                                 onEffectSoundEnabledChange = onEffectSoundEnabledChange,
@@ -336,6 +372,9 @@ fun HomeContent(
                                 onDailyRewardNotificationChange = onDailyRewardNotificationChange,
                                 onStreakNotificationChange = onStreakNotificationChange,
                                 onNewMissionNotificationChange = onNewMissionNotificationChange,
+                                onOpenOnboarding = onOpenOnboarding,
+                                onStorePreviewModeChange = onStorePreviewModeChange,
+                                onRateAppClick = onRateAppClick,
                                 onEditNameClick = { showPlayerNameDialog = true }
                             )
                         }
@@ -349,6 +388,8 @@ fun HomeContent(
                                     tab = tab,
                                     leaderboardSnapshot = leaderboardSnapshot
                                 )
+                                if (tab == HomeTab.Leaderboard) onLeaderboardOpenedForMission()
+                                if (tab == HomeTab.Shop) onShopOpenedForMission()
                                 selectedHomeTab = tab
                             }
                         }
@@ -402,6 +443,14 @@ private fun logHomeTabOpened(
         HomeTab.Season,
         HomeTab.Missions,
         HomeTab.Settings -> Unit
+    }
+}
+
+private fun appVersionLabel(): String {
+    return if (BuildConfig.DEBUG) {
+        BuildConfig.VERSION_NAME
+    } else {
+        BuildConfig.VERSION_NAME.substringBefore("-debug")
     }
 }
 
@@ -473,9 +522,12 @@ private fun PlayTabContent(
     dailyChallengeState: DailyChallengeState,
     rewardedAdUiState: RewardedAdUiState,
     progressionState: ProgressionState,
+    isOnboardingCompleted: Boolean,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onDailyRewardCardClick: () -> Unit,
+    onDailyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit
 ) {
     Text(
@@ -491,6 +543,9 @@ private fun PlayTabContent(
         progressionState = progressionState
     )
     HomeLevelProgressCard(progressionState = progressionState)
+    if (isOnboardingCompleted && !progressionState.firstTargetBonusClaimed) {
+        FirstTargetCard()
+    }
     SeasonMiniCard(season = progressionState.season)
     DailyModeCard(
         state = dailyFeaturedMode,
@@ -499,11 +554,13 @@ private fun PlayTabContent(
     AchievementCounterCard(achievements = progressionState.achievements)
     DailyStreakMiniCard(
         state = progressionState.dailyReward,
+        onClick = onDailyRewardCardClick,
         onProtectClick = onDailyStreakProtect
     )
     DailyChallengeCard(
         state = dailyChallengeState,
         rewardedAdUiState = rewardedAdUiState,
+        onClaimClick = onDailyChallengeClaim,
         onDoubleRewardClick = onDailyChallengeDoubleRewardClick
     )
     ThemeTargetCard(progressionState = progressionState)
@@ -513,6 +570,58 @@ private fun PlayTabContent(
         onModeStartClick = onModeStartClick
     )
     HowToPlayEntryCard(onClick = onHowToPlayClick)
+}
+
+@Composable
+private fun FirstTargetCard(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeGold.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "★",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ArcadeGold,
+                    maxLines = 1
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.first_target_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.first_target_description, FirstTargetBonusCoins),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -661,6 +770,15 @@ private fun SeasonMiniCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            if (season.isXpBoostActive) {
+                Text(
+                    text = stringResource(R.string.season_xp_boost_active_short),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeTeal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             LinearProgressIndicator(
                 progress = { season.progressPercent / 100f },
                 modifier = Modifier.fillMaxWidth(),
@@ -674,7 +792,10 @@ private fun SeasonMiniCard(
 @Composable
 private fun SeasonTabContent(
     season: SeasonState,
-    onClaimClick: (Int) -> Unit
+    rewardedAdUiState: RewardedAdUiState,
+    onClaimClick: (Int) -> Unit,
+    onBoostClick: () -> Unit,
+    onMissionClaim: (String) -> Unit
 ) {
     Text(
         text = stringResource(R.string.season_title),
@@ -723,12 +844,187 @@ private fun SeasonTabContent(
             )
         }
     }
+    SeasonXpBoostCard(
+        season = season,
+        rewardedAdUiState = rewardedAdUiState,
+        onBoostClick = onBoostClick
+    )
+    SeasonMissionSection(
+        missions = season.missions,
+        onMissionClaim = onMissionClaim
+    )
     season.rewards.forEach { reward ->
         SeasonRewardCard(
             reward = reward,
             unlocked = reward.level <= season.level,
             onClaimClick = onClaimClick
         )
+    }
+}
+
+@Composable
+private fun SeasonXpBoostCard(
+    season: SeasonState,
+    rewardedAdUiState: RewardedAdUiState,
+    onBoostClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.38f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.season_xp_boost_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (season.isXpBoostActive) {
+                            stringResource(R.string.season_xp_boost_active, season.xpBoostRemainingMinutes)
+                        } else {
+                            stringResource(R.string.season_xp_boost_description, SeasonXpBoostBonusPercent)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.season_xp_boost_bonus, SeasonXpBoostBonusPercent),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ArcadeTeal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SecondaryGameButton(
+                text = when {
+                    rewardedAdUiState.isShowing || rewardedAdUiState.isLoading -> stringResource(R.string.rewarded_loading)
+                    season.isXpBoostActive -> stringResource(R.string.season_xp_boost_refresh)
+                    else -> stringResource(R.string.season_xp_boost_watch_ad)
+                },
+                enabled = rewardedAdUiState.isReady && !rewardedAdUiState.isShowing && !rewardedAdUiState.isLoading,
+                isLoading = rewardedAdUiState.isShowing || rewardedAdUiState.isLoading,
+                onClick = onBoostClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun SeasonMissionSection(
+    missions: List<SeasonMissionState>,
+    onMissionClaim: (String) -> Unit
+) {
+    Text(
+        text = stringResource(R.string.season_missions_title),
+        style = MaterialTheme.typography.titleMedium,
+        color = ReflexGamePalette.textPrimary,
+        modifier = Modifier.fillMaxWidth()
+    )
+    missions.forEach { mission ->
+        SeasonMissionCard(
+            mission = mission,
+            onClaimClick = { onMissionClaim(mission.id) }
+        )
+    }
+}
+
+@Composable
+private fun SeasonMissionCard(
+    mission: SeasonMissionState,
+    onClaimClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(
+            1.dp,
+            if (mission.completed && !mission.claimed) ArcadeGold.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.12f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(mission.titleRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(mission.descriptionRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.season_mission_reward_value, mission.rewardSeasonXp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeGold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            LinearProgressIndicator(
+                progress = { mission.progressPercent / 100f },
+                modifier = Modifier.fillMaxWidth(),
+                color = if (mission.completed) ArcadeGold else ArcadeBlue,
+                trackColor = Color.White.copy(alpha = 0.12f)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(
+                        R.string.season_mission_progress,
+                        mission.progress.coerceAtMost(mission.target),
+                        mission.target
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                SecondaryGameButton(
+                    text = when {
+                        mission.claimed -> stringResource(R.string.claimed)
+                        mission.completed -> stringResource(R.string.claim_reward)
+                        else -> stringResource(R.string.season_mission_in_progress)
+                    },
+                    enabled = mission.completed && !mission.claimed,
+                    onClick = onClaimClick,
+                    modifier = Modifier.width(132.dp)
+                )
+            }
+        }
     }
 }
 
@@ -810,19 +1106,23 @@ private fun MissionsTabContent(
     rewardedAdUiState: RewardedAdUiState,
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onDailyRewardCardClick: () -> Unit,
+    onDailyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit
 ) {
     DailyChallengeCard(
         state = dailyChallengeState,
         rewardedAdUiState = rewardedAdUiState,
+        onClaimClick = onDailyChallengeClaim,
         onDoubleRewardClick = onDailyChallengeDoubleRewardClick
     )
     WeeklyChallengeCard(state = progressionState.weeklyChallenge)
     DailyRewardCard(
         state = progressionState.dailyReward,
         onClaimClick = onDailyRewardClaim,
-        onProtectClick = onDailyStreakProtect
+        onProtectClick = onDailyStreakProtect,
+        onCardClick = onDailyRewardCardClick
     )
     AchievementSection(
         achievements = progressionState.achievements,
@@ -838,7 +1138,9 @@ private fun RewardsTabContent(
     rewardedAdUiState: RewardedAdUiState,
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
+    onDailyRewardCardClick: () -> Unit,
     onCoinChestClick: () -> Unit,
+    onDailyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit
 ) {
@@ -851,7 +1153,8 @@ private fun RewardsTabContent(
     DailyRewardCard(
         state = progressionState.dailyReward,
         onClaimClick = onDailyRewardClaim,
-        onProtectClick = onDailyStreakProtect
+        onProtectClick = onDailyStreakProtect,
+        onCardClick = onDailyRewardCardClick
     )
     CoinChestCard(
         state = progressionState.coinChest,
@@ -863,6 +1166,7 @@ private fun RewardsTabContent(
         weeklyChallengeState = progressionState.weeklyChallenge,
         achievements = progressionState.achievements,
         rewardedAdUiState = rewardedAdUiState,
+        onDailyChallengeClaim = onDailyChallengeClaim,
         onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
         onAchievementClaim = onAchievementClaim
     )
@@ -923,6 +1227,8 @@ private fun SettingsTabContent(
     isDailyRewardNotificationEnabled: Boolean,
     isStreakNotificationEnabled: Boolean,
     isNewMissionNotificationEnabled: Boolean,
+    isNotificationPermissionGranted: Boolean,
+    isStorePreviewMode: Boolean,
     onLanguageSelected: (AppLanguage) -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
     onEffectSoundEnabledChange: (Boolean) -> Unit,
@@ -930,6 +1236,9 @@ private fun SettingsTabContent(
     onDailyRewardNotificationChange: (Boolean) -> Unit,
     onStreakNotificationChange: (Boolean) -> Unit,
     onNewMissionNotificationChange: (Boolean) -> Unit,
+    onOpenOnboarding: () -> Unit,
+    onStorePreviewModeChange: (Boolean) -> Unit,
+    onRateAppClick: () -> Unit,
     onEditNameClick: () -> Unit
 ) {
     val rank = rankFor(score = bestScoresByMode.values.maxOrNull() ?: 0, level = progressionState.level)
@@ -992,24 +1301,23 @@ private fun SettingsTabContent(
     }
 
     SettingsSectionCard(title = stringResource(R.string.settings_notifications_title)) {
-        Text(
-            text = stringResource(R.string.settings_notifications_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = ReflexGamePalette.textSecondary
+        NotificationStatusMessage(
+            isPermissionGranted = isNotificationPermissionGranted,
+            hasEnabledToggle = isDailyRewardNotificationEnabled || isStreakNotificationEnabled || isNewMissionNotificationEnabled
         )
-        SettingsToggleRow(
+        NotificationToggleRow(
             title = stringResource(R.string.settings_daily_reward_reminder),
             description = stringResource(R.string.settings_daily_reward_reminder_description),
             checked = isDailyRewardNotificationEnabled,
             onCheckedChange = onDailyRewardNotificationChange
         )
-        SettingsToggleRow(
+        NotificationToggleRow(
             title = stringResource(R.string.settings_streak_reminder),
             description = stringResource(R.string.settings_streak_reminder_description),
             checked = isStreakNotificationEnabled,
             onCheckedChange = onStreakNotificationChange
         )
-        SettingsToggleRow(
+        NotificationToggleRow(
             title = stringResource(R.string.settings_new_mission_notification),
             description = stringResource(R.string.settings_new_mission_notification_description),
             checked = isNewMissionNotificationEnabled,
@@ -1020,7 +1328,7 @@ private fun SettingsTabContent(
     SettingsSectionCard(title = stringResource(R.string.settings_data_title)) {
         SettingsInfoRow(
             title = stringResource(R.string.settings_app_version),
-            value = BuildConfig.VERSION_NAME
+            value = appVersionLabel()
         )
         SettingsInfoRow(
             title = stringResource(R.string.settings_total_games),
@@ -1036,7 +1344,26 @@ private fun SettingsTabContent(
         )
     }
 
+    if (BuildConfig.DEBUG) {
+        SettingsSectionCard(title = stringResource(R.string.store_preview_settings_title)) {
+            SettingsActionButton(
+                text = stringResource(
+                    if (isStorePreviewMode) {
+                        R.string.store_preview_disable
+                    } else {
+                        R.string.store_preview_enable
+                    }
+                ),
+                onClick = { onStorePreviewModeChange(!isStorePreviewMode) }
+            )
+        }
+    }
+
     SettingsSectionCard(title = stringResource(R.string.settings_support_title)) {
+        SettingsActionButton(
+            text = stringResource(R.string.settings_open_onboarding),
+            onClick = onOpenOnboarding
+        )
         SettingsActionButton(
             text = stringResource(R.string.settings_contact_us),
             onClick = { runCatching { uriHandler.openUri("mailto:support@reflexavi.app") } }
@@ -1045,9 +1372,23 @@ private fun SettingsTabContent(
             text = stringResource(R.string.settings_privacy_policy),
             onClick = { runCatching { uriHandler.openUri("https://reflexavi.app/privacy") } }
         )
+        Text(
+            text = stringResource(R.string.settings_rate_app_prompt_title),
+            style = MaterialTheme.typography.labelLarge,
+            color = ReflexGamePalette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = stringResource(R.string.settings_rate_app_prompt_message),
+            style = MaterialTheme.typography.bodySmall,
+            color = ReflexGamePalette.textSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
         SettingsActionButton(
             text = stringResource(R.string.settings_rate_app),
-            onClick = { runCatching { uriHandler.openUri("market://details?id=${BuildConfig.APPLICATION_ID}") } }
+            onClick = onRateAppClick
         )
     }
 }
@@ -1077,6 +1418,111 @@ private fun SettingsSectionCard(
             )
             content()
         }
+    }
+}
+
+@Composable
+private fun NotificationStatusMessage(
+    isPermissionGranted: Boolean,
+    hasEnabledToggle: Boolean
+) {
+    val text = when {
+        !isPermissionGranted -> stringResource(R.string.settings_notifications_permission_closed_short)
+        !hasEnabledToggle -> stringResource(R.string.settings_notifications_all_disabled)
+        else -> stringResource(R.string.settings_notifications_description)
+    }
+    val accent = if (isPermissionGranted) ArcadeTeal else ArcadeGold
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = accent.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.28f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = ReflexGamePalette.textPrimary,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun NotificationToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.055f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(
+            1.dp,
+            if (checked) ArcadeTeal.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    NotificationStateChip(checked = checked)
+                }
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationStateChip(
+    checked: Boolean
+) {
+    val accent = if (checked) ArcadeTeal else Color.White.copy(alpha = 0.42f)
+    Surface(
+        color = accent.copy(alpha = if (checked) 0.18f else 0.08f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
+    ) {
+        Text(
+            text = stringResource(if (checked) R.string.settings_toggle_on else R.string.settings_toggle_off),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (checked) ArcadeTeal else ReflexGamePalette.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1167,7 +1613,8 @@ private fun ShopTabContent(
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
     onThemeTrial: (PlayerTheme) -> Unit,
-    onCoinChestClick: () -> Unit
+    onCoinChestClick: () -> Unit,
+    onShopCoinRewardClick: () -> Unit
 ) {
     Text(
         text = stringResource(R.string.theme_shop_title),
@@ -1179,6 +1626,11 @@ private fun ShopTabContent(
         style = MaterialTheme.typography.bodyMedium,
         color = ReflexGamePalette.textSecondary,
         textAlign = TextAlign.Center
+    )
+    ShopCoinEarnCard(
+        progressionState = progressionState,
+        rewardedAdUiState = rewardedAdUiState,
+        onEarnClick = onShopCoinRewardClick
     )
     CoinChestCard(
         state = progressionState.coinChest,
@@ -1192,6 +1644,124 @@ private fun ShopTabContent(
         onThemeBuy = onThemeBuy,
         onThemeTrial = onThemeTrial
     )
+}
+
+@Composable
+private fun ShopCoinEarnCard(
+    progressionState: ProgressionState,
+    rewardedAdUiState: RewardedAdUiState,
+    onEarnClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val rewardState = progressionState.shopCoinReward
+    val currentCoins = progressionState.coins.coerceAtLeast(0)
+    val targetTheme = PlayerTheme.entries
+        .filterNot { it in progressionState.unlockedThemes }
+        .filter { it.coinPrice > 0 }
+        .minByOrNull { it.coinPrice }
+    val remainingCoins = targetTheme?.let { (it.coinPrice - currentCoins).coerceAtLeast(0) } ?: 0
+    val canWatch = rewardState.canClaim && rewardedAdUiState.isReady && !rewardedAdUiState.isShowing && !rewardedAdUiState.isLoading
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.38f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(ArcadeGold.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ArcadeGold
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.shop_coin_earn_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (targetTheme == null) {
+                            stringResource(R.string.theme_target_all_unlocked_empty)
+                        } else {
+                            stringResource(
+                                R.string.shop_coin_earn_target,
+                                stringResource(targetTheme.titleRes),
+                                remainingCoins
+                            )
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ReflexGamePalette.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.coin_wallet_value, currentCoins),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeGold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(
+                        R.string.shop_coin_earn_remaining_rights,
+                        rewardState.remainingClaims,
+                        rewardState.maxClaimsPerDay
+                    ),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (rewardState.canClaim) ReflexGamePalette.textSecondary else ArcadeCoral,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                SecondaryGameButton(
+                    text = when {
+                        !rewardState.canClaim -> stringResource(R.string.shop_coin_earn_limit_reached)
+                        rewardedAdUiState.isLoading || rewardedAdUiState.isShowing -> stringResource(R.string.rewarded_loading)
+                        !rewardedAdUiState.isReady -> stringResource(R.string.shop_coin_earn_ad_not_ready)
+                        else -> stringResource(R.string.shop_coin_earn_button, rewardState.rewardCoins)
+                    },
+                    enabled = canWatch,
+                    onClick = onEarnClick,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            if (rewardState.canClaim && !rewardedAdUiState.isReady && !rewardedAdUiState.isLoading && !rewardedAdUiState.isShowing) {
+                Text(
+                    text = stringResource(R.string.shop_coin_earn_ad_not_ready),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ArcadeGold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1782,6 +2352,7 @@ internal fun GameModeCard(
 private fun DailyChallengeCard(
     state: DailyChallengeState,
     rewardedAdUiState: RewardedAdUiState = RewardedAdUiState(),
+    onClaimClick: () -> Unit = {},
     onDoubleRewardClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -1851,7 +2422,11 @@ private fun DailyChallengeCard(
                     )
                     Text(
                         text = if (state.completed) {
-                            stringResource(R.string.daily_challenge_completed_description)
+                            if (state.rewardClaimed) {
+                                stringResource(R.string.mission_reward_daily_claimed, state.rewardCoins)
+                            } else {
+                                stringResource(R.string.daily_challenge_completed_description)
+                            }
                         } else {
                             stringResource(state.type.descriptionRes)
                         },
@@ -1880,6 +2455,20 @@ private fun DailyChallengeCard(
                     )
                 }
             }
+            Text(
+                text = stringResource(R.string.mission_reward_ready_value, state.rewardCoins),
+                style = MaterialTheme.typography.labelMedium,
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (state.completed && !state.rewardClaimed) {
+                SecondaryGameButton(
+                    text = stringResource(R.string.claim_reward),
+                    onClick = onClaimClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             if (state.completed && state.rewardClaimed && !state.doubleRewardClaimed) {
                 SecondaryGameButton(
                     text = when {
@@ -1902,6 +2491,7 @@ private fun MissionRewardsCard(
     weeklyChallengeState: ChallengeState,
     achievements: List<AchievementState>,
     rewardedAdUiState: RewardedAdUiState,
+    onDailyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -1976,7 +2566,13 @@ private fun MissionRewardsCard(
                 },
                 accent = if (dailyChallengeState.completed) ArcadeTeal else ArcadeGold
             ) {
-                if (dailyChallengeState.completed && dailyChallengeState.rewardClaimed && !dailyChallengeState.doubleRewardClaimed) {
+                if (dailyChallengeState.completed && !dailyChallengeState.rewardClaimed) {
+                    SecondaryGameButton(
+                        text = stringResource(R.string.claim_reward),
+                        onClick = onDailyChallengeClaim,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (dailyChallengeState.completed && dailyChallengeState.rewardClaimed && !dailyChallengeState.doubleRewardClaimed) {
                     SecondaryGameButton(
                         text = when {
                             rewardedAdUiState.isReady -> stringResource(R.string.daily_challenge_double_reward)
@@ -2145,6 +2741,7 @@ private fun CoinWalletCard(
 @Composable
 private fun DailyStreakMiniCard(
     state: DailyRewardState,
+    onClick: () -> Unit,
     onProtectClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -2154,7 +2751,9 @@ private fun DailyStreakMiniCard(
         else -> ArcadeGold
     }
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         color = ReflexGamePalette.cardGlassStrong,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
@@ -2214,6 +2813,7 @@ private fun DailyRewardCard(
     state: DailyRewardState,
     onClaimClick: () -> Unit,
     onProtectClick: () -> Unit,
+    onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = when {
@@ -2222,7 +2822,9 @@ private fun DailyRewardCard(
         else -> ArcadeTeal
     }
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onCardClick),
         color = if (state.canClaim || state.isStreakAtRisk) ReflexGamePalette.cardGlassStrong else ArcadeTeal.copy(alpha = 0.1f),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
@@ -2731,32 +3333,24 @@ private fun LevelUpPopup(
     coinBonus: Int,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    PolishedGameDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = stringResource(R.string.ok),
-                    color = ArcadeGold
-                )
-            }
-        },
-        title = {
-            Text(
-                text = stringResource(R.string.level_up_value, level),
-                color = ReflexGamePalette.textPrimary
+            PrimaryGameButton(
+                text = stringResource(R.string.ok),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
             )
         },
-        text = {
-            Text(
-                text = stringResource(R.string.level_up_bonus_message, coinBonus),
-                color = ReflexGamePalette.textSecondary
-            )
-        },
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        titleContentColor = ReflexGamePalette.textPrimary,
-        textContentColor = ReflexGamePalette.textSecondary
-    )
+        title = stringResource(R.string.level_up_value, level)
+    ) {
+        Text(
+            text = stringResource(R.string.level_up_bonus_message, coinBonus),
+            modifier = Modifier.fillMaxWidth(),
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable
@@ -3067,18 +3661,22 @@ private fun PlayerNameDialog(
     val randomNameText = stringResource(R.string.player_name_random)
     val suggestionsText = stringResource(R.string.player_name_suggestions)
 
-    AlertDialog(
+    PolishedGameDialog(
         onDismissRequest = onDismiss,
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        title = {
-            Text(
-                text = titleText,
-                color = ReflexGamePalette.textPrimary
+        title = titleText,
+        confirmButton = {
+            PrimaryGameButton(
+                text = saveText,
+                onClick = {
+                    val candidate = name.trim().take(PLAYER_NAME_MAX_LENGTH)
+                    hasError = candidate.isBlank() || !onSave(candidate)
+                },
+                modifier = Modifier.fillMaxWidth()
             )
-        },
-        text = {
+        }
+    ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
@@ -3151,20 +3749,11 @@ private fun PlayerNameDialog(
                     onClick = {
                         name = playerNameSuggestions.random()
                         hasError = false
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-        },
-        confirmButton = {
-            PrimaryGameButton(
-                text = saveText,
-                onClick = {
-                    val candidate = name.trim().take(PLAYER_NAME_MAX_LENGTH)
-                    hasError = candidate.isBlank() || !onSave(candidate)
-                }
-            )
-        }
-    )
+    }
 }
 
 @Composable
@@ -3187,6 +3776,7 @@ private fun DailyRewardPopup(
             selectedLanguage = selectedLanguage,
             state.rewardCoins
         )
+        state.claimedToday -> localizedHomeStringResource(R.string.daily_reward_claimed_today, selectedLanguage)
         else -> localizedHomeStringResource(
             id = R.string.daily_reward_popup_message,
             selectedLanguage = selectedLanguage,
@@ -3196,34 +3786,32 @@ private fun DailyRewardPopup(
     val claimText = when {
         state.isStreakAtRisk -> localizedHomeStringResource(R.string.daily_reward_protect_button, selectedLanguage)
         state.isSuperReward -> localizedHomeStringResource(R.string.daily_reward_super_claim, selectedLanguage)
+        state.claimedToday -> localizedHomeStringResource(R.string.daily_reward_continue, selectedLanguage)
         else -> localizedHomeStringResource(R.string.daily_reward_continue, selectedLanguage)
     }
 
-    AlertDialog(
+    PolishedGameDialog(
         onDismissRequest = onDismiss,
-        containerColor = ReflexGamePalette.cardGlassStrong,
-        title = {
-            Text(
-                text = title,
-                color = ReflexGamePalette.textPrimary
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = message,
-                    color = ReflexGamePalette.textSecondary
-                )
-                DailyRewardProgressLine(state = state)
-            }
-        },
+        title = title,
         confirmButton = {
             PrimaryGameButton(
                 text = claimText,
-                onClick = if (state.isStreakAtRisk) onProtectClick else onClaimClick
+                onClick = when {
+                    state.isStreakAtRisk -> onProtectClick
+                    state.canClaim -> onClaimClick
+                    else -> onDismiss
+                }
             )
         }
-    )
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.fillMaxWidth(),
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+        DailyRewardProgressLine(state = state)
+    }
 }
 
 @Composable
@@ -3445,6 +4033,12 @@ private fun ThemeShopSection(
         }
 
         unlockedThemePopup?.let { theme ->
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(GameDialogScrimColor.copy(alpha = 0.72f))
+                    .clickable { unlockedThemePopup = null }
+            )
             ThemeUnlockCelebration(
                 theme = theme,
                 selectedLanguage = selectedLanguage,
@@ -3619,13 +4213,30 @@ private fun ThemeCard(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                shadowElevation = if (theme.rarity == ThemeRarity.Mythic) 24f * pulse else 8f
+                shadowElevation = when {
+                    selected || trialActive -> 26f * pulse
+                    canBuy && !unlocked -> 18f * pulse
+                    theme.rarity == ThemeRarity.Mythic -> 24f * pulse
+                    else -> 8f
+                }
             },
-        color = if (selected || trialActive) accent.copy(alpha = 0.16f + rarityGlow * 0.08f) else ReflexGamePalette.cardGlassStrong,
+        color = when {
+            selected || trialActive -> accent.copy(alpha = 0.18f + rarityGlow * 0.08f)
+            canBuy && !unlocked -> ArcadeGold.copy(alpha = 0.08f)
+            else -> ReflexGamePalette.cardGlassStrong
+        },
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(
-            width = if (theme.rarity == ThemeRarity.Mythic) 1.8.dp else 1.dp,
-            color = accent.copy(alpha = if (selected || trialActive) 0.72f else 0.26f + rarityGlow * 0.38f)
+            width = when {
+                selected || trialActive -> 2.dp
+                theme.rarity == ThemeRarity.Mythic -> 1.8.dp
+                else -> 1.dp
+            },
+            color = when {
+                selected || trialActive -> accent.copy(alpha = 0.86f)
+                canBuy && !unlocked -> ArcadeGold.copy(alpha = 0.62f)
+                else -> accent.copy(alpha = 0.26f + rarityGlow * 0.38f)
+            }
         )
     ) {
         Column(
@@ -3663,19 +4274,23 @@ private fun ThemeCard(
                             )
                         }
                     }
-                    if (isPrestigeTheme) {
-                        Surface(
-                            color = ArcadeGold.copy(alpha = 0.16f),
-                            shape = RoundedCornerShape(999.dp),
-                            border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
-                        ) {
-                            Text(
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        if (selected) {
+                            ThemeStatusBadge(
+                                text = stringResource(R.string.theme_selected),
+                                color = ArcadeTeal
+                            )
+                        }
+                        if (isPrestigeTheme) {
+                            ThemeStatusBadge(
+                                text = stringResource(R.string.theme_legendary_label),
+                                color = ArcadeGold
+                            )
+                        }
+                        if (isPrestigeTheme) {
+                            ThemeStatusBadge(
                                 text = stringResource(R.string.theme_prestige_label),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ArcadeGold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = ArcadeGold
                             )
                         }
                     }
@@ -3699,11 +4314,11 @@ private fun ThemeCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (isPrestigeTheme && !unlocked) {
+                    if (!unlocked && theme.coinPrice > 0) {
                         Text(
                             text = stringResource(R.string.theme_target_remaining, remainingCoins),
                             style = MaterialTheme.typography.labelSmall,
-                            color = ArcadeGold,
+                            color = if (canBuy) ArcadeGold else ReflexGamePalette.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3722,23 +4337,30 @@ private fun ThemeCard(
                     modifier = Modifier.width(132.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    SecondaryGameButton(
-                        text = when {
-                            selected -> stringResource(R.string.theme_selected)
-                            unlocked -> stringResource(R.string.select_theme)
-                            canBuy -> stringResource(R.string.buy_theme)
-                            else -> stringResource(R.string.theme_locked)
-                        },
-                        enabled = when {
-                            selected -> false
-                            unlocked -> true
-                            else -> canBuy
-                        },
-                        onClick = when {
-                            unlocked -> onSelect
-                            else -> onBuy
-                        }
-                    )
+                    if (!unlocked && canBuy) {
+                        PrimaryGameButton(
+                            text = stringResource(R.string.buy_theme),
+                            onClick = onBuy,
+                            height = 48.dp
+                        )
+                    } else {
+                        SecondaryGameButton(
+                            text = when {
+                                selected -> stringResource(R.string.theme_selected)
+                                unlocked -> stringResource(R.string.select_theme)
+                                else -> stringResource(R.string.theme_insufficient_coins)
+                            },
+                            enabled = when {
+                                selected -> false
+                                unlocked -> true
+                                else -> false
+                            },
+                            onClick = when {
+                                unlocked -> onSelect
+                                else -> onBuy
+                            }
+                        )
+                    }
                     if (!unlocked && !trialActive) {
                         SecondaryGameButton(
                             text = stringResource(R.string.theme_try_ad),
@@ -3748,6 +4370,29 @@ private fun ThemeCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ThemeStatusBadge(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.34f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

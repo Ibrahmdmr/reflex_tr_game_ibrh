@@ -4,16 +4,13 @@ import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import com.google.firebase.FirebaseApp
-import com.google.firebase.Timestamp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.firestore.FirebaseFirestore
 import com.reflex.tr.game.ibrh.BuildConfig
 
 object FirebaseGameServices {
     private const val TAG = "FirebaseGameServices"
-    private const val TEST_USERS_COLLECTION = "test_users"
 
     private var initialized = false
     private var appContext: Context? = null
@@ -26,8 +23,10 @@ object FirebaseGameServices {
         runCatching {
             FirebaseApp.initializeApp(context.applicationContext)
             log("Firebase app initialized")
-            recordNonFatal("Firebase non-fatal startup test")
-            signInAnonymouslyAndTestFirestore()
+            if (BuildConfig.DEBUG) {
+                recordNonFatal("Firebase debug startup check")
+            }
+            signInAnonymously()
             logEvent(FirebaseEvent.AppOpen)
         }.onFailure { error ->
             logError("Firebase initialization failed", error)
@@ -53,7 +52,7 @@ object FirebaseGameServices {
         }
     }
 
-    private fun signInAnonymouslyAndTestFirestore() {
+    private fun signInAnonymously() {
         FirebaseAuth.getInstance().signInAnonymously()
             .addOnSuccessListener { result ->
                 val userId = result.user?.uid.orEmpty()
@@ -62,38 +61,10 @@ object FirebaseGameServices {
                     logError("Anonymous Auth returned blank userId", null)
                     return@addOnSuccessListener
                 }
-                writeAndReadTestUser(userId)
             }
             .addOnFailureListener { error ->
                 logError("Anonymous Auth failed", error)
                 recordNonFatal("Anonymous Auth failed", error)
-            }
-    }
-
-    private fun writeAndReadTestUser(userId: String) {
-        val firestore = FirebaseFirestore.getInstance()
-        val document = firestore.collection(TEST_USERS_COLLECTION).document(userId)
-        val payload = mapOf(
-            "userId" to userId,
-            "createdAt" to Timestamp.now(),
-            "appVersion" to BuildConfig.VERSION_NAME
-        )
-
-        document.set(payload)
-            .addOnSuccessListener {
-                log("Firestore test write success collection=$TEST_USERS_COLLECTION userId=$userId")
-                document.get()
-                    .addOnSuccessListener { snapshot ->
-                        log("Firestore test read success exists=${snapshot.exists()} data=${snapshot.data}")
-                    }
-                    .addOnFailureListener { error ->
-                        logError("Firestore test read failed", error)
-                        recordNonFatal("Firestore test read failed", error)
-                    }
-            }
-            .addOnFailureListener { error ->
-                logError("Firestore test write failed", error)
-                recordNonFatal("Firestore test write failed", error)
             }
     }
 
@@ -132,7 +103,15 @@ enum class FirebaseEvent(val eventName: String) {
     AchievementUnlocked("achievement_unlocked"),
     AchievementClaimed("achievement_claimed"),
     LevelUp("level_up"),
-    RankChanged("rank_changed")
+    RankChanged("rank_changed"),
+    NotificationPermissionShown("notification_permission_shown"),
+    NotificationPermissionGranted("notification_permission_granted"),
+    NotificationPermissionDenied("notification_permission_denied"),
+    NotificationToggleEnabled("notification_toggle_enabled"),
+    NotificationToggleDisabled("notification_toggle_disabled"),
+    NotificationScheduled("notification_scheduled"),
+    NotificationClicked("notification_clicked"),
+    NotificationCancelled("notification_cancelled")
 }
 
 enum class FirebaseParam(val key: String) {
@@ -149,5 +128,8 @@ enum class FirebaseParam(val key: String) {
     Placement("placement"),
     AchievementId("achievement_id"),
     Level("level"),
-    RankName("rank_name")
+    RankName("rank_name"),
+    NotificationType("notification_type"),
+    PermissionStatus("permission_status"),
+    SourceScreen("source_screen")
 }

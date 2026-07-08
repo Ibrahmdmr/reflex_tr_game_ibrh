@@ -1,0 +1,5 @@
+<resources>
+    <string name="store_preview_settings_title">Geliştirici Önizleme</string>
+    <string name="store_preview_enable">Önizleme Modunu Aç</string>
+    <string name="store_preview_disable">Önizleme Modunu Kapat</string>
+</resources>

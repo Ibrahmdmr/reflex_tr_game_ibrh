@@ -18,6 +18,12 @@ private const val VIBRATION_ENABLED_KEY = "vibration_enabled"
 private const val NOTIFICATION_DAILY_REWARD_KEY = "notification_daily_reward"
 private const val NOTIFICATION_STREAK_KEY = "notification_streak"
 private const val NOTIFICATION_NEW_MISSION_KEY = "notification_new_mission"
+private const val ONBOARDING_COMPLETED_KEY = "onboarding_completed"
+private const val FIRST_TARGET_BONUS_CLAIMED_KEY = "first_target_bonus_claimed"
+private const val STORE_PREVIEW_MODE_KEY = "store_preview_mode"
+private const val FIRST_OPEN_DATE_KEY = "first_open_date"
+private const val REVIEW_LAST_PROMPT_TIME_KEY = "review_last_prompt_time"
+private const val REVIEW_AUTO_COMPLETED_KEY = "review_auto_completed"
 private const val LANGUAGE_TURKISH = "tr"
 private const val LANGUAGE_ENGLISH = "en"
 private const val DAILY_CHALLENGE_ID_KEY = "daily_challenge_id"
@@ -38,10 +44,13 @@ private const val REWARDED_AD_WATCH_COUNT_KEY = "rewarded_ad_watch_count"
 private const val SELECTED_THEME_KEY = "selected_theme"
 private const val UNLOCKED_THEMES_KEY = "unlocked_themes"
 private const val DAILY_REWARD_LAST_CLAIM_DATE_KEY = "daily_reward_last_claim_date"
+private const val DAILY_DIALOG_LAST_SHOWN_DATE_KEY = "daily_dialog_last_shown_date"
 private const val DAILY_REWARD_STREAK_KEY = "daily_reward_streak"
 private const val COIN_CHEST_OPEN_DATE_KEY = "coin_chest_open_date"
 private const val COIN_CHEST_OPEN_COUNT_KEY = "coin_chest_open_count"
 private const val COIN_CHEST_LAST_REWARD_KEY = "coin_chest_last_reward"
+private const val SHOP_COIN_REWARD_DATE_KEY = "shop_coin_reward_date"
+private const val SHOP_COIN_REWARD_COUNT_KEY = "shop_coin_reward_count"
 private const val ONE_MORE_GAME_BONUS_DATE_KEY = "one_more_game_bonus_date"
 private const val ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY = "one_more_game_bonus_played_count"
 private const val ONE_MORE_GAME_BONUS_CLAIMED_KEY = "one_more_game_bonus_claimed"
@@ -53,12 +62,19 @@ private const val SEASON_START_DATE_KEY = "season_start_date"
 private const val SEASON_XP_KEY = "season_xp"
 private const val SEASON_CLAIMED_LEVELS_KEY = "season_claimed_levels"
 private const val SEASON_BADGE_LEVELS_KEY = "season_badge_levels"
+private const val SEASON_XP_BOOST_END_TIME_KEY = "season_xp_boost_end_time"
+private const val SEASON_MISSION_DATE_KEY = "season_mission_date"
+private const val SEASON_MISSION_PLAY_COUNT_KEY = "season_mission_play_count"
+private const val SEASON_MISSION_REWARDED_COUNT_KEY = "season_mission_rewarded_count"
+private const val SEASON_MISSION_XP_EARNED_KEY = "season_mission_xp_earned"
+private const val SEASON_MISSION_CLAIMED_IDS_KEY = "season_mission_claimed_ids"
 private const val PLAYER_NAME_KEY = "player_name"
 private const val PLAYER_NAME_PROMPT_COMPLETED_KEY = "player_name_prompt_completed"
 private const val PLAYER_TITLE_KEY = "player_title"
 private const val PLAYER_WEEKLY_SCORE_KEY = "player_weekly_score"
 private const val PLAYER_WEEKLY_SCORE_DATE_KEY = "player_weekly_score_date"
 private const val DAY_IN_MILLIS = 24L * 60L * 60L * 1000L
+private const val REVIEW_COOLDOWN_MILLIS = 14L * DAY_IN_MILLIS
 private const val DEFAULT_PLAYER_NAME = ""
 
 enum class AppLanguage(val code: String) {
@@ -75,6 +91,7 @@ class GamePreferences(private val context: Context) {
 
     init {
         migrateGlobalBestScoreToClassic()
+        markFirstOpenDateIfNeeded()
     }
 
     private val bestScoresState = MutableStateFlow(loadBestScores())
@@ -85,6 +102,8 @@ class GamePreferences(private val context: Context) {
     private val dailyRewardNotificationState = MutableStateFlow(loadDailyRewardNotificationEnabled())
     private val streakNotificationState = MutableStateFlow(loadStreakNotificationEnabled())
     private val newMissionNotificationState = MutableStateFlow(loadNewMissionNotificationEnabled())
+    private val onboardingCompletedState = MutableStateFlow(loadOnboardingCompleted())
+    private val storePreviewModeState = MutableStateFlow(loadStorePreviewModeEnabled())
 
     val bestScoresFlow: Flow<Map<GameMode, Int>> = bestScoresState.asStateFlow()
     val languageFlow: Flow<AppLanguage> = languageState.asStateFlow()
@@ -94,6 +113,8 @@ class GamePreferences(private val context: Context) {
     val dailyRewardNotificationFlow: Flow<Boolean> = dailyRewardNotificationState.asStateFlow()
     val streakNotificationFlow: Flow<Boolean> = streakNotificationState.asStateFlow()
     val newMissionNotificationFlow: Flow<Boolean> = newMissionNotificationState.asStateFlow()
+    val onboardingCompletedFlow: Flow<Boolean> = onboardingCompletedState.asStateFlow()
+    val storePreviewModeFlow: Flow<Boolean> = storePreviewModeState.asStateFlow()
 
     suspend fun saveBestScore(mode: GameMode, score: Int) {
         val key = mode.bestScorePreferenceKey()
@@ -163,11 +184,31 @@ class GamePreferences(private val context: Context) {
         newMissionNotificationState.value = enabled
     }
 
+    suspend fun saveOnboardingCompleted(completed: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(ONBOARDING_COMPLETED_KEY, completed)
+            .apply()
+
+        onboardingCompletedState.value = completed
+    }
+
+    suspend fun saveStorePreviewModeEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(STORE_PREVIEW_MODE_KEY, enabled)
+            .apply()
+
+        storePreviewModeState.value = enabled
+    }
+
+    fun isStorePreviewModeEnabled(): Boolean {
+        return storePreviewModeState.value
+    }
+
     fun getDailyChallengeState(): DailyChallengeState {
         val today = todayDateKey()
         val savedDate = sharedPreferences.getString(DAILY_CHALLENGE_CREATED_DATE_KEY, null)
         val savedType = sharedPreferences.getString(DAILY_CHALLENGE_TYPE_KEY, null)
-        val type = DailyChallenge.entries.firstOrNull { it.name == savedType }
+        val type = dailyChallengeTypeFromName(savedType)
 
         if (savedDate == today && type != null) {
             return DailyChallengeState(
@@ -178,7 +219,7 @@ class GamePreferences(private val context: Context) {
                 progress = sharedPreferences.getInt(DAILY_CHALLENGE_PROGRESS_KEY, 0),
                 completed = sharedPreferences.getBoolean(DAILY_CHALLENGE_COMPLETED_KEY, false),
                 createdDate = today,
-                rewardCoins = sharedPreferences.getInt(DAILY_CHALLENGE_REWARD_COINS_KEY, 100),
+                rewardCoins = sharedPreferences.getInt(DAILY_CHALLENGE_REWARD_COINS_KEY, type.rewardCoins),
                 rewardClaimed = sharedPreferences.getBoolean(DAILY_CHALLENGE_REWARD_CLAIMED_KEY, false),
                 doubleRewardClaimed = sharedPreferences.getBoolean(DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY, false)
             )
@@ -192,7 +233,7 @@ class GamePreferences(private val context: Context) {
             progress = 0,
             completed = false,
             createdDate = today,
-            rewardCoins = 100
+            rewardCoins = nextType.rewardCoins
         )
         saveDailyChallengeState(newState)
         return newState
@@ -224,11 +265,13 @@ class GamePreferences(private val context: Context) {
             selectedTheme = loadSelectedTheme(),
             unlockedThemes = loadUnlockedThemes(),
             coinChest = loadCoinChestState(),
+            shopCoinReward = loadShopCoinRewardState(),
             oneMoreGameBonus = loadOneMoreGameBonusState(),
             dailyReward = loadDailyRewardState(),
             season = loadSeasonState(),
             achievements = loadAchievements(),
-            weeklyChallenge = loadWeeklyChallenge()
+            weeklyChallenge = loadWeeklyChallenge(),
+            firstTargetBonusClaimed = sharedPreferences.getBoolean(FIRST_TARGET_BONUS_CLAIMED_KEY, false)
         )
     }
 
@@ -299,6 +342,7 @@ class GamePreferences(private val context: Context) {
             .putInt(TOTAL_HITS_KEY, state.totalHits.coerceAtLeast(0))
             .putInt(LIFETIME_MAX_COMBO_KEY, state.lifetimeMaxCombo.coerceAtLeast(0))
             .putInt(REWARDED_AD_WATCH_COUNT_KEY, state.rewardedAdWatchCount.coerceAtLeast(0))
+            .putBoolean(FIRST_TARGET_BONUS_CLAIMED_KEY, state.firstTargetBonusClaimed)
             .putString(SELECTED_THEME_KEY, state.selectedTheme.storageKey)
             .putString(
                 UNLOCKED_THEMES_KEY,
@@ -311,6 +355,8 @@ class GamePreferences(private val context: Context) {
             .putString(COIN_CHEST_OPEN_DATE_KEY, state.coinChest.lastOpenedDate)
             .putInt(COIN_CHEST_OPEN_COUNT_KEY, state.coinChest.openedToday.coerceIn(0, state.coinChest.maxOpensPerDay))
             .putInt(COIN_CHEST_LAST_REWARD_KEY, state.coinChest.lastRewardCoins.coerceAtLeast(0))
+            .putString(SHOP_COIN_REWARD_DATE_KEY, state.shopCoinReward.lastClaimDate)
+            .putInt(SHOP_COIN_REWARD_COUNT_KEY, state.shopCoinReward.claimedToday.coerceIn(0, state.shopCoinReward.maxClaimsPerDay))
             .putString(ONE_MORE_GAME_BONUS_DATE_KEY, oneMoreGameBonus.dateKey)
             .putInt(ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY, oneMoreGameBonus.gamesPlayedToday.coerceAtLeast(0))
             .putBoolean(ONE_MORE_GAME_BONUS_CLAIMED_KEY, oneMoreGameBonus.bonusClaimedToday)
@@ -321,6 +367,12 @@ class GamePreferences(private val context: Context) {
             .putInt(SEASON_XP_KEY, state.season.xp.coerceAtLeast(0))
             .putString(SEASON_CLAIMED_LEVELS_KEY, state.season.claimedRewardLevels.joinToString(","))
             .putString(SEASON_BADGE_LEVELS_KEY, state.season.preservedBadgeLevels.joinToString(","))
+            .putLong(SEASON_XP_BOOST_END_TIME_KEY, state.season.xpBoostEndTimeMillis.coerceAtLeast(0L))
+            .putString(SEASON_MISSION_DATE_KEY, state.season.missionDateKey.ifBlank { todayDateKey() })
+            .putInt(SEASON_MISSION_PLAY_COUNT_KEY, state.season.gamesPlayedToday.coerceAtLeast(0))
+            .putInt(SEASON_MISSION_REWARDED_COUNT_KEY, state.season.rewardedAdsWatchedToday.coerceAtLeast(0))
+            .putInt(SEASON_MISSION_XP_EARNED_KEY, state.season.seasonXpEarnedToday.coerceAtLeast(0))
+            .putString(SEASON_MISSION_CLAIMED_IDS_KEY, state.season.claimedMissionIds.joinToString(","))
             .apply()
     }
 
@@ -329,6 +381,19 @@ class GamePreferences(private val context: Context) {
         sharedPreferences.edit()
             .putString(DAILY_REWARD_LAST_CLAIM_DATE_KEY, today)
             .putInt(DAILY_REWARD_STREAK_KEY, streakDay.coerceAtLeast(1))
+            .apply()
+    }
+
+    fun shouldShowDailyRewardDialog(state: DailyRewardState): Boolean {
+        val today = todayDateKey()
+        val lastShownDate = sharedPreferences.getString(DAILY_DIALOG_LAST_SHOWN_DATE_KEY, "").orEmpty()
+        val lastClaimDate = sharedPreferences.getString(DAILY_REWARD_LAST_CLAIM_DATE_KEY, "").orEmpty()
+        return state.canClaim && lastShownDate != today && lastClaimDate != today
+    }
+
+    fun markDailyRewardDialogShown() {
+        sharedPreferences.edit()
+            .putString(DAILY_DIALOG_LAST_SHOWN_DATE_KEY, todayDateKey())
             .apply()
     }
 
@@ -386,10 +451,75 @@ class GamePreferences(private val context: Context) {
         return sharedPreferences.getBoolean(NOTIFICATION_NEW_MISSION_KEY, false)
     }
 
+    private fun loadOnboardingCompleted(): Boolean {
+        return sharedPreferences.getBoolean(ONBOARDING_COMPLETED_KEY, false)
+    }
+
+    private fun loadStorePreviewModeEnabled(): Boolean {
+        return sharedPreferences.getBoolean(STORE_PREVIEW_MODE_KEY, false)
+    }
+
+    fun isOnboardingCompleted(): Boolean {
+        return loadOnboardingCompleted()
+    }
+
+    fun shouldRequestInAppReviewAfterGame(
+        totalGames: Int,
+        isNewBestScore: Boolean,
+        score: Int,
+        maxCombo: Int
+    ): Boolean {
+        if (sharedPreferences.getBoolean(REVIEW_AUTO_COMPLETED_KEY, false)) return false
+
+        val lastPromptTime = sharedPreferences.getLong(REVIEW_LAST_PROMPT_TIME_KEY, 0L)
+        val cooldownPassed = lastPromptTime == 0L ||
+            System.currentTimeMillis() - lastPromptTime >= REVIEW_COOLDOWN_MILLIS
+        if (!cooldownPassed) return false
+
+        val hasEnoughGames = totalGames >= 5
+        val hasReturnedAnotherDay = activeAppDays() >= 2
+        val positiveGameOverMoment = score >= 10 || maxCombo >= 5 || isNewBestScore
+
+        return hasEnoughGames || isNewBestScore || hasReturnedAnotherDay || positiveGameOverMoment
+    }
+
+    fun markInAppReviewRequested(autoCompleted: Boolean) {
+        sharedPreferences.edit()
+            .putLong(REVIEW_LAST_PROMPT_TIME_KEY, System.currentTimeMillis())
+            .putBoolean(REVIEW_AUTO_COMPLETED_KEY, autoCompleted || sharedPreferences.getBoolean(REVIEW_AUTO_COMPLETED_KEY, false))
+            .apply()
+    }
+
+    private fun markFirstOpenDateIfNeeded() {
+        if (sharedPreferences.contains(FIRST_OPEN_DATE_KEY)) return
+
+        sharedPreferences.edit()
+            .putString(FIRST_OPEN_DATE_KEY, todayDateKey())
+            .apply()
+    }
+
+    private fun activeAppDays(): Int {
+        val firstOpenDate = sharedPreferences.getString(FIRST_OPEN_DATE_KEY, null) ?: return 1
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return runCatching {
+            val first = formatter.parse(firstOpenDate) ?: Date()
+            val today = formatter.parse(todayDateKey()) ?: Date()
+            (((today.time - first.time) / DAY_IN_MILLIS).toInt() + 1).coerceAtLeast(1)
+        }.getOrDefault(1)
+    }
+
     private fun chooseDailyChallengeType(previousType: DailyChallenge?): DailyChallenge {
         val availableTypes = DailyChallenge.entries.filterNot { it == previousType }
         val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
         return availableTypes[dayOfYear % availableTypes.size]
+    }
+
+    private fun dailyChallengeTypeFromName(name: String?): DailyChallenge? {
+        return when (name) {
+            "Score20" -> DailyChallenge.ClassicScore20
+            "FakeTarget10" -> DailyChallenge.FakeTargetScore5
+            else -> DailyChallenge.entries.firstOrNull { it.name == name }
+        }
     }
 
     private fun todayDateKey(): String {
@@ -431,6 +561,20 @@ class GamePreferences(private val context: Context) {
         )
     }
 
+    private fun loadShopCoinRewardState(): ShopCoinRewardState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(SHOP_COIN_REWARD_DATE_KEY, "").orEmpty()
+        val claimedToday = if (savedDate == today) {
+            sharedPreferences.getInt(SHOP_COIN_REWARD_COUNT_KEY, 0)
+        } else {
+            0
+        }
+        return ShopCoinRewardState(
+            claimedToday = claimedToday.coerceIn(0, 5),
+            lastClaimDate = savedDate.takeIf { it == today }.orEmpty()
+        )
+    }
+
     private fun loadOneMoreGameBonusState(): OneMoreGameBonusState {
         val today = todayDateKey()
         val savedDate = sharedPreferences.getString(ONE_MORE_GAME_BONUS_DATE_KEY, "").orEmpty()
@@ -462,22 +606,38 @@ class GamePreferences(private val context: Context) {
         }
         val elapsedDays = daysBetween(savedStart, today).coerceAtLeast(0)
         val preservedBadges = sharedPreferences.getString(SEASON_BADGE_LEVELS_KEY, "").orEmpty().toIntSet()
+        val savedMissionDate = sharedPreferences.getString(SEASON_MISSION_DATE_KEY, "").orEmpty()
         if (elapsedDays >= SeasonDurationDays) {
             return SeasonState(
                 seasonNumber = sharedPreferences.getInt(SEASON_NUMBER_KEY, 1).coerceAtLeast(1) + 1,
                 startDateKey = today,
                 xp = 0,
                 remainingDays = SeasonDurationDays,
-                preservedBadgeLevels = preservedBadges
+                preservedBadgeLevels = preservedBadges,
+                missionDateKey = today
             )
         }
+        val isMissionToday = savedMissionDate == today
         return SeasonState(
             seasonNumber = sharedPreferences.getInt(SEASON_NUMBER_KEY, 1).coerceAtLeast(1),
             startDateKey = savedStart,
             xp = sharedPreferences.getInt(SEASON_XP_KEY, 0).coerceAtLeast(0),
             remainingDays = (SeasonDurationDays - elapsedDays).coerceIn(0, SeasonDurationDays),
             claimedRewardLevels = sharedPreferences.getString(SEASON_CLAIMED_LEVELS_KEY, "").orEmpty().toIntSet(),
-            preservedBadgeLevels = preservedBadges
+            preservedBadgeLevels = preservedBadges,
+            xpBoostEndTimeMillis = sharedPreferences.getLong(SEASON_XP_BOOST_END_TIME_KEY, 0L).coerceAtLeast(0L),
+            missionDateKey = today,
+            gamesPlayedToday = if (isMissionToday) sharedPreferences.getInt(SEASON_MISSION_PLAY_COUNT_KEY, 0)
+                .coerceAtLeast(0) else 0,
+            rewardedAdsWatchedToday = if (isMissionToday) sharedPreferences.getInt(SEASON_MISSION_REWARDED_COUNT_KEY, 0)
+                .coerceAtLeast(0) else 0,
+            seasonXpEarnedToday = if (isMissionToday) sharedPreferences.getInt(SEASON_MISSION_XP_EARNED_KEY, 0)
+                .coerceAtLeast(0) else 0,
+            claimedMissionIds = if (isMissionToday) {
+                sharedPreferences.getString(SEASON_MISSION_CLAIMED_IDS_KEY, "").orEmpty().toStringSet()
+            } else {
+                emptySet()
+            }
         )
     }
 
@@ -629,5 +789,12 @@ private fun String.toIntSet(): Set<Int> {
     return split(",")
         .mapNotNull { value -> value.trim().toIntOrNull() }
         .filter { it > 0 }
+        .toSet()
+}
+
+private fun String.toStringSet(): Set<String> {
+    return split(",")
+        .map { value -> value.trim() }
+        .filter { it.isNotBlank() }
         .toSet()
 }

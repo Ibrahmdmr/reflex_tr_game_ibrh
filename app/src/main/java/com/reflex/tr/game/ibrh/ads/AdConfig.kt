@@ -13,10 +13,10 @@ data class AdConfig(
 ) {
     companion object {
         val Default = AdConfig(
-            firstInterstitialFreeGames = 2,
+            firstInterstitialFreeGames = 3,
             interstitialMinGameInterval = 3,
             interstitialMaxGameInterval = 5,
-            interstitialCooldownMillis = 105_000L,
+            interstitialCooldownMillis = 120_000L,
             shortGameThresholdMillis = 15_000L,
             shortGameScoreThreshold = 2,
             highScoreDelayRatio = 0.8f,
@@ -25,4 +25,3 @@ data class AdConfig(
         )
     }
 }
-

@@ -59,22 +59,56 @@ data class DailyFeaturedModeState(
 enum class DailyChallenge(
     @StringRes val titleRes: Int,
     @StringRes val descriptionRes: Int,
-    val targetValue: Int
+    val targetValue: Int,
+    val rewardCoins: Int
 ) {
-    Score20(
-        titleRes = R.string.daily_challenge_score_20_title,
-        descriptionRes = R.string.daily_challenge_score_20_description,
-        targetValue = 20
+    ClassicScore20(
+        titleRes = R.string.daily_challenge_classic_20_title,
+        descriptionRes = R.string.daily_challenge_classic_20_description,
+        targetValue = 20,
+        rewardCoins = 100
+    ),
+    MovingTargetHits10(
+        titleRes = R.string.daily_challenge_moving_10_title,
+        descriptionRes = R.string.daily_challenge_moving_10_description,
+        targetValue = 10,
+        rewardCoins = 75
+    ),
+    FakeTargetScore5(
+        titleRes = R.string.daily_challenge_fake_5_title,
+        descriptionRes = R.string.daily_challenge_fake_5_description,
+        targetValue = 5,
+        rewardCoins = 50
+    ),
+    ColorReflexHits10(
+        titleRes = R.string.daily_challenge_color_10_title,
+        descriptionRes = R.string.daily_challenge_color_10_description,
+        targetValue = 10,
+        rewardCoins = 100
     ),
     Play3Games(
         titleRes = R.string.daily_challenge_play_3_title,
         descriptionRes = R.string.daily_challenge_play_3_description,
-        targetValue = 3
+        targetValue = 3,
+        rewardCoins = 50
     ),
-    FakeTarget10(
-        titleRes = R.string.daily_challenge_fake_10_title,
-        descriptionRes = R.string.daily_challenge_fake_10_description,
-        targetValue = 10
+    Combo5(
+        titleRes = R.string.daily_challenge_combo_5_title,
+        descriptionRes = R.string.daily_challenge_combo_5_description,
+        targetValue = 5,
+        rewardCoins = 75
+    ),
+    OpenLeaderboard(
+        titleRes = R.string.daily_challenge_leaderboard_title,
+        descriptionRes = R.string.daily_challenge_leaderboard_description,
+        targetValue = 1,
+        rewardCoins = 25
+    ),
+    VisitShop(
+        titleRes = R.string.daily_challenge_shop_title,
+        descriptionRes = R.string.daily_challenge_shop_description,
+        targetValue = 1,
+        rewardCoins = 25
     )
 }
 
@@ -84,8 +118,10 @@ enum class RewardedAction {
     UnlockTheme,
     ProtectStreak,
     CoinChest,
+    ShopCoinReward,
     DailyChallengeDoubleReward,
-    Boost
+    Boost,
+    SeasonXpBoost
 }
 
 enum class GameBoost(
@@ -212,10 +248,14 @@ enum class DailyRewardType {
 val DailyRewardCoinPlan = listOf(50, 75, 100, 150, 200, 300, 500)
 val CoinChestRewardPlan = listOf(50, 75, 100, 150, 250)
 const val OneMoreGameBonusCoins = 25
+const val FirstTargetBonusCoins = 50
+const val FirstFiveExperienceGameLimit = 5
 private const val OneMoreGameBonusOfferLimit = 3
 const val SeasonDurationDays = 30
 const val SeasonMaxLevel = 30
 const val SeasonXpPerLevel = 200
+const val SeasonXpBoostBonusPercent = 25
+const val SeasonXpBoostDurationMillis = 30 * 60 * 1_000L
 
 enum class SeasonRewardKind(@StringRes val titleRes: Int) {
     Coins(R.string.season_reward_coin),
@@ -236,13 +276,42 @@ data class SeasonRewardState(
     val claimed: Boolean
 )
 
+enum class SeasonMissionType {
+    PlayGames,
+    WatchRewardedAd,
+    EarnSeasonXp
+}
+
+data class SeasonMissionState(
+    val id: String,
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
+    val type: SeasonMissionType,
+    val target: Int,
+    val progress: Int,
+    val rewardSeasonXp: Int,
+    val claimed: Boolean
+) {
+    val completed: Boolean
+        get() = progress >= target
+
+    val progressPercent: Int
+        get() = ((progress.coerceIn(0, target) * 100f) / target.coerceAtLeast(1)).toInt().coerceIn(0, 100)
+}
+
 data class SeasonState(
     val seasonNumber: Int = 1,
     val startDateKey: String = "",
     val xp: Int = 0,
     val remainingDays: Int = SeasonDurationDays,
     val claimedRewardLevels: Set<Int> = emptySet(),
-    val preservedBadgeLevels: Set<Int> = emptySet()
+    val preservedBadgeLevels: Set<Int> = emptySet(),
+    val xpBoostEndTimeMillis: Long = 0L,
+    val missionDateKey: String = "",
+    val gamesPlayedToday: Int = 0,
+    val rewardedAdsWatchedToday: Int = 0,
+    val seasonXpEarnedToday: Int = 0,
+    val claimedMissionIds: Set<String> = emptySet()
 ) {
     val level: Int
         get() = (xp / SeasonXpPerLevel + 1).coerceIn(1, SeasonMaxLevel)
@@ -263,6 +332,47 @@ data class SeasonState(
         get() = (1..SeasonMaxLevel).map { level ->
             seasonRewardForLevel(level = level, claimedLevels = claimedRewardLevels)
         }
+
+    val isXpBoostActive: Boolean
+        get() = xpBoostEndTimeMillis > System.currentTimeMillis()
+
+    val xpBoostRemainingMinutes: Int
+        get() = (((xpBoostEndTimeMillis - System.currentTimeMillis()).coerceAtLeast(0L) + 59_999L) / 60_000L)
+            .toInt()
+
+    val missions: List<SeasonMissionState>
+        get() = listOf(
+            SeasonMissionState(
+                id = "play_3_games",
+                titleRes = R.string.season_mission_play_3_title,
+                descriptionRes = R.string.season_mission_play_3_description,
+                type = SeasonMissionType.PlayGames,
+                target = 3,
+                progress = gamesPlayedToday,
+                rewardSeasonXp = 90,
+                claimed = "play_3_games" in claimedMissionIds
+            ),
+            SeasonMissionState(
+                id = "watch_1_rewarded_ad",
+                titleRes = R.string.season_mission_rewarded_1_title,
+                descriptionRes = R.string.season_mission_rewarded_1_description,
+                type = SeasonMissionType.WatchRewardedAd,
+                target = 1,
+                progress = rewardedAdsWatchedToday,
+                rewardSeasonXp = 60,
+                claimed = "watch_1_rewarded_ad" in claimedMissionIds
+            ),
+            SeasonMissionState(
+                id = "earn_50_season_xp",
+                titleRes = R.string.season_mission_xp_50_title,
+                descriptionRes = R.string.season_mission_xp_50_description,
+                type = SeasonMissionType.EarnSeasonXp,
+                target = 50,
+                progress = seasonXpEarnedToday,
+                rewardSeasonXp = 80,
+                claimed = "earn_50_season_xp" in claimedMissionIds
+            )
+        )
 }
 
 fun seasonRewardForLevel(
@@ -329,6 +439,19 @@ data class CoinChestState(
         get() = remainingOpens > 0
 }
 
+data class ShopCoinRewardState(
+    val claimedToday: Int = 0,
+    val maxClaimsPerDay: Int = 5,
+    val lastClaimDate: String = "",
+    val rewardCoins: Int = 100
+) {
+    val remainingClaims: Int
+        get() = (maxClaimsPerDay - claimedToday).coerceAtLeast(0)
+
+    val canClaim: Boolean
+        get() = remainingClaims > 0
+}
+
 data class DailyRewardState(
     val streakDay: Int = 1,
     val dayInCycle: Int = 1,
@@ -358,13 +481,15 @@ data class ProgressionState(
     val trialTheme: PlayerTheme? = null,
     val trialGamesRemaining: Int = 0,
     val coinChest: CoinChestState = CoinChestState(),
+    val shopCoinReward: ShopCoinRewardState = ShopCoinRewardState(),
     val oneMoreGameBonus: OneMoreGameBonusState = OneMoreGameBonusState(),
     val dailyReward: DailyRewardState = DailyRewardState(),
     val season: SeasonState = SeasonState(),
     val achievements: List<AchievementState> = emptyList(),
     val weeklyChallenge: ChallengeState = ChallengeState.defaultWeekly(),
     val latestUnlockedAchievementIds: List<String> = emptyList(),
-    val lastLevelUp: Int? = null
+    val lastLevelUp: Int? = null,
+    val firstTargetBonusClaimed: Boolean = false
 ) {
     val activeTheme: PlayerTheme
         get() = trialTheme ?: selectedTheme
@@ -501,12 +626,12 @@ data class DailyChallengeState(
         fun default(): DailyChallengeState {
             return DailyChallengeState(
                 id = "default_score20",
-                type = DailyChallenge.Score20,
-                target = DailyChallenge.Score20.targetValue,
+                type = DailyChallenge.ClassicScore20,
+                target = DailyChallenge.ClassicScore20.targetValue,
                 progress = 0,
                 completed = false,
                 createdDate = "",
-                rewardCoins = 100
+                rewardCoins = DailyChallenge.ClassicScore20.rewardCoins
             )
         }
     }
@@ -576,5 +701,7 @@ data class GameUiState(
     val hasUsedRewardContinue: Boolean = false,
     val isRewardContinueReady: Boolean = false,
     val canContinueWithReward: Boolean = false,
-    val shouldRequestInterstitialAd: Boolean = false
+    val shouldRequestInterstitialAd: Boolean = false,
+    val shouldAutoShowDailyRewardDialog: Boolean = false,
+    val isStorePreviewMode: Boolean = false
 )

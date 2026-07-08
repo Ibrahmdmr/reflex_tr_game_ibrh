@@ -1,0 +1,5 @@
+<resources>
+    <string name="store_preview_settings_title">Developer Preview</string>
+    <string name="store_preview_enable">Enable Preview Mode</string>
+    <string name="store_preview_disable">Disable Preview Mode</string>
+</resources>

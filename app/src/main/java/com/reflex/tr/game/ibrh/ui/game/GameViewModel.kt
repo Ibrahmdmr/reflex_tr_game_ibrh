@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.AdAnalyticsTracker
 import com.reflex.tr.game.ibrh.ads.AdConfig
@@ -15,8 +16,10 @@ import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
@@ -58,7 +61,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var selectedLeaderboardPeriod = LeaderboardPeriod.AllTime
     private var leaderboardRefreshTick = 0
     private val _uiState = MutableStateFlow(createInitialState())
-    val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<GameUiState> = combine(
+        _uiState,
+        gamePreferences.storePreviewModeFlow
+    ) { state, previewEnabled ->
+        if (BuildConfig.DEBUG && previewEnabled) {
+            storePreviewUiState(state)
+        } else {
+            state.copy(isStorePreviewMode = false)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = if (BuildConfig.DEBUG && gamePreferences.isStorePreviewModeEnabled()) {
+            storePreviewUiState(_uiState.value)
+        } else {
+            _uiState.value.copy(isStorePreviewMode = false)
+        }
+    )
 
     private var timerJob: Job? = null
     private var targetTimeoutJob: Job? = null
@@ -73,25 +93,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var lastHitElapsedMillis = 0L
     private var gameStartedElapsedMillis = 0L
     private var lastInterstitialShownElapsedMillis = 0L
+    private var lastRewardedAdElapsedMillis = 0L
 
     init {
         observeBestScore()
         refreshProfileAndLeaderboard()
     }
 
+    fun setStorePreviewMode(enabled: Boolean) {
+        if (!BuildConfig.DEBUG) return
+        viewModelScope.launch {
+            gamePreferences.saveStorePreviewModeEnabled(enabled)
+        }
+    }
+
     fun startGame() {
+        if (isStorePreviewModeActive()) return
         val refreshedState = refreshDailyFeaturedMode()
         trackGameStart(refreshedState.selectedMode)
         launchNewGame(mode = refreshedState.selectedMode)
     }
 
     fun startGame(mode: GameMode) {
+        if (isStorePreviewModeActive()) return
         refreshDailyFeaturedMode()
         trackGameStart(mode)
         launchNewGame(mode = mode)
     }
 
     fun startGameWithCoinBoost(boost: GameBoost): Boolean {
+        if (isStorePreviewModeActive()) return false
         val state = _uiState.value
         if (state.progressionState.coins < boost.coinPrice) return false
 
@@ -107,6 +138,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startGameWithRewardedBoost(boost: GameBoost) {
+        if (isStorePreviewModeActive()) return
         val updatedProgression = recordRewardedAdWatched(_uiState.value.progressionState)
         gamePreferences.saveProgressionState(updatedProgression)
         _uiState.update { it.copy(progressionState = updatedProgression) }
@@ -117,6 +149,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectMode(mode: GameMode) {
+        if (isStorePreviewModeActive()) return
         val bestScores = _uiState.value.bestScoresByMode
         _uiState.update {
             it.copy(
@@ -134,6 +167,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onTargetTapped(targetId: Long) {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
@@ -150,7 +184,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val updatedDailyChallenge = advanceDailyChallengeForHit(
                 state = it.dailyChallengeState,
                 mode = it.selectedMode,
-                score = newScore
+                score = newScore,
+                combo = nextCombo
             )
             val nextTargets = generateTargets(
                 mode = it.selectedMode,
@@ -163,8 +198,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 bestScore = maxOf(it.bestScore, newScore),
                 isNewBestScore = it.isNewBestScore || newScore > it.bestScore,
                 difficultyLevel = newDifficulty,
-                targetSizeDp = calculateTargetSizeDp(newScore, it.selectedMode),
-                targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(newScore, it.selectedMode),
+                targetSizeDp = calculateTargetSizeDp(
+                    score = newScore,
+                    mode = it.selectedMode,
+                    progression = it.progressionState
+                ),
+                targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(
+                    score = newScore,
+                    mode = it.selectedMode,
+                    progression = it.progressionState
+                ),
                 targetPosition = nextTargets.firstCorrectPosition(),
                 targets = nextTargets,
                 combo = nextCombo,
@@ -180,12 +223,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             previous = currentState.dailyChallengeState,
             updated = updatedState.dailyChallengeState
         )
-        claimDailyChallengeBaseRewardIfReady()
         startComboResetTimer(expectedCombo = nextCombo)
         startTargetTimeout()
     }
 
     fun onMissTapped() {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
@@ -193,10 +236,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun retryGame() {
+        if (isStorePreviewModeActive()) return
         launchNewGame(mode = _uiState.value.selectedMode)
     }
 
     fun pauseGame() {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (!currentState.hasGameStarted || currentState.isPaused || currentState.isGameOver) return
 
@@ -210,6 +255,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resumeGame() {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (!currentState.hasGameStarted || !currentState.isPaused || currentState.isGameOver) return
 
@@ -224,6 +270,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun goToHome() {
+        if (isStorePreviewModeActive()) return
         timerJob?.cancel()
         targetTimeoutJob?.cancel()
         rewardContinueGraceJob?.cancel()
@@ -249,6 +296,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onRewardContinueEarned() {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (!currentState.isGameOver || currentState.hasUsedRewardContinue) return
 
@@ -265,6 +313,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun continueGameAfterReward() {
+        if (isStorePreviewModeActive()) return
         val currentState = _uiState.value
         if (
             !currentState.isGameOver ||
@@ -308,6 +357,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onDoubleCoinsRewardEarned() {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         if (!state.isGameOver || state.isCoinDoubleClaimed || state.baseCoinsThisGame <= 0) return
 
@@ -338,6 +388,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onDailyChallengeDoubleRewardEarned() {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val challenge = state.dailyChallengeState
         if (!challenge.completed || !challenge.rewardClaimed || challenge.doubleRewardClaimed) return
@@ -371,7 +422,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun claimDailyChallengeReward() {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        val challenge = state.dailyChallengeState
+        if (!challenge.completed || challenge.rewardClaimed) return
+
+        val updatedChallenge = challenge.copy(rewardClaimed = true)
+        val updatedProgression = addXpWithLevelRewards(
+            state.progressionState.copy(
+                coins = state.progressionState.coins + challenge.rewardCoins
+            ),
+            DAILY_CHALLENGE_XP_REWARD
+        ).let { addSeasonXp(it, SEASON_XP_CHALLENGE_COMPLETED) }
+        _uiState.update {
+            it.copy(
+                dailyChallengeState = updatedChallenge,
+                progressionState = updatedProgression
+            )
+        }
+        gamePreferences.saveDailyChallengeState(updatedChallenge)
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
+    fun onLeaderboardOpenedForMission() {
+        if (isStorePreviewModeActive()) return
+        advanceDailyChallengeForVisit(DailyChallenge.OpenLeaderboard)
+    }
+
+    fun onShopOpenedForMission() {
+        if (isStorePreviewModeActive()) return
+        advanceDailyChallengeForVisit(DailyChallenge.VisitShop)
+    }
+
     fun onCoinChestRewardEarned() {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val chest = state.progressionState.coinChest
         if (!chest.canOpen) return
@@ -406,7 +491,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun onShopCoinRewardEarned() {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        val rewardState = state.progressionState.shopCoinReward
+        if (!rewardState.canClaim) return
+
+        val updatedRewardState = rewardState.copy(
+            claimedToday = (rewardState.claimedToday + 1).coerceAtMost(rewardState.maxClaimsPerDay),
+            lastClaimDate = todayDateKey()
+        )
+        val updatedProgression = recordRewardedAdWatched(
+            state.progressionState.copy(
+                coins = state.progressionState.coins + rewardState.rewardCoins,
+                shopCoinReward = updatedRewardState
+            )
+        )
+        _uiState.update {
+            it.copy(
+                progressionState = updatedProgression,
+                pendingRewardedAction = null
+            )
+        }
+        gamePreferences.saveProgressionState(updatedProgression)
+        logNewAchievementUnlocks(updatedProgression)
+    }
+
     fun claimDailyReward() {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val reward = state.progressionState.dailyReward
         if (!reward.canClaim) return
@@ -414,7 +526,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val rewardedProgression = applyDailyReward(
             progression = state.progressionState
         )
-        _uiState.update { it.copy(progressionState = rewardedProgression) }
+        _uiState.update {
+            it.copy(
+                progressionState = rewardedProgression,
+                shouldAutoShowDailyRewardDialog = false
+            )
+        }
         gamePreferences.saveProgressionState(rewardedProgression)
         gamePreferences.saveDailyRewardClaim(streakDay = rewardedProgression.dailyReward.streakDay)
         FirebaseGameServices.logEvent(
@@ -426,7 +543,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun markDailyRewardDialogShown() {
+        if (isStorePreviewModeActive()) return
+        gamePreferences.markDailyRewardDialogShown()
+        _uiState.update { it.copy(shouldAutoShowDailyRewardDialog = false) }
+    }
+
     fun protectDailyRewardStreak() {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val reward = state.progressionState.dailyReward
         if (!reward.canProtectStreak) return
@@ -452,6 +576,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updatePlayerName(name: String): Boolean {
+        if (isStorePreviewModeActive()) return true
         val sanitizedName = sanitizePlayerName(name) ?: return false
         gamePreferences.savePlayerName(sanitizedName)
         FirebaseGameServices.logEvent(
@@ -465,26 +590,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPlayerTitle(title: PlayerTitle) {
+        if (isStorePreviewModeActive()) return
         gamePreferences.savePlayerTitle(title)
         refreshProfileAndLeaderboard()
     }
 
     fun selectLeaderboardMode(mode: GameMode) {
+        if (isStorePreviewModeActive()) return
         selectedLeaderboardMode = mode
         refreshProfileAndLeaderboard()
     }
 
     fun selectLeaderboardPeriod(period: LeaderboardPeriod) {
+        if (isStorePreviewModeActive()) return
         selectedLeaderboardPeriod = period
         refreshProfileAndLeaderboard()
     }
 
     fun refreshLeaderboard() {
+        if (isStorePreviewModeActive()) return
         leaderboardRefreshTick += 1
         refreshProfileAndLeaderboard(showLoading = true)
     }
 
     fun claimAchievementReward(achievementId: String) {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val achievement = state.progressionState.achievements.firstOrNull { it.id == achievementId }
         if (achievement == null || !achievement.unlocked || achievement.claimed) return
@@ -513,6 +643,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimSeasonReward(level: Int) {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val season = state.progressionState.season
         if (level !in 1..SeasonMaxLevel || level > season.level || level in season.claimedRewardLevels) return
@@ -533,7 +664,35 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         gamePreferences.saveProgressionState(updatedProgression)
     }
 
+    fun activateSeasonXpBoost() {
+        if (isStorePreviewModeActive()) return
+        val watchedProgression = recordRewardedAdWatched(_uiState.value.progressionState)
+        val updatedSeason = seasonForToday(watchedProgression.season).copy(
+            xpBoostEndTimeMillis = System.currentTimeMillis() + SeasonXpBoostDurationMillis
+        )
+        val updatedProgression = watchedProgression.copy(season = updatedSeason)
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
+        logNewAchievementUnlocks(updatedProgression)
+    }
+
+    fun claimSeasonMission(missionId: String) {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        val season = seasonForToday(state.progressionState.season)
+        val mission = season.missions.firstOrNull { it.id == missionId } ?: return
+        if (!mission.completed || mission.claimed) return
+
+        val claimedProgression = state.progressionState.copy(
+            season = season.copy(claimedMissionIds = season.claimedMissionIds + mission.id)
+        )
+        val updatedProgression = addSeasonXp(claimedProgression, mission.rewardSeasonXp)
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
     fun buyTheme(theme: PlayerTheme) {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         val progression = state.progressionState
         if (theme in progression.unlockedThemes || progression.coins < theme.coinPrice) return
@@ -567,6 +726,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun tryThemeForOneGame(theme: PlayerTheme) {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         if (theme in state.progressionState.unlockedThemes) return
 
@@ -582,6 +742,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectTheme(theme: PlayerTheme) {
+        if (isStorePreviewModeActive()) return
         val state = _uiState.value
         if (theme !in state.progressionState.unlockedThemes) return
 
@@ -606,10 +767,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onInterstitialAdRequestHandled(wasShown: Boolean) {
+        if (isStorePreviewModeActive()) return
         if (wasShown) {
             lastInterstitialShownElapsedMillis = SystemClock.elapsedRealtime()
         }
         _uiState.update { it.copy(shouldRequestInterstitialAd = false) }
+    }
+
+    private fun isStorePreviewModeActive(): Boolean {
+        return BuildConfig.DEBUG && gamePreferences.isStorePreviewModeEnabled()
     }
 
     private fun launchNewGame(mode: GameMode, boost: GameBoost? = null) {
@@ -816,8 +982,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 dailyReward = progressionFromStorage.dailyReward,
                 achievements = progressionFromStorage.achievements,
                 weeklyChallenge = progressionFromStorage.weeklyChallenge,
-                oneMoreGameBonus = progressionFromStorage.oneMoreGameBonus
+                oneMoreGameBonus = progressionFromStorage.oneMoreGameBonus,
+                firstTargetBonusClaimed = progressionFromStorage.firstTargetBonusClaimed
             )
+            val firstTargetBonusCoins = if (
+                gamePreferences.isOnboardingCompleted() &&
+                !progressionBeforeGame.firstTargetBonusClaimed
+            ) {
+                FirstTargetBonusCoins
+            } else {
+                0
+            }
             val oneMoreBonusCoins = if (progressionBeforeGame.oneMoreGameBonus.shouldRewardNextCompletedGame) {
                 progressionBeforeGame.oneMoreGameBonus.rewardCoins
             } else {
@@ -828,7 +1003,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 playedMode = it.selectedMode,
                 dailyFeaturedMode = it.dailyFeaturedMode
             )
-            val totalEarnedCoins = earnedCoins + oneMoreBonusCoins + dailyModeBonusCoins
+            val totalEarnedCoins = earnedCoins + firstTargetBonusCoins + oneMoreBonusCoins + dailyModeBonusCoins
             val updatedOneMoreGameBonus = advanceOneMoreGameBonusAfterCompletedGame(
                 state = progressionBeforeGame.oneMoreGameBonus,
                 bonusAwarded = oneMoreBonusCoins > 0
@@ -840,7 +1015,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 maxCombo = it.maxCombo,
                 earnedCoins = totalEarnedCoins,
                 isNewBestScore = isNewModeBest
-            ).copy(oneMoreGameBonus = updatedOneMoreGameBonus)
+            ).copy(
+                oneMoreGameBonus = updatedOneMoreGameBonus,
+                firstTargetBonusClaimed = progressionBeforeGame.firstTargetBonusClaimed || firstTargetBonusCoins > 0
+            )
             val trialAwareProgression = if (updatedProgression.trialGamesRemaining > 0) {
                 val remaining = updatedProgression.trialGamesRemaining - 1
                 updatedProgression.copy(
@@ -904,7 +1082,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             previous = previousDailyChallenge,
             updated = finalState.dailyChallengeState
         )
-        claimDailyChallengeBaseRewardIfReady()
         if (finalState.score > previousModeBestScore) {
             viewModelScope.launch {
                 val uploaded = leaderboardRepository.uploadScore(
@@ -959,8 +1136,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             lives = INITIAL_LIVES,
             timeLeftSeconds = INITIAL_TIME_SECONDS,
             difficultyLevel = calculateDifficultyLevel(score = 0),
-            targetSizeDp = calculateTargetSizeDp(score = 0, mode = mode),
-            targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(score = 0, mode = mode),
+            targetSizeDp = calculateTargetSizeDp(score = 0, mode = mode, progression = progression),
+            targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(
+                score = 0,
+                mode = mode,
+                progression = progression
+            ),
             targetPosition = targets.firstCorrectPosition(),
             selectedMode = mode,
             dailyFeaturedMode = createDailyFeaturedMode(),
@@ -975,7 +1156,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 profile = playerProfile,
                 progression = progression,
                 bestScoresByMode = bestScores
-            )
+            ),
+            shouldAutoShowDailyRewardDialog = gamePreferences.shouldShowDailyRewardDialog(progression.dailyReward)
         )
     }
 
@@ -1002,7 +1184,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return (score / 5 + 1).coerceIn(1, 8)
     }
 
-    private fun calculateTargetSizeDp(score: Int, mode: GameMode): Int {
+    private fun calculateTargetSizeDp(
+        score: Int,
+        mode: GameMode,
+        progression: ProgressionState = _uiState.value.progressionState
+    ): Int {
         val modeExtraReduction = when (mode) {
             GameMode.Classic -> 0
             GameMode.MovingTarget -> 2
@@ -1010,10 +1196,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             GameMode.ColorReflex -> 2
         }
         val sizeReduction = (score / 3) * 4 + modeExtraReduction
-        return (INITIAL_TARGET_SIZE_DP - sizeReduction).coerceAtLeast(MIN_TARGET_SIZE_DP)
+        val baseSize = (INITIAL_TARGET_SIZE_DP - sizeReduction).coerceAtLeast(MIN_TARGET_SIZE_DP)
+        if (progression.totalGames >= FirstFiveExperienceGameLimit) return baseSize
+
+        val softBonus = (10 - progression.totalGames).coerceAtLeast(6)
+        return (baseSize + softBonus).coerceAtMost(INITIAL_TARGET_SIZE_DP + 10)
     }
 
-    private fun calculateTargetVisibleDurationMillis(score: Int, mode: GameMode): Long {
+    private fun calculateTargetVisibleDurationMillis(
+        score: Int,
+        mode: GameMode,
+        progression: ProgressionState = _uiState.value.progressionState
+    ): Long {
         val modeExtraReduction = when (mode) {
             GameMode.Classic -> 0L
             GameMode.MovingTarget -> 80L
@@ -1021,8 +1215,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             GameMode.ColorReflex -> 60L
         }
         val durationReduction = (score / 2) * 80L + modeExtraReduction
-        return (INITIAL_TARGET_VISIBLE_DURATION_MS - durationReduction)
+        val baseDuration = (INITIAL_TARGET_VISIBLE_DURATION_MS - durationReduction)
             .coerceAtLeast(MIN_TARGET_VISIBLE_DURATION_MS)
+        if (progression.totalGames >= FirstFiveExperienceGameLimit) return baseDuration
+
+        val softBonusMillis = 360L - (progression.totalGames * 35L)
+        return (baseDuration + softBonusMillis).coerceAtMost(INITIAL_TARGET_VISIBLE_DURATION_MS + 360L)
     }
 
     private fun loseLife(countAttempt: Boolean = false) {
@@ -1111,18 +1309,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun advanceDailyChallengeForHit(
         state: DailyChallengeState,
         mode: GameMode,
-        score: Int
+        score: Int,
+        combo: Int
     ): DailyChallengeState {
         if (state.completed) return state
 
         val nextProgress = when (state.type) {
-            DailyChallenge.Score20 -> score.coerceAtMost(state.target)
-            DailyChallenge.Play3Games -> state.progress
-            DailyChallenge.FakeTarget10 -> if (mode == GameMode.FakeTarget) {
+            DailyChallenge.ClassicScore20 -> if (mode == GameMode.Classic) {
                 score.coerceAtMost(state.target)
             } else {
                 state.progress
             }
+            DailyChallenge.MovingTargetHits10 -> if (mode == GameMode.MovingTarget) {
+                score.coerceAtMost(state.target)
+            } else {
+                state.progress
+            }
+            DailyChallenge.FakeTargetScore5 -> if (mode == GameMode.FakeTarget) {
+                score.coerceAtMost(state.target)
+            } else {
+                state.progress
+            }
+            DailyChallenge.ColorReflexHits10 -> if (mode == GameMode.ColorReflex) {
+                score.coerceAtMost(state.target)
+            } else {
+                state.progress
+            }
+            DailyChallenge.Combo5 -> combo.coerceAtMost(state.target)
+            DailyChallenge.Play3Games,
+            DailyChallenge.OpenLeaderboard,
+            DailyChallenge.VisitShop -> state.progress
         }
         return state.copy(
             progress = nextProgress,
@@ -1140,6 +1356,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             progress = nextProgress,
             completed = nextProgress >= state.target
         )
+    }
+
+    private fun advanceDailyChallengeForVisit(type: DailyChallenge) {
+        val previous = _uiState.value.dailyChallengeState
+        if (previous.completed || previous.type != type) return
+
+        val updated = previous.copy(
+            progress = 1,
+            completed = true
+        )
+        _uiState.update { it.copy(dailyChallengeState = updated) }
+        gamePreferences.saveDailyChallengeState(updated)
+        logChallengeCompletedIfNeeded(previous = previous, updated = updated)
     }
 
     private fun claimDailyChallengeBaseRewardIfReady() {
@@ -1248,7 +1477,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             weeklyChallenge = weeklyChallenge
             ),
             earnedXp
-        ), SEASON_XP_GAME_PLAYED).let {
+        ), SEASON_XP_GAME_PLAYED, countGamePlayed = true).let {
             updateAchievementProgress(
                 progression = it,
                 score = score,
@@ -1258,6 +1487,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun recordRewardedAdWatched(progression: ProgressionState): ProgressionState {
+        lastRewardedAdElapsedMillis = SystemClock.elapsedRealtime()
         return addSeasonXp(updateAchievementProgress(
             addXpWithLevelRewards(
                 progression.copy(
@@ -1265,7 +1495,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 ),
                 REWARDED_AD_XP_REWARD
             )
-        ), SEASON_XP_REWARDED_AD)
+        ), SEASON_XP_REWARDED_AD, countRewardedAd = true)
     }
 
     private fun updateAchievementProgress(
@@ -1355,16 +1585,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun addSeasonXp(
         progression: ProgressionState,
-        xpAmount: Int
+        xpAmount: Int,
+        countGamePlayed: Boolean = false,
+        countRewardedAd: Boolean = false
     ): ProgressionState {
         if (xpAmount <= 0) return progression
-        val season = progression.season
+        val season = seasonForToday(progression.season)
         val maxXp = (SeasonMaxLevel - 1) * SeasonXpPerLevel
+        val boostedXp = if (season.xpBoostEndTimeMillis > System.currentTimeMillis()) {
+            (xpAmount * (100 + SeasonXpBoostBonusPercent)) / 100
+        } else {
+            xpAmount
+        }.coerceAtLeast(0)
         return progression.copy(
             season = season.copy(
-                xp = (season.xp + xpAmount).coerceIn(0, maxXp)
+                xp = (season.xp + boostedXp).coerceIn(0, maxXp),
+                gamesPlayedToday = season.gamesPlayedToday + if (countGamePlayed) 1 else 0,
+                rewardedAdsWatchedToday = season.rewardedAdsWatchedToday + if (countRewardedAd) 1 else 0,
+                seasonXpEarnedToday = season.seasonXpEarnedToday + boostedXp
             )
         )
+    }
+
+    private fun seasonForToday(season: SeasonState): SeasonState {
+        val today = todayDateKey()
+        return if (season.missionDateKey == today) {
+            season
+        } else {
+            season.copy(
+                missionDateKey = today,
+                gamesPlayedToday = 0,
+                rewardedAdsWatchedToday = 0,
+                seasonXpEarnedToday = 0,
+                claimedMissionIds = emptySet()
+            )
+        }
     }
 
     private fun calculateLevel(xp: Int): Int {
@@ -1505,6 +1760,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val now = SystemClock.elapsedRealtime()
         val cooldownPassed = lastInterstitialShownElapsedMillis == 0L ||
             now - lastInterstitialShownElapsedMillis >= adConfig.interstitialCooldownMillis
+        val rewardedCooldownPassed = lastRewardedAdElapsedMillis == 0L ||
+            now - lastRewardedAdElapsedMillis >= adConfig.interstitialCooldownMillis
         val isShortGame = gameDurationMillis < adConfig.shortGameThresholdMillis ||
             score <= adConfig.shortGameScoreThreshold
         val isHighValueRun = isNewBestScore ||
@@ -1513,6 +1770,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return completedGameCount > adConfig.firstInterstitialFreeGames &&
             completedGameCount >= nextInterstitialGameCount &&
             cooldownPassed &&
+            rewardedCooldownPassed &&
             !isShortGame &&
             !isHighValueRun
     }
