@@ -52,12 +52,9 @@ import com.reflex.tr.game.ibrh.ui.game.PlayerTheme
 import com.reflex.tr.game.ibrh.ui.game.ReflexTargetColor
 import com.reflex.tr.game.ibrh.ui.game.TargetPosition
 import com.reflex.tr.game.ibrh.ui.game.themeVisualSpec
-import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
-import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
-import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
