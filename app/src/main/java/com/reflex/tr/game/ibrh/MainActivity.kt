@@ -1,6 +1,7 @@
 package com.reflex.tr.game.ibrh
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -98,6 +99,11 @@ private enum class NotificationToggle {
     Mission
 }
 
+private enum class AppPopup {
+    Onboarding,
+    NotificationPermission
+}
+
 private data class OnboardingPage(
     val icon: String,
     @StringRes val titleRes: Int,
@@ -114,6 +120,7 @@ private val NotificationToggle.notificationType: LocalNotificationType
 class MainActivity : ComponentActivity() {
     private lateinit var adMobManager: AdMobManager
     private var rewardedAdUiState by mutableStateOf(RewardedAdUiState())
+    private var activeRewardedAction: RewardedAction? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashStartTime = SystemClock.uptimeMillis()
@@ -130,6 +137,9 @@ class MainActivity : ComponentActivity() {
             logDebug(
                 "Rewarded state -> ready=${uiState.isReady}, loading=${uiState.isLoading}, showing=${uiState.isShowing}, failed=${uiState.hasLoadFailed}"
             )
+            if (activeRewardedAction != null && !uiState.isShowing && !uiState.rewardEarned) {
+                activeRewardedAction = null
+            }
             rewardedAdUiState = uiState
         }
         initializeMobileAds()
@@ -145,13 +155,31 @@ class MainActivity : ComponentActivity() {
                         rewardedAdUiState = rewardedAdUiState,
                         onRewardedAdRequested = { action, onRewardEarned ->
                             logDebug("Rewarded button pressed: $action")
-                            adMobManager.showRewardedAd(
+                            if (activeRewardedAction != null || rewardedAdUiState.isShowing) {
+                                logDebug("Rewarded request ignored while another ad is active")
+                                return@AppRoot
+                            }
+                            var rewardHandled = false
+                            activeRewardedAction = action
+                            val showStarted = adMobManager.showRewardedAd(
                                 placement = action.analyticsName,
                                 onRewardEarned = {
+                                    if (rewardHandled) {
+                                        logDebug("Duplicate rewarded callback ignored: $action")
+                                        return@showRewardedAd
+                                    }
+                                    rewardHandled = true
                                     logDebug("Reward earned callback triggered")
-                                    onRewardEarned()
+                                    try {
+                                        onRewardEarned()
+                                    } finally {
+                                        activeRewardedAction = null
+                                    }
                                 }
                             )
+                            if (!showStarted) {
+                                activeRewardedAction = null
+                            }
                         },
                         onInterstitialAdRequested = {
                             adMobManager.showInterstitialAd()
@@ -255,6 +283,7 @@ fun AppRoot(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val activity = context as? Activity
     val gamePreferences = remember(context) { GamePreferences(context.applicationContext) }
     val selectedLanguage by gamePreferences.languageFlow.collectAsStateWithLifecycle(
         initialValue = AppLanguage.Turkish
@@ -288,6 +317,11 @@ fun AppRoot(
     var permissionRequestToggle by remember { mutableStateOf<NotificationToggle?>(null) }
     var notificationPermissionGranted by remember { mutableStateOf(false) }
     var showOnboarding by remember(isOnboardingCompleted) { mutableStateOf(!isOnboardingCompleted) }
+    val activeAppPopup = when {
+        showOnboarding -> AppPopup.Onboarding
+        pendingNotificationToggle != null -> AppPopup.NotificationPermission
+        else -> null
+    }
     fun saveNotificationPreference(toggle: NotificationToggle, enabled: Boolean) {
         coroutineScope.launch {
             when (toggle) {
@@ -369,7 +403,7 @@ fun AppRoot(
     }
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
-        if (showOnboarding) {
+        if (activeAppPopup == AppPopup.Onboarding) {
             FirstLaunchOnboardingDialog(
                 onFinish = {
                     showOnboarding = false
@@ -379,7 +413,7 @@ fun AppRoot(
                 }
             )
         }
-        pendingNotificationToggle?.let { toggle ->
+        if (activeAppPopup == AppPopup.NotificationPermission) pendingNotificationToggle?.let { toggle ->
             PolishedGameDialog(
                 onDismissRequest = { pendingNotificationToggle = null },
                 title = localizedContext.getString(R.string.notification_permission_title),
@@ -515,8 +549,14 @@ fun AppRoot(
                         onInterstitialAdRequested = onInterstitialAdRequested,
                         onInAppReviewRequested = ::maybeRequestInAppReview,
                         onRateAppClick = { onInAppReviewRequested(true) },
+                        onExitAppRequested = { activity?.finish() },
                         onHowToPlayClick = {
-                            navController.navigate(HowToPlayRoute)
+                            if (navController.currentDestination?.route != HowToPlayRoute) {
+                                navController.navigate(HowToPlayRoute) {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
                         }
                     )
                 }
@@ -537,25 +577,28 @@ private fun FirstLaunchOnboardingDialog(
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
-    val pages = listOf(
-        OnboardingPage(
-            icon = "🎯",
-            titleRes = R.string.onboarding_reflex_title,
-            bodyRes = R.string.onboarding_reflex_body
-        ),
-        OnboardingPage(
-            icon = "⚡",
-            titleRes = R.string.onboarding_modes_title,
-            bodyRes = R.string.onboarding_modes_body
-        ),
-        OnboardingPage(
-            icon = "🪙",
-            titleRes = R.string.onboarding_rewards_title,
-            bodyRes = R.string.onboarding_rewards_body
+    val pages = remember {
+        listOf(
+            OnboardingPage(
+                icon = "🎯",
+                titleRes = R.string.onboarding_reflex_title,
+                bodyRes = R.string.onboarding_reflex_body
+            ),
+            OnboardingPage(
+                icon = "⚡",
+                titleRes = R.string.onboarding_modes_title,
+                bodyRes = R.string.onboarding_modes_body
+            ),
+            OnboardingPage(
+                icon = "🪙",
+                titleRes = R.string.onboarding_rewards_title,
+                bodyRes = R.string.onboarding_rewards_body
+            )
         )
-    )
+    }
     var pageIndex by rememberSaveable { mutableStateOf(0) }
-    val page = pages[pageIndex]
+    val safePageIndex = pageIndex.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
+    val page = pages.getOrNull(safePageIndex) ?: return
 
     Dialog(
         onDismissRequest = {},
@@ -616,7 +659,7 @@ private fun FirstLaunchOnboardingDialog(
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = context.getString(R.string.onboarding_step_value, pageIndex + 1, pages.size),
+                        text = context.getString(R.string.onboarding_step_value, safePageIndex + 1, pages.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -645,15 +688,15 @@ private fun FirstLaunchOnboardingDialog(
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             onClick = {
-                                if (pageIndex == pages.lastIndex) {
+                                if (safePageIndex == pages.lastIndex) {
                                     onFinish()
                                 } else {
-                                    pageIndex += 1
+                                    pageIndex = safePageIndex + 1
                                 }
                             }
                         ) {
                             Text(
-                                text = if (pageIndex == pages.lastIndex) {
+                                text = if (safePageIndex == pages.lastIndex) {
                                     context.getString(R.string.onboarding_start)
                                 } else {
                                     context.getString(R.string.onboarding_next)

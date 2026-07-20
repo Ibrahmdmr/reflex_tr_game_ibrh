@@ -662,6 +662,62 @@ data class GameTarget(
     val color: ReflexTargetColor = ReflexTargetColor.Red
 )
 
+data class GameRuntimeState(
+    val score: Int = 0,
+    val bestScore: Int = 0,
+    val bestScoresByMode: Map<GameMode, Int> = GameMode.entries.associateWith { 0 },
+    val isNewBestScore: Boolean = false,
+    val difficultyLevel: Int = 1,
+    val lives: Int = 3,
+    val timeLeftSeconds: Int = 30,
+    val targetPosition: TargetPosition = TargetPosition(),
+    val targetSizeDp: Int = 82,
+    val targetVisibleDurationMillis: Long = 1_800L,
+    val targetLifetimeKey: Int = 0,
+    val hasGameStarted: Boolean = false,
+    val selectedMode: GameMode = GameMode.Classic,
+    val dailyFeaturedMode: DailyFeaturedModeState = DailyFeaturedModeState(),
+    val activeBoost: GameBoost? = null,
+    val targets: List<GameTarget> = emptyList(),
+    val activeColor: ReflexTargetColor = ReflexTargetColor.Red,
+    val combo: Int = 0,
+    val maxCombo: Int = 0,
+    val successfulHits: Int = 0,
+    val totalAttempts: Int = 0,
+    val dailyChallengeState: DailyChallengeState = DailyChallengeState.default()
+)
+
+data class PlayerProgressionUiState(
+    val progressionState: ProgressionState = ProgressionState(),
+    val playerProfile: PlayerProfile = PlayerProfile()
+)
+
+data class RewardAdState(
+    val earnedCoinsThisGame: Int = 0,
+    val baseCoinsThisGame: Int = 0,
+    val isCoinDoubleClaimed: Boolean = false,
+    val pendingRewardedAction: RewardedAction? = null,
+    val oneMoreGameBonusEarnedThisGame: Int = 0,
+    val hasUsedRewardContinue: Boolean = false,
+    val isRewardContinueReady: Boolean = false,
+    val canContinueWithReward: Boolean = false,
+    val shouldRequestInterstitialAd: Boolean = false
+)
+
+data class DialogPopupState(
+    val isPaused: Boolean = false,
+    val isResumeGracePeriod: Boolean = false,
+    val isGameOver: Boolean = false,
+    val gameOverReason: String? = null,
+    @StringRes val gameOverReasonRes: Int? = null,
+    val shouldAutoShowDailyRewardDialog: Boolean = false,
+    val isStorePreviewMode: Boolean = false
+)
+
+data class LeaderboardThemeState(
+    val leaderboardSnapshot: LeaderboardSnapshot = LeaderboardSnapshot()
+)
+
 data class GameUiState(
     val score: Int = 0,
     val bestScore: Int = 0,
@@ -704,4 +760,65 @@ data class GameUiState(
     val shouldRequestInterstitialAd: Boolean = false,
     val shouldAutoShowDailyRewardDialog: Boolean = false,
     val isStorePreviewMode: Boolean = false
-)
+) {
+    val gameState: GameRuntimeState
+        get() = GameRuntimeState(
+            score = score,
+            bestScore = bestScore,
+            bestScoresByMode = bestScoresByMode,
+            isNewBestScore = isNewBestScore,
+            difficultyLevel = difficultyLevel,
+            lives = lives,
+            timeLeftSeconds = timeLeftSeconds,
+            targetPosition = targetPosition,
+            targetSizeDp = targetSizeDp,
+            targetVisibleDurationMillis = targetVisibleDurationMillis,
+            targetLifetimeKey = targetLifetimeKey,
+            hasGameStarted = hasGameStarted,
+            selectedMode = selectedMode,
+            dailyFeaturedMode = dailyFeaturedMode,
+            activeBoost = activeBoost,
+            targets = targets,
+            activeColor = activeColor,
+            combo = combo,
+            maxCombo = maxCombo,
+            successfulHits = successfulHits,
+            totalAttempts = totalAttempts,
+            dailyChallengeState = dailyChallengeState
+        )
+
+    val playerProgressionState: PlayerProgressionUiState
+        get() = PlayerProgressionUiState(
+            progressionState = progressionState,
+            playerProfile = playerProfile
+        )
+
+    val rewardAdState: RewardAdState
+        get() = RewardAdState(
+            earnedCoinsThisGame = earnedCoinsThisGame,
+            baseCoinsThisGame = baseCoinsThisGame,
+            isCoinDoubleClaimed = isCoinDoubleClaimed,
+            pendingRewardedAction = pendingRewardedAction,
+            oneMoreGameBonusEarnedThisGame = oneMoreGameBonusEarnedThisGame,
+            hasUsedRewardContinue = hasUsedRewardContinue,
+            isRewardContinueReady = isRewardContinueReady,
+            canContinueWithReward = canContinueWithReward,
+            shouldRequestInterstitialAd = shouldRequestInterstitialAd
+        )
+
+    val dialogPopupState: DialogPopupState
+        get() = DialogPopupState(
+            isPaused = isPaused,
+            isResumeGracePeriod = isResumeGracePeriod,
+            isGameOver = isGameOver,
+            gameOverReason = gameOverReason,
+            gameOverReasonRes = gameOverReasonRes,
+            shouldAutoShowDailyRewardDialog = shouldAutoShowDailyRewardDialog,
+            isStorePreviewMode = isStorePreviewMode
+        )
+
+    val leaderboardThemeState: LeaderboardThemeState
+        get() = LeaderboardThemeState(
+            leaderboardSnapshot = leaderboardSnapshot
+        )
+}

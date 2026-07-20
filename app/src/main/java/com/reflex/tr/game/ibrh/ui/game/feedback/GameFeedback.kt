@@ -81,11 +81,12 @@ fun TargetMarker(
     val isPressed by interactionSource.collectIsPressedAsState()
     val currentOnTap by rememberUpdatedState(onTap)
     val infiniteTransition = rememberInfiniteTransition(label = "target_pulse")
+    val shouldPulse = comboLevel >= 3 || role == GameTargetRole.Correct
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.96f,
-        targetValue = 1.08f,
+        targetValue = if (shouldPulse) 1.08f else 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 980, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = if (shouldPulse) 1180 else 1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "target_pulse_scale"
@@ -97,9 +98,9 @@ fun TargetMarker(
     )
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.24f,
-        targetValue = 0.44f,
+        targetValue = if (shouldPulse) 0.44f else 0.3f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1180, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = if (shouldPulse) 1400 else 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "target_glow_alpha"
@@ -109,8 +110,8 @@ fun TargetMarker(
         spawnScale.animateTo(1.08f, tween(130, easing = FastOutSlowInEasing))
         spawnScale.animateTo(1f, tween(90, easing = FastOutSlowInEasing))
     }
-    val baseColor = targetColor.toComposeColor()
-    val themeGlowColor = themeVisualSpec(theme).primary
+    val baseColor = remember(targetColor) { targetColor.toComposeColor() }
+    val themeGlowColor = remember(theme) { themeVisualSpec(theme).primary }
     val ringAlpha = if (role == GameTargetRole.Correct) 0.9f else 0.62f
     val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.78f
     val borderAlpha = if (role == GameTargetRole.Correct) 0.92f else 0.5f

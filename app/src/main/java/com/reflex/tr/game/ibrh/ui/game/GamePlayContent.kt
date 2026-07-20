@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -73,10 +75,20 @@ fun GamePlayContent(
 ) {
     val missTapInteractionSource = remember { MutableInteractionSource() }
     val shakeTranslationX = rememberShakeTranslationX(trigger = missFeedbackTrigger)
-    val targetSize = uiState.targetSizeDp.dp
-    val themeSpec = themeVisualSpec(uiState.progressionState.activeTheme)
-    val comboTier = comboTierFor(uiState.combo)
-    val firstFiveHintRes = firstFiveExperienceHintRes(uiState)
+    val activeTheme = uiState.progressionState.activeTheme
+    val targetSize = remember(uiState.targetSizeDp) { uiState.targetSizeDp.dp }
+    val themeSpec = remember(activeTheme) { themeVisualSpec(activeTheme) }
+    val comboTier by remember(uiState.combo) {
+        derivedStateOf { comboTierFor(uiState.combo) }
+    }
+    val firstFiveHintRes by remember(
+        uiState.hasGameStarted,
+        uiState.isGameOver,
+        uiState.progressionState.totalGames,
+        uiState.score
+    ) {
+        derivedStateOf { firstFiveExperienceHintRes(uiState) }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -181,7 +193,7 @@ fun GamePlayContent(
                         }
                 ) {
                     AnimatedArenaBackground(
-                        theme = uiState.progressionState.activeTheme,
+                        theme = activeTheme,
                         combo = uiState.combo
                     )
                     MissFeedbackEffect(trigger = missFeedbackTrigger)
@@ -220,7 +232,7 @@ fun GamePlayContent(
                                 role = target.role,
                                 spawnKey = target.id,
                                 comboLevel = uiState.combo,
-                                theme = uiState.progressionState.activeTheme,
+                                theme = activeTheme,
                                 onTap = { onTargetTap(target.id) }
                             )
                         }
@@ -285,6 +297,20 @@ private data class ComboTier(
     val scoreScale: Float
 )
 
+private data class ArenaParticle(
+    val xFraction: Float,
+    val yFraction: Float,
+    val sizeDp: Int
+)
+
+private val ArenaParticles = List(10) { index ->
+    ArenaParticle(
+        xFraction = ((index * 37) % 100) / 100f,
+        yFraction = ((index * 61) % 100) / 100f,
+        sizeDp = 5 + index % 5 * 2
+    )
+}
+
 private fun comboTierFor(combo: Int): ComboTier {
     return when {
         combo >= 20 -> ComboTier(R.string.combo_tier_ultra, 1f, 1.42f)
@@ -301,7 +327,7 @@ private fun AnimatedArenaBackground(
     theme: PlayerTheme,
     combo: Int
 ) {
-    val spec = themeVisualSpec(theme)
+    val spec = remember(theme) { themeVisualSpec(theme) }
     val transition = rememberInfiniteTransition(label = "arena_background")
     val drift by transition.animateFloat(
         initialValue = -0.12f,
@@ -357,27 +383,25 @@ private fun AnimatedArenaBackground(
                 drawCircle(
                     color = spec.secondary.copy(alpha = 0.08f + pulse * 0.1f + comboBoost * 0.08f),
                     radius = size.minDimension * (0.012f + (index % 3) * 0.005f),
-                    center = androidx.compose.ui.geometry.Offset(x, y)
+                    center = Offset(x, y)
                 )
             }
-        }
-        repeat(10) { index ->
-            val x = ((index * 37) % 100) / 100f
-            val y = ((index * 61) % 100) / 100f
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .offset(
-                        x = (24f + x * 260f + drift * 22f).dp,
-                        y = (18f + y * 420f - drift * 18f).dp
-                    )
-                    .size((5 + index % 5 * 2).dp)
-                    .graphicsLayer {
-                        alpha = 0.16f + pulse * 0.32f + comboBoost * 0.22f
-                        shadowElevation = 18f + comboBoost * 18f
-                    }
-                    .background(spec.secondary.copy(alpha = 0.42f), RoundedCornerShape(999.dp))
-            )
+            ArenaParticles.forEach { particle ->
+                val radius = particle.sizeDp.dp.toPx() / 2f
+                val x = 24.dp.toPx() + particle.xFraction * 260.dp.toPx() + drift * 22.dp.toPx()
+                val y = 18.dp.toPx() + particle.yFraction * 420.dp.toPx() - drift * 18.dp.toPx()
+                val alpha = 0.16f + pulse * 0.32f + comboBoost * 0.22f
+                drawCircle(
+                    color = spec.secondary.copy(alpha = alpha * 0.34f),
+                    radius = radius * (2.4f + comboBoost),
+                    center = Offset(x, y)
+                )
+                drawCircle(
+                    color = spec.secondary.copy(alpha = 0.42f),
+                    radius = radius,
+                    center = Offset(x, y)
+                )
+            }
         }
     }
 }

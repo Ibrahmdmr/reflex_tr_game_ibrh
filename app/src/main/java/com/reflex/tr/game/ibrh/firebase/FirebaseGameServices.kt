@@ -53,23 +53,29 @@ object FirebaseGameServices {
     }
 
     private fun signInAnonymously() {
-        FirebaseAuth.getInstance().signInAnonymously()
-            .addOnSuccessListener { result ->
-                val userId = result.user?.uid.orEmpty()
-                log("Anonymous Auth success userId=$userId")
-                if (userId.isBlank()) {
-                    logError("Anonymous Auth returned blank userId", null)
-                    return@addOnSuccessListener
+        runCatching {
+            FirebaseAuth.getInstance().signInAnonymously()
+                .addOnSuccessListener { result ->
+                    val userId = result.user?.uid.orEmpty()
+                    log("Anonymous Auth success userId=$userId")
+                    if (userId.isBlank()) {
+                        logError("Anonymous Auth returned blank userId", null)
+                        return@addOnSuccessListener
+                    }
                 }
-            }
-            .addOnFailureListener { error ->
-                logError("Anonymous Auth failed", error)
-                recordNonFatal("Anonymous Auth failed", error)
-            }
+                .addOnFailureListener { error ->
+                    logError("Anonymous Auth failed", error)
+                    recordNonFatal("Anonymous Auth failed", error)
+                }
+        }.onFailure { error ->
+            logError("Anonymous Auth start failed", error)
+        }
     }
 
     private fun log(message: String) {
-        Log.d(TAG, message)
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, message)
+        }
     }
 
     private fun logError(message: String, error: Throwable?) {

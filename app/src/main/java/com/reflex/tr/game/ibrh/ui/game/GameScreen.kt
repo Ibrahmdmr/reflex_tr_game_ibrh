@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,12 @@ import java.util.Locale
 
 private val ScreenHorizontalPadding = 20.dp
 private val ScreenVerticalPadding = 18.dp
+
+private enum class GamePopup {
+    Boost,
+    PauseExit,
+    GameOver
+}
 
 @Composable
 fun GameScreen(
@@ -94,6 +101,7 @@ fun GameScreen(
         maxCombo: Int
     ) -> Unit = { _, _, _, _ -> },
     onRateAppClick: () -> Unit = {},
+    onExitAppRequested: () -> Unit = {},
     onHowToPlayClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -185,6 +193,7 @@ fun GameScreen(
         onShopOpenedForMission = viewModel::onShopOpenedForMission,
         onStorePreviewModeChange = viewModel::setStorePreviewMode,
         onRateAppClick = onRateAppClick,
+        onExitAppRequested = onExitAppRequested,
         onHomeClick = viewModel::goToHome,
         onPauseGame = viewModel::pauseGame,
         onResumeGame = viewModel::resumeGame,
@@ -253,6 +262,7 @@ fun GameScreen(
     onShopOpenedForMission: () -> Unit = {},
     onStorePreviewModeChange: (Boolean) -> Unit = {},
     onRateAppClick: () -> Unit = {},
+    onExitAppRequested: () -> Unit = {},
     onHomeClick: () -> Unit,
     onPauseGame: () -> Unit,
     onResumeGame: () -> Unit,
@@ -278,8 +288,14 @@ fun GameScreen(
     var hitFeedbackTrigger by remember { mutableIntStateOf(0) }
     var hitFeedbackPosition by remember { mutableStateOf(uiState.targetPosition) }
     var previousLives by remember { mutableIntStateOf(uiState.lives) }
-    var showExitGameDialog by remember { mutableStateOf(false) }
-    var showBoostSheet by remember { mutableStateOf(false) }
+    var showExitGameDialog by rememberSaveable { mutableStateOf(false) }
+    var showBoostSheet by rememberSaveable { mutableStateOf(false) }
+    val activeGamePopup = when {
+        uiState.isGameOver -> GamePopup.GameOver
+        showExitGameDialog -> GamePopup.PauseExit
+        showBoostSheet && !uiState.hasGameStarted -> GamePopup.Boost
+        else -> null
+    }
     val isGameplayInputEnabled =
         !uiState.isPaused &&
             !uiState.isResumeGracePeriod &&
@@ -287,7 +303,18 @@ fun GameScreen(
 
     LaunchedEffect(uiState.isGameOver) {
         if (uiState.isGameOver) {
+            showBoostSheet = false
+            showExitGameDialog = false
             soundHooks.onGameOver()
+        }
+    }
+
+    LaunchedEffect(uiState.hasGameStarted, uiState.isResumeGracePeriod) {
+        if (uiState.hasGameStarted) {
+            showBoostSheet = false
+        }
+        if (uiState.isResumeGracePeriod) {
+            showExitGameDialog = false
         }
     }
 
@@ -337,12 +364,106 @@ fun GameScreen(
         }
     }
 
-    BackHandler(enabled = uiState.hasGameStarted) {
-        if (uiState.isGameOver) {
-            onHomeClick()
-        } else if (!showExitGameDialog) {
-            onPauseGame()
-            showExitGameDialog = true
+    BackHandler(enabled = uiState.hasGameStarted || activeGamePopup != null) {
+        when (activeGamePopup) {
+            GamePopup.GameOver -> {
+                showExitGameDialog = false
+                showBoostSheet = false
+                onHomeClick()
+            }
+            GamePopup.PauseExit -> {
+                showExitGameDialog = false
+                onResumeGame()
+            }
+            GamePopup.Boost -> showBoostSheet = false
+            null -> {
+                if (uiState.hasGameStarted && !showExitGameDialog) {
+                    onPauseGame()
+                    showExitGameDialog = true
+                }
+            }
+        }
+    }
+
+    val requestBoostSheet = {
+        if (activeGamePopup == null && !uiState.hasGameStarted) {
+            showBoostSheet = true
+        }
+    }
+
+    val goHomeSafely = {
+        showBoostSheet = false
+        showExitGameDialog = false
+        onHomeClick()
+    }
+
+    val retrySafely = {
+        showBoostSheet = false
+        showExitGameDialog = false
+        onRetryClick()
+    }
+
+    val continueSafely = {
+        showExitGameDialog = false
+        onContinueClick()
+    }
+
+    val doubleCoinsSafely = {
+        showExitGameDialog = false
+        onDoubleCoinsClick()
+    }
+
+    val startGameSafely = {
+        showBoostSheet = false
+        onStartClick()
+    }
+
+    val startBoostAdSafely: (GameBoost) -> Unit = { boost ->
+        showBoostSheet = false
+        onBoostAdClick(boost)
+    }
+
+    val startBoostCoinSafely: (GameBoost) -> Unit = { boost ->
+        if (onBoostCoinClick(boost)) {
+            showBoostSheet = false
+        }
+    }
+
+    val returnHomeFromGameOver = {
+        goHomeSafely()
+    }
+
+    val returnHomeFromPause = {
+        showExitGameDialog = false
+        onHomeClick()
+    }
+
+    val resumeFromPause = {
+        showExitGameDialog = false
+        onResumeGame()
+    }
+
+    val playButtonClick = {
+        requestBoostSheet()
+    }
+
+    val gameOverVisible = activeGamePopup == GamePopup.GameOver
+
+    val pauseExitVisible = activeGamePopup == GamePopup.PauseExit
+
+    val boostVisible = activeGamePopup == GamePopup.Boost
+
+    val isPopupBlockingInput = activeGamePopup != null
+
+    val shouldHandleMissTap: () -> Unit = {
+        if (!isPopupBlockingInput) {
+            handleMissTap()
+        }
+    }
+
+    val shouldHandleTargetTap: (Long) -> Unit = { targetId ->
+        if (!isPopupBlockingInput) {
+            handleTargetTap(targetId)
         }
     }
 
@@ -406,7 +527,7 @@ fun GameScreen(
             )
     ) {
         if (!uiState.hasGameStarted) {
-        HomeContent(
+            HomeContent(
                 bestScore = uiState.bestScore,
                 bestScoresByMode = uiState.bestScoresByMode,
                 selectedMode = uiState.selectedMode,
@@ -418,7 +539,7 @@ fun GameScreen(
                 leaderboardSnapshot = uiState.leaderboardSnapshot,
                 rewardedAdUiState = rewardedAdUiState,
                 isSoundEnabled = isSoundEnabled,
-                onStartClick = { showBoostSheet = true },
+                onStartClick = playButtonClick,
                 onModeStartClick = onModeStartClick,
                 onHowToPlayClick = onHowToPlayClick,
                 selectedLanguage = selectedLanguage,
@@ -462,25 +583,16 @@ fun GameScreen(
                 onShopOpenedForMission = onShopOpenedForMission,
                 onStorePreviewModeChange = onStorePreviewModeChange,
                 onRateAppClick = onRateAppClick,
+                onExitAppRequested = onExitAppRequested,
                 modifier = Modifier.align(Alignment.Center)
             )
-            if (showBoostSheet) {
+            if (boostVisible) {
                 BoostSelectionBottomSheet(
                     coins = uiState.progressionState.coins,
                     rewardedAdUiState = rewardedAdUiState,
-                    onStartWithoutBoost = {
-                        showBoostSheet = false
-                        onStartClick()
-                    },
-                    onCoinBoostClick = { boost ->
-                        if (onBoostCoinClick(boost)) {
-                            showBoostSheet = false
-                        }
-                    },
-                    onAdBoostClick = { boost ->
-                        showBoostSheet = false
-                        onBoostAdClick(boost)
-                    },
+                    onStartWithoutBoost = startGameSafely,
+                    onCoinBoostClick = startBoostCoinSafely,
+                    onAdBoostClick = startBoostAdSafely,
                     onDismiss = { showBoostSheet = false }
                 )
             }
@@ -492,8 +604,8 @@ fun GameScreen(
             missFeedbackTrigger = missFeedbackTrigger,
             hitFeedbackTrigger = hitFeedbackTrigger,
             hitFeedbackPosition = hitFeedbackPosition,
-            onTargetTap = handleTargetTap,
-            onMissTap = handleMissTap
+            onTargetTap = shouldHandleTargetTap,
+            onMissTap = shouldHandleMissTap
         )
 
         if (uiState.isResumeGracePeriod) {
@@ -503,7 +615,7 @@ fun GameScreen(
         }
 
         AnimatedVisibility(
-            visible = uiState.isGameOver,
+            visible = gameOverVisible,
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut() + scaleOut(targetScale = 0.96f)
         ) {
@@ -531,9 +643,9 @@ fun GameScreen(
                     continueHelperText = continueHelperText,
                     isContinueEnabled = continueButtonEnabled,
                     isContinueLoading = continueButtonLoading,
-                    onHomeClick = onHomeClick,
-                    onChangeModeClick = onHomeClick,
-                    onOpenThemeStoreClick = onHomeClick,
+                    onHomeClick = returnHomeFromGameOver,
+                    onChangeModeClick = returnHomeFromGameOver,
+                    onOpenThemeStoreClick = returnHomeFromGameOver,
                     isDoubleCoinsEnabled = !uiState.isCoinDoubleClaimed &&
                         uiState.baseCoinsThisGame > 0 &&
                         rewardedAdUiState.isReady &&
@@ -545,25 +657,19 @@ fun GameScreen(
                         rewardedAdUiState.isLoading -> stringResource(R.string.rewarded_loading)
                         else -> stringResource(R.string.rewarded_not_ready)
                     },
-                    onContinueClick = onContinueClick,
-                    onDoubleCoinsClick = onDoubleCoinsClick,
-                    onRetryClick = onRetryClick
+                    onContinueClick = continueSafely,
+                    onDoubleCoinsClick = doubleCoinsSafely,
+                    onRetryClick = retrySafely
                 )
             }
         }
 
-        if (showExitGameDialog) {
+        if (pauseExitVisible) {
             ExitGameDialog(
                 selectedLanguage = selectedLanguage,
                 tomorrowRewardCoins = uiState.progressionState.dailyReward.nextRewardCoins,
-                onContinueClick = {
-                    showExitGameDialog = false
-                    onResumeGame()
-                },
-                onHomeClick = {
-                    showExitGameDialog = false
-                    onHomeClick()
-                }
+                onContinueClick = resumeFromPause,
+                onHomeClick = returnHomeFromPause
             )
         }
     }

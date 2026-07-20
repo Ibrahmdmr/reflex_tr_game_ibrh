@@ -84,11 +84,13 @@ object LocalNotificationScheduler {
     }
 
     fun cancelAll(context: Context, logAnalytics: Boolean = true) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        LocalNotificationType.entries.forEach { type ->
-            alarmManager.cancel(pendingIntent(context, type))
-            if (logAnalytics) {
-                logNotificationEvent(FirebaseEvent.NotificationCancelled, type)
+        runCatching {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            LocalNotificationType.entries.forEach { type ->
+                alarmManager.cancel(pendingIntent(context, type))
+                if (logAnalytics) {
+                    logNotificationEvent(FirebaseEvent.NotificationCancelled, type)
+                }
             }
         }
     }
@@ -100,14 +102,16 @@ object LocalNotificationScheduler {
     }
 
     private fun schedule(context: Context, type: LocalNotificationType, triggerAtMillis: Long) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.setWindow(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMillis,
-            NOTIFICATION_WINDOW_MILLIS,
-            pendingIntent(context, type)
-        )
-        logNotificationEvent(FirebaseEvent.NotificationScheduled, type)
+        runCatching {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            alarmManager.setWindow(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis.coerceAtLeast(System.currentTimeMillis()),
+                NOTIFICATION_WINDOW_MILLIS,
+                pendingIntent(context, type)
+            )
+            logNotificationEvent(FirebaseEvent.NotificationScheduled, type)
+        }
     }
 
     private fun pendingIntent(context: Context, type: LocalNotificationType): PendingIntent {
@@ -190,7 +194,16 @@ class LocalNotificationReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        NotificationManagerCompat.from(context).notify(type.notificationId, notification)
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        runCatching {
+            NotificationManagerCompat.from(context).notify(type.notificationId, notification)
+        }
     }
 
     private fun ensureChannel(context: Context) {

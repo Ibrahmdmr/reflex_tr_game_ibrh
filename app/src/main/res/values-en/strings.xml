@@ -462,6 +462,9 @@
 
     <string name="exit_game_title">Exit game?</string>
     <string name="exit_game_message">The game is paused. You can continue or return to the home screen.</string>
+    <string name="exit_app_title">Exit app?</string>
+    <string name="exit_app_message">You are on the Reflex Hunt home screen. You can stay or close the app.</string>
+    <string name="exit_app_confirm">Close App</string>
     <string name="game_over_title">Run Complete</string>
     <string name="game_over_reason_time_up">Time’s up.</string>
     <string name="game_over_reason_no_lives">No lives left.</string>

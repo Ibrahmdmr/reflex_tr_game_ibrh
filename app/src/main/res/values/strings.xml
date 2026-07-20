@@ -462,6 +462,9 @@
 
     <string name="exit_game_title">Oyundan çıkılsın mı?</string>
     <string name="exit_game_message">Oyun duraklatıldı. Devam edebilir veya ana sayfaya dönebilirsin.</string>
+    <string name="exit_app_title">Uygulamadan çıkılsın mı?</string>
+    <string name="exit_app_message">Refleks Avı ana sayfasındasın. Devam edebilir veya uygulamayı kapatabilirsin.</string>
+    <string name="exit_app_confirm">Uygulamayı Kapat</string>
     <string name="game_over_title">Koşu Bitti</string>
     <string name="game_over_reason_time_up">Süre bitti.</string>
     <string name="game_over_reason_no_lives">Can kalmadı.</string>

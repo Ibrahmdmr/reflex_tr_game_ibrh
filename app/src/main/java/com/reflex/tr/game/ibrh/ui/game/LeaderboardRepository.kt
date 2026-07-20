@@ -1,11 +1,13 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import android.content.ContentValues.TAG
 import android.os.Bundle
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
@@ -15,6 +17,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+
+private const val DEFAULT_LEADERBOARD_PLAYER_NAME = "Oyuncu"
 
 interface LeaderboardRepository {
     fun getLocalLeaderboard(
@@ -58,18 +63,20 @@ class LocalLeaderboardRepository : LeaderboardRepository {
         refreshTick: Int
     ): LeaderboardSnapshot {
         val weekKey = currentWeekKey()
-        val seed = (weekKey + playerName + selectedMode.storageKey + selectedPeriod.name + refreshTick).hashCode().absoluteValue
+        val safeName = sanitizeFirestorePlayerName(playerName)
+        val safePlayerScore = sanitizeScore(playerScore)
+        val seed = (weekKey + safeName + selectedMode.storageKey + selectedPeriod.name + refreshTick).hashCode().absoluteValue
         val names = listOf("Nova", "Blitz", "Pulse", "Echo", "Shadow", "NeonX", "Cyber", "ReflexPro", "TargetKing", "Matrix")
             .shuffledSeeded(seed)
             .take(7)
         val fakeEntries = names.mapIndexed { index, name ->
             val scoreOffset = ((seed / (index + 3)) % 18) - 8
             val anchor = when (index) {
-                0 -> playerScore + 12
-                1 -> playerScore + 6
-                2 -> playerScore + 2
-                3 -> playerScore - 3
-                else -> playerScore - 8 - index * 2
+                0 -> safePlayerScore + 12
+                1 -> safePlayerScore + 6
+                2 -> safePlayerScore + 2
+                3 -> safePlayerScore - 3
+                else -> safePlayerScore - 8 - index * 2
             }
             val minimumScore = if (selectedPeriod == LeaderboardPeriod.Weekly) 2 else 4
             val score = maxOf(minimumScore, anchor + scoreOffset)
@@ -83,8 +90,8 @@ class LocalLeaderboardRepository : LeaderboardRepository {
         }
         val playerEntry = LeaderboardEntry(
             rank = 0,
-            name = playerName,
-            score = playerScore,
+            name = safeName,
+            score = safePlayerScore,
             theme = playerTheme,
             rankTier = playerRankTier,
             isPlayer = true
@@ -110,7 +117,7 @@ class LocalLeaderboardRepository : LeaderboardRepository {
             motivationRes = motivationRes,
             motivationPlayerName = nextOpponent?.name.orEmpty(),
             motivationScoreGap = nextOpponent?.let {
-                (it.score - playerScore + 1).coerceAtLeast(1)
+                (it.score - safePlayerScore + 1).coerceAtLeast(1)
             } ?: 0,
             refreshedTick = refreshTick
         )
@@ -159,8 +166,11 @@ class FirestoreLeaderboardRepository(
 
     private companion object {
         const val TAG = "LeaderboardRepository"
+        const val ROOT_COLLECTION = "leaderboards"
+        const val SCORES_COLLECTION = "scores"
     }
 
+    private val refreshMutex = Mutex()
     private val lastSuccessfulSnapshots = mutableMapOf<String, LeaderboardSnapshot>()
 
     override fun getLocalLeaderboard(
@@ -172,10 +182,11 @@ class FirestoreLeaderboardRepository(
         selectedPeriod: LeaderboardPeriod,
         refreshTick: Int
     ): LeaderboardSnapshot {
+        val safeScore = sanitizeScore(playerScore)
         val playerEntry = LeaderboardEntry(
             rank = 1,
             name = sanitizeFirestorePlayerName(playerName),
-            score = playerScore.coerceAtLeast(0),
+            score = safeScore,
             theme = playerTheme,
             rankTier = playerRankTier,
             isPlayer = true
@@ -184,7 +195,7 @@ class FirestoreLeaderboardRepository(
             entries = listOf(playerEntry),
             selectedMode = selectedMode,
             selectedPeriod = selectedPeriod,
-            playerScore = playerScore,
+            playerScore = safeScore,
             playerRank = 1,
             refreshTick = refreshTick,
             statusMessageRes = null
@@ -209,84 +220,90 @@ class FirestoreLeaderboardRepository(
             }
         )
 
-        val cacheKey = "${selectedMode.leaderboardCollectionKey}_${selectedPeriod.name}"
-        return runCatching {
-            val uid = requireUserId()
-            val querySnapshot = firestore.collection("leaderboards")
-                .document(selectedMode.leaderboardCollectionKey)
-                .collection("scores")
-                .orderBy("score", Query.Direction.DESCENDING)
-                .limit(100)
-                .get()
-                .await()
-
-            val entries = querySnapshot.documents.mapIndexedNotNull { index, document ->
-                val score = document.getLong("score")?.toInt() ?: return@mapIndexedNotNull null
-                val name = sanitizeFirestorePlayerName(document.getString("playerName"))
-                val level = document.getLong("level")?.toInt() ?: 1
-                val theme = playerThemeFromStorageKey(document.getString("selectedTheme").orEmpty())
-                LeaderboardEntry(
-                    rank = index + 1,
-                    name = name,
-                    score = score,
-                    theme = theme,
-                    rankTier = rankFor(score = score, level = level),
-                    isPlayer = document.id == uid || document.getString("uid") == uid
-                )
-            }.toMutableList()
-
-            if (entries.none { it.isPlayer } && playerScore > 0) {
-                entries += LeaderboardEntry(
-                    rank = 0,
-                    name = sanitizeFirestorePlayerName(playerName),
-                    score = playerScore,
-                    theme = playerTheme,
-                    rankTier = playerRankTier,
-                    isPlayer = true
-                )
-            }
-
-            val rankedEntries = entries
-                .sortedByDescending { it.score }
-                .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
-            Log.d(TAG, "Firestore leaderboard read success mode=${selectedMode.leaderboardCollectionKey} count=${rankedEntries.size}")
-            val playerRank = rankedEntries.firstOrNull { it.isPlayer }?.rank ?: 0
-            val snapshot = buildSnapshot(
-                entries = rankedEntries,
+        val modeKey = selectedMode.leaderboardCollectionKey
+        val cacheKey = leaderboardCacheKey(selectedMode, selectedPeriod)
+        if (!refreshMutex.tryLock()) {
+            return cachedOrEmptySnapshot(
+                cacheKey = cacheKey,
+                playerName = playerName,
+                playerScore = playerScore,
+                playerTheme = playerTheme,
+                playerRankTier = playerRankTier,
                 selectedMode = selectedMode,
                 selectedPeriod = selectedPeriod,
-                playerScore = playerScore,
-                playerRank = playerRank,
                 refreshTick = refreshTick,
-                statusMessageRes = R.string.leaderboard_refreshed
+                statusMessageRes = R.string.leaderboard_loading
             )
-            lastSuccessfulSnapshots[cacheKey] = snapshot
-            snapshot
-        }.getOrElse { error ->
-            FirebaseGameServices.recordNonFatal("Leaderboard refresh failed", error)
-            val cached = lastSuccessfulSnapshots[cacheKey]
-            if (cached != null) {
-                cached.copy(
+        }
+
+        return try {
+            runCatching {
+                val uid = requireUserId()
+                val querySnapshot = scoresCollection(modeKey)
+                    .orderBy("score", Query.Direction.DESCENDING)
+                    .limit(100)
+                    .get()
+                    .await()
+
+                val entries = querySnapshot.documents.mapIndexedNotNull { index, document ->
+                    val score = sanitizeScore(document.getLong("score")?.toInt() ?: return@mapIndexedNotNull null)
+                    val name = sanitizeFirestorePlayerName(document.getString("playerName"))
+                    val level = document.getLong("level")?.toInt() ?: 1
+                    val theme = playerThemeFromStorageKey(document.getString("selectedTheme").orEmpty())
+                    LeaderboardEntry(
+                        rank = index + 1,
+                        name = name,
+                        score = score,
+                        theme = theme,
+                        rankTier = rankFor(score = score, level = level),
+                        isPlayer = document.id == uid || document.getString("uid") == uid
+                    )
+                }.toMutableList()
+
+                val safePlayerScore = sanitizeScore(playerScore)
+                if (entries.none { it.isPlayer } && safePlayerScore > 0) {
+                    entries += LeaderboardEntry(
+                        rank = 0,
+                        name = sanitizeFirestorePlayerName(playerName),
+                        score = safePlayerScore,
+                        theme = playerTheme,
+                        rankTier = playerRankTier,
+                        isPlayer = true
+                    )
+                }
+
+                val rankedEntries = entries
+                    .sortedByDescending { it.score }
+                    .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
+                logDebug("Firestore leaderboard read success mode=$modeKey count=${rankedEntries.size}")
+                val playerRank = rankedEntries.firstOrNull { it.isPlayer }?.rank ?: 0
+                val snapshot = buildSnapshot(
+                    entries = rankedEntries,
                     selectedMode = selectedMode,
                     selectedPeriod = selectedPeriod,
-                    refreshedTick = refreshTick,
-                    isOffline = true,
-                    statusMessageRes = R.string.leaderboard_offline_cache
+                    playerScore = safePlayerScore,
+                    playerRank = playerRank,
+                    refreshTick = refreshTick,
+                    statusMessageRes = R.string.leaderboard_refreshed
                 )
-            } else {
-                getLocalLeaderboard(
+                lastSuccessfulSnapshots[cacheKey] = snapshot
+                snapshot
+            }.getOrElse { error ->
+                FirebaseGameServices.recordNonFatal("Leaderboard refresh failed", error)
+                cachedOrEmptySnapshot(
+                    cacheKey = cacheKey,
                     playerName = playerName,
                     playerScore = playerScore,
                     playerTheme = playerTheme,
                     playerRankTier = playerRankTier,
                     selectedMode = selectedMode,
                     selectedPeriod = selectedPeriod,
-                    refreshTick = refreshTick
-                ).copy(
-                    isOffline = true,
+                    refreshTick = refreshTick,
                     statusMessageRes = R.string.leaderboard_refresh_failed
                 )
             }
+        } finally {
+            refreshMutex.unlock()
         }
     }
 
@@ -299,19 +316,18 @@ class FirestoreLeaderboardRepository(
     ): Boolean {
         return runCatching {
             val uid = requireUserId()
-            val document = firestore.collection("leaderboards")
-                .document(mode.leaderboardCollectionKey)
-                .collection("scores")
-                .document(uid)
+            val modeKey = mode.leaderboardCollectionKey
+            val safeScore = sanitizeScore(score)
+            val document = scoresCollection(modeKey).document(uid)
             val safeName = sanitizeFirestorePlayerName(playerName)
             val didWrite = firestore.runTransaction { transaction ->
                 val snapshot = transaction.get(document)
-                val remoteScore = snapshot.getLong("score")?.toInt() ?: -1
-                if (score > remoteScore) {
+                val remoteScore = sanitizeScore(snapshot.getLong("score")?.toInt() ?: -1)
+                if (!snapshot.exists() || safeScore > remoteScore) {
                     val payload = mutableMapOf<String, Any>(
                         "uid" to uid,
                         "playerName" to safeName,
-                        "score" to score.coerceAtLeast(0),
+                        "score" to safeScore,
                         "level" to level.coerceAtLeast(1),
                         "selectedTheme" to selectedTheme.storageKey,
                         "updatedAt" to FieldValue.serverTimestamp()
@@ -329,11 +345,11 @@ class FirestoreLeaderboardRepository(
                 FirebaseGameServices.logEvent(
                     event = FirebaseEvent.LeaderboardScoreUpload,
                     params = Bundle().apply {
-                        putString(FirebaseParam.ModeName.key, mode.leaderboardCollectionKey)
-                        putInt(FirebaseParam.Score.key, score)
+                        putString(FirebaseParam.ModeName.key, modeKey)
+                        putInt(FirebaseParam.Score.key, safeScore)
                     }
                 )
-                Log.d(TAG, "Firestore leaderboard score upload success mode=${mode.leaderboardCollectionKey} score=$score")
+                logDebug("Firestore leaderboard score upload success mode=$modeKey score=$safeScore")
             }
             didWrite
         }.getOrElse { error ->
@@ -341,7 +357,7 @@ class FirestoreLeaderboardRepository(
                 event = FirebaseEvent.LeaderboardUploadFailed,
                 params = Bundle().apply {
                     putString(FirebaseParam.ModeName.key, mode.leaderboardCollectionKey)
-                    putInt(FirebaseParam.Score.key, score)
+                    putInt(FirebaseParam.Score.key, sanitizeScore(score))
                 }
             )
             FirebaseGameServices.recordNonFatal("Leaderboard score upload failed", error)
@@ -354,6 +370,58 @@ class FirestoreLeaderboardRepository(
         val result = auth.signInAnonymously().await()
         return result.user?.uid?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Anonymous Auth returned blank uid")
+    }
+
+    private fun scoresCollection(modeKey: String) = firestore.collection(ROOT_COLLECTION)
+        .document(modeKey)
+        .collection(SCORES_COLLECTION)
+
+    private fun leaderboardCacheKey(
+        selectedMode: GameMode,
+        selectedPeriod: LeaderboardPeriod
+    ): String {
+        return "${selectedMode.leaderboardCollectionKey}_${selectedPeriod.name}"
+    }
+
+    private fun cachedOrEmptySnapshot(
+        cacheKey: String,
+        playerName: String,
+        playerScore: Int,
+        playerTheme: PlayerTheme,
+        playerRankTier: RankTier,
+        selectedMode: GameMode,
+        selectedPeriod: LeaderboardPeriod,
+        refreshTick: Int,
+        statusMessageRes: Int
+    ): LeaderboardSnapshot {
+        val cached = lastSuccessfulSnapshots[cacheKey]
+        if (cached != null) {
+            return cached.copy(
+                selectedMode = selectedMode,
+                selectedPeriod = selectedPeriod,
+                refreshedTick = refreshTick,
+                isLoading = false,
+                isOffline = true,
+                statusMessageRes = R.string.leaderboard_offline_cache
+            )
+        }
+
+        val localSnapshot = localFallback.getLocalLeaderboard(
+            playerName = playerName,
+            playerScore = playerScore,
+            playerTheme = playerTheme,
+            playerRankTier = playerRankTier,
+            selectedMode = selectedMode,
+            selectedPeriod = selectedPeriod,
+            refreshTick = refreshTick
+        )
+        return localSnapshot.copy(
+            entries = emptyList(),
+            playerRank = 0,
+            isLoading = false,
+            isOffline = true,
+            statusMessageRes = statusMessageRes
+        )
     }
 
     private fun buildSnapshot(
@@ -413,20 +481,35 @@ private fun <T> List<T>.shuffledSeeded(seed: Int): List<T> {
         .map { it.second }
 }
 
+private val LeaderboardModeKeys = mapOf(
+    GameMode.Classic to "classic",
+    GameMode.MovingTarget to "moving_target",
+    GameMode.FakeTarget to "fake_target",
+    GameMode.ColorReflex to "color_reflex"
+)
+
 private val GameMode.leaderboardCollectionKey: String
-    get() = when (this) {
-        GameMode.Classic -> "classic"
-        GameMode.MovingTarget -> "moving_target"
-        GameMode.FakeTarget -> "fake_target"
-        GameMode.ColorReflex -> "color_reflex"
-    }
+    get() = LeaderboardModeKeys[this] ?: "classic"
 
 private fun sanitizeFirestorePlayerName(name: String?): String {
-    return name.orEmpty().trim().take(12)
+    return name.orEmpty()
+        .trim()
+        .take(12)
+        .ifBlank { DEFAULT_LEADERBOARD_PLAYER_NAME }
+}
+
+private fun sanitizeScore(score: Int): Int {
+    return score.coerceAtLeast(0)
 }
 
 private fun playerThemeFromStorageKey(key: String): PlayerTheme {
     return PlayerTheme.entries.firstOrNull { it.storageKey == key } ?: PlayerTheme.NeonRed
+}
+
+private fun logDebug(message: String) {
+    if (BuildConfig.DEBUG) {
+        Log.d(TAG, message)
+    }
 }
 
 private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
