@@ -77,6 +77,11 @@ internal fun ProfileProgressCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = ReflexGamePalette.textSecondary
                     )
+                    if (isCollectionComplete(progressionState)) {
+                        CollectionMasterBadge(
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     TextButton(onClick = onEditNameClick) {

@@ -126,13 +126,13 @@ internal fun ThemeTargetCard(
 internal fun ThemeShopSection(
     progressionState: ProgressionState,
     selectedLanguage: AppLanguage,
+    modifier: Modifier = Modifier,
     unlockedThemePopup: PlayerTheme? = null,
     popupBlocked: Boolean = false,
     onThemeUnlockPopupChange: (PlayerTheme?) -> Unit = {},
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
-    onThemeTrial: (PlayerTheme) -> Unit,
-    modifier: Modifier = Modifier
+    onThemeTrial: (PlayerTheme) -> Unit
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         Column(

@@ -146,6 +146,10 @@ internal fun SeasonTabContent(
         missions = season.missions,
         onMissionClaim = onMissionClaim
     )
+    SeasonQuestSection(
+        quests = season.quests,
+        completed = season.seasonQuestsCompleted
+    )
     season.rewards.forEach { reward ->
         SeasonRewardCard(
             reward = reward,
@@ -322,6 +326,99 @@ internal fun SeasonMissionCard(
 }
 
 @Composable
+internal fun SeasonQuestSection(
+    quests: List<SeasonQuestState>,
+    completed: Boolean
+) {
+    Text(
+        text = stringResource(R.string.season_quests_title),
+        style = MaterialTheme.typography.titleMedium,
+        color = ReflexGamePalette.textPrimary,
+        modifier = Modifier.fillMaxWidth()
+    )
+    if (completed) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = ArcadeGold.copy(alpha = 0.14f),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
+        ) {
+            Text(
+                text = stringResource(R.string.season_hunter_unlocked),
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = ArcadeGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+    quests.forEach { quest ->
+        SeasonQuestCard(quest = quest)
+    }
+}
+
+@Composable
+private fun SeasonQuestCard(quest: SeasonQuestState) {
+    val accent = if (quest.completed) ArcadeTeal else ArcadeGold
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (quest.completed) 0.38f else 0.18f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (quest.completed) "✓" else "•",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = accent
+                )
+                Text(
+                    text = stringResource(quest.type.titleRes),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.coin_reward_value, quest.rewardCoins),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ArcadeGold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            LinearProgressIndicator(
+                progress = { quest.progressPercent / 100f },
+                modifier = Modifier.fillMaxWidth(),
+                color = accent,
+                trackColor = Color.White.copy(alpha = 0.12f)
+            )
+            Text(
+                text = stringResource(
+                    R.string.season_quest_progress,
+                    quest.progress.coerceAtMost(quest.target),
+                    quest.target
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 internal fun SeasonRewardCard(
     reward: SeasonRewardState,
     unlocked: Boolean,
@@ -372,5 +469,3 @@ internal fun SeasonRewardCard(
         }
     }
 }
-
-

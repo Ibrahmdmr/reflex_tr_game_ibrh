@@ -14,6 +14,7 @@ import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.reflex.tr.game.ibrh.MainActivity
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
@@ -77,10 +78,10 @@ object LocalNotificationScheduler {
         enabledTypes.forEachIndexed { index, type ->
             schedule(appContext, type, targetTime + index * NOTIFICATION_WINDOW_MILLIS)
         }
-        prefs.edit()
-            .putString(NOTIFICATION_SCHEDULE_DATE_KEY, targetDate)
-            .putInt(NOTIFICATION_SCHEDULE_MASK_KEY, mask)
-            .apply()
+        prefs.edit {
+            putString(NOTIFICATION_SCHEDULE_DATE_KEY, targetDate)
+            putInt(NOTIFICATION_SCHEDULE_MASK_KEY, mask)
+        }
     }
 
     fun cancelAll(context: Context, logAnalytics: Boolean = true) {
@@ -239,10 +240,10 @@ class LocalNotificationReceiver : BroadcastReceiver() {
         val today = todayKey()
         val sentDate = prefs.getString(NOTIFICATION_SENT_DATE_KEY, "").orEmpty()
         val nextCount = if (sentDate == today) prefs.getInt(NOTIFICATION_SENT_COUNT_KEY, 0) + 1 else 1
-        prefs.edit()
-            .putString(NOTIFICATION_SENT_DATE_KEY, today)
-            .putInt(NOTIFICATION_SENT_COUNT_KEY, nextCount.coerceAtMost(MAX_DAILY_NOTIFICATIONS))
-            .apply()
+        prefs.edit {
+            putString(NOTIFICATION_SENT_DATE_KEY, today)
+            putInt(NOTIFICATION_SENT_COUNT_KEY, nextCount.coerceAtMost(MAX_DAILY_NOTIFICATIONS))
+        }
     }
 
     companion object {

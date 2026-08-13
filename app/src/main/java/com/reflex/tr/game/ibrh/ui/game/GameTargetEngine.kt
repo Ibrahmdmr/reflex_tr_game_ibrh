@@ -3,13 +3,6 @@ package com.reflex.tr.game.ibrh.ui.game
 import kotlin.math.abs
 import kotlin.random.Random
 
-private object GameTargetTuning {
-    const val InitialTargetSizeDp = 82
-    const val MinTargetSizeDp = 48
-    const val InitialVisibleDurationMillis = 1_800L
-    const val MinVisibleDurationMillis = 850L
-}
-
 internal class GameTargetEngine {
     private var nextTargetId = 0L
 
@@ -17,7 +10,8 @@ internal class GameTargetEngine {
         mode: GameMode,
         score: Int,
         currentTargets: List<GameTarget> = emptyList(),
-        activeColor: ReflexTargetColor = ReflexTargetColor.Red
+        activeColor: ReflexTargetColor = ReflexTargetColor.Red,
+        progression: ProgressionState = ProgressionState()
     ): List<GameTarget> {
         val currentCorrect = currentTargets.firstOrNull { it.role == GameTargetRole.Correct }?.position
         val usedPositions = mutableListOf<TargetPosition>()
@@ -37,7 +31,11 @@ internal class GameTargetEngine {
                 )
             )
             GameMode.FakeTarget -> {
-                val fakeCount = if (score >= 8) 2 else 1
+                val fakeCount = GameDifficultyConfig.fakeTargetCount(
+                    score = score,
+                    mode = mode,
+                    progression = progression
+                )
                 buildList {
                     add(
                         GameTarget(
@@ -63,7 +61,13 @@ internal class GameTargetEngine {
                 val wrongColors = ReflexTargetColor.entries
                     .filterNot { it == activeColor }
                     .sortedBy { it.ordinal }
-                    .take(if (score >= 12) 3 else 2)
+                    .take(
+                        GameDifficultyConfig.wrongColorCount(
+                            score = score,
+                            mode = mode,
+                            progression = progression
+                        )
+                    )
                 buildList {
                     wrongColors.forEach { wrongColor ->
                         add(
@@ -101,11 +105,19 @@ internal class GameTargetEngine {
 
     fun randomTargetColor(except: ReflexTargetColor? = null): ReflexTargetColor {
         val colors = ReflexTargetColor.entries.filterNot { it == except }
-        return colors.random()
+        return colors.randomOrNull() ?: ReflexTargetColor.Red
     }
 
-    fun calculateMovementIntervalMillis(score: Int): Long {
-        return (900L - (score / 2) * 70L).coerceAtLeast(320L)
+    fun calculateMovementIntervalMillis(
+        score: Int,
+        mode: GameMode = GameMode.MovingTarget,
+        progression: ProgressionState = ProgressionState()
+    ): Long {
+        return GameDifficultyConfig.movementIntervalMillis(
+            score = score,
+            mode = mode,
+            progression = progression
+        )
     }
 
     private fun generateRandomTargetPositionAwayFrom(
@@ -150,7 +162,12 @@ internal class GameTargetEngine {
 }
 
 internal fun calculateDifficultyLevel(score: Int): Int {
-    return (score / 5 + 1).coerceIn(1, 8)
+    return when (GameDifficultyConfig.tierForScore(score)) {
+        GameDifficultyTier.Easy -> 1
+        GameDifficultyTier.Medium -> 2
+        GameDifficultyTier.Hard -> 3
+        GameDifficultyTier.Extreme -> 4
+    }
 }
 
 internal fun calculateTargetSizeDp(
@@ -158,19 +175,11 @@ internal fun calculateTargetSizeDp(
     mode: GameMode,
     progression: ProgressionState
 ): Int {
-    val modeExtraReduction = when (mode) {
-        GameMode.Classic -> 0
-        GameMode.MovingTarget -> 2
-        GameMode.FakeTarget -> 4
-        GameMode.ColorReflex -> 2
-    }
-    val sizeReduction = (score / 3) * 4 + modeExtraReduction
-    val baseSize = (GameTargetTuning.InitialTargetSizeDp - sizeReduction)
-        .coerceAtLeast(GameTargetTuning.MinTargetSizeDp)
-    if (progression.totalGames >= FirstFiveExperienceGameLimit) return baseSize
-
-    val softBonus = (10 - progression.totalGames).coerceAtLeast(6)
-    return (baseSize + softBonus).coerceAtMost(GameTargetTuning.InitialTargetSizeDp + 10)
+    return GameDifficultyConfig.targetSizeDp(
+        score = score,
+        mode = mode,
+        progression = progression
+    )
 }
 
 internal fun calculateTargetVisibleDurationMillis(
@@ -178,20 +187,11 @@ internal fun calculateTargetVisibleDurationMillis(
     mode: GameMode,
     progression: ProgressionState
 ): Long {
-    val modeExtraReduction = when (mode) {
-        GameMode.Classic -> 0L
-        GameMode.MovingTarget -> 80L
-        GameMode.FakeTarget -> 40L
-        GameMode.ColorReflex -> 60L
-    }
-    val durationReduction = (score / 2) * 80L + modeExtraReduction
-    val baseDuration = (GameTargetTuning.InitialVisibleDurationMillis - durationReduction)
-        .coerceAtLeast(GameTargetTuning.MinVisibleDurationMillis)
-    if (progression.totalGames >= FirstFiveExperienceGameLimit) return baseDuration
-
-    val softBonusMillis = 360L - (progression.totalGames * 35L)
-    return (baseDuration + softBonusMillis)
-        .coerceAtMost(GameTargetTuning.InitialVisibleDurationMillis + 360L)
+    return GameDifficultyConfig.visibleDurationMillis(
+        score = score,
+        mode = mode,
+        progression = progression
+    )
 }
 
 internal fun List<GameTarget>.firstCorrectPosition(): TargetPosition {

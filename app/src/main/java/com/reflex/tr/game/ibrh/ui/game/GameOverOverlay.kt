@@ -1,5 +1,6 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -9,10 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,12 +40,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ui.game.components.CompactStatCard
 import com.reflex.tr.game.ibrh.ui.game.components.GamePanelCard
+import com.reflex.tr.game.ibrh.ui.game.components.PremiumSurfaceCard
 import com.reflex.tr.game.ibrh.ui.game.components.PrimaryGameButton
+import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
+import com.reflex.tr.game.ibrh.ui.game.components.SectionTitle
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
+import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
 @Composable
@@ -52,12 +60,22 @@ fun GameOverOverlay(
     isNewBestScore: Boolean,
     mode: GameMode,
     maxCombo: Int,
+    maxFlawlessStreak: Int,
+    bossRoundBonusCoins: Int,
+    ultraMomentBonusCoins: Int,
+    ultraMomentHits: Int,
+    perfectHits: Int,
+    greatHits: Int,
     accuracyPercent: Int,
+    newPersonalRecords: Set<PersonalRecordType>,
+    unlockedProfileBadges: Set<ProfileBadge>,
     reason: String?,
     earnedCoins: Int,
     baseCoins: Int,
     totalCoins: Int,
     seasonXp: Int,
+    comboChallenge: ComboChallengeState,
+    dailyMiniTournament: DailyMiniTournamentState,
     isCoinDoubleClaimed: Boolean,
     showContinueButton: Boolean,
     continueButtonText: String,
@@ -72,6 +90,7 @@ fun GameOverOverlay(
     doubleCoinsText: String,
     onContinueClick: () -> Unit,
     onDoubleCoinsClick: () -> Unit,
+    onShareScoreClick: () -> Unit,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -96,7 +115,8 @@ fun GameOverOverlay(
         GamePanelCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxHeight - 12.dp),
+                .heightIn(max = maxHeight - 12.dp)
+                .navigationBarsPadding(),
             containerColor = ReflexGamePalette.cardGlassStrong,
             contentPadding = panelPadding
         ) {
@@ -185,6 +205,20 @@ fun GameOverOverlay(
                     )
                 }
 
+                if (newPersonalRecords.isNotEmpty()) {
+                    NewPersonalRecordsCard(
+                        records = newPersonalRecords,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = recordScale
+                            scaleY = recordScale
+                        }
+                    )
+                }
+
+                if (unlockedProfileBadges.isNotEmpty()) {
+                    UnlockedProfileBadgesCard(badges = unlockedProfileBadges)
+                }
+
                 if (!reason.isNullOrBlank()) {
                     Text(
                         text = reason,
@@ -200,8 +234,24 @@ fun GameOverOverlay(
                     score = score,
                     bestScore = bestScore,
                     maxCombo = maxCombo,
+                    maxFlawlessStreak = maxFlawlessStreak,
+                    bossRoundBonusCoins = bossRoundBonusCoins,
+                    ultraMomentBonusCoins = ultraMomentBonusCoins,
+                    ultraMomentHits = ultraMomentHits,
+                    perfectHits = perfectHits,
+                    greatHits = greatHits,
                     accuracyPercent = accuracyPercent,
                     seasonXp = seasonXp
+                )
+
+                SmartGameSuggestionCard(
+                    suggestionRes = smartGameSuggestionRes(
+                        score = score,
+                        bestScore = bestScore,
+                        isNewBestScore = isNewBestScore,
+                        maxCombo = maxCombo,
+                        accuracyPercent = accuracyPercent
+                    )
                 )
 
                 CoinEarnedCard(
@@ -215,9 +265,20 @@ fun GameOverOverlay(
                     )
                 )
 
+                ComboChallengeProgressCard(state = comboChallenge)
+
+                if (mode == dailyMiniTournament.mode) {
+                    DailyMiniTournamentGameOverCard(state = dailyMiniTournament)
+                }
+
                 PrimaryGameButton(
                     text = stringResource(R.string.retry_game),
                     onClick = onRetryClick
+                )
+
+                SecondaryGameButton(
+                    text = stringResource(R.string.share_score),
+                    onClick = onShareScoreClick
                 )
 
                 if (showContinueButton) {
@@ -226,11 +287,11 @@ fun GameOverOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        CompactRewardButton(
+                        SecondaryGameButton(
                             text = continueButtonText,
-                            enabled = isContinueEnabled,
                             onClick = onContinueClick,
-                            modifier = Modifier.fillMaxWidth(0.82f)
+                            enabled = isContinueEnabled,
+                            isLoading = isContinueLoading
                         )
 
                         if (!continueHelperText.isNullOrBlank()) {
@@ -245,32 +306,185 @@ fun GameOverOverlay(
                     }
                 }
 
-                CompactRewardButton(
-                    text = doubleCoinsText,
-                    enabled = isDoubleCoinsEnabled,
-                    onClick = onDoubleCoinsClick,
-                    modifier = if (showContinueButton) {
-                        Modifier
-                            .fillMaxWidth(0.74f)
-                            .align(Alignment.CenterHorizontally)
-                    } else {
-                        Modifier.fillMaxWidth(0.82f)
-                    }
-                )
-
-                OutlinedButton(
-                    onClick = onHomeClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.back_to_home),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
+                if (isDoubleCoinsEnabled || isDoubleCoinsLoading) {
+                    SecondaryGameButton(
+                        text = doubleCoinsText,
+                        onClick = onDoubleCoinsClick,
+                        enabled = isDoubleCoinsEnabled,
+                        isLoading = isDoubleCoinsLoading
                     )
                 }
+
+                SecondaryGameButton(
+                    text = stringResource(R.string.back_to_home),
+                    onClick = onHomeClick
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun UnlockedProfileBadgesCard(
+    badges: Set<ProfileBadge>,
+    modifier: Modifier = Modifier
+) {
+    PremiumSurfaceCard(
+        modifier = modifier.fillMaxWidth(),
+        accentColor = ArcadeTeal,
+        containerColor = ArcadeTeal.copy(alpha = 0.11f)
+    ) {
+            SectionTitle(
+                text = stringResource(R.string.badge_unlocked_label),
+                accentColor = ArcadeTeal
+            )
+            badges.forEach { badge ->
+                Text(
+                    text = stringResource(badge.titleRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+    }
+}
+
+@Composable
+private fun NewPersonalRecordsCard(
+    records: Set<PersonalRecordType>,
+    modifier: Modifier = Modifier
+) {
+    PremiumSurfaceCard(
+        modifier = modifier.fillMaxWidth(),
+        accentColor = ArcadeGold,
+        containerColor = ArcadeGold.copy(alpha = 0.11f)
+    ) {
+            SectionTitle(
+                text = stringResource(R.string.personal_record_new_label),
+                accentColor = ArcadeGold
+            )
+            records.forEach { record ->
+                Text(
+                    text = stringResource(record.titleRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+    }
+}
+
+@Composable
+private fun ComboChallengeProgressCard(
+    state: ComboChallengeState,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ArcadeBlue.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.combo_challenge_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = ArcadeGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(
+                    R.string.combo_challenge_game_over_progress,
+                    state.progress,
+                    state.target
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun DailyMiniTournamentGameOverCard(
+    state: DailyMiniTournamentState,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = if (state.completed) ArcadeTeal.copy(alpha = 0.12f) else ArcadeGold.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (state.completed) ArcadeTeal.copy(alpha = 0.34f) else ArcadeGold.copy(alpha = 0.28f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.daily_mini_tournament_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (state.completed) ArcadeTeal else ArcadeGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = if (state.completed) {
+                    if (state.rewardClaimedThisGame) {
+                        stringResource(R.string.daily_mini_tournament_completed_reward, state.rewardCoins)
+                    } else {
+                        stringResource(R.string.daily_mini_tournament_claimed)
+                    }
+                } else {
+                    stringResource(R.string.daily_mini_tournament_game_over_remaining, state.bestScore, state.remainingScore)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun SmartGameSuggestionCard(
+    @StringRes suggestionRes: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ArcadeTeal.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.smart_suggestion_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = ArcadeGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(suggestionRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -332,6 +546,12 @@ private fun PerformanceSummaryGrid(
     score: Int,
     bestScore: Int,
     maxCombo: Int,
+    maxFlawlessStreak: Int,
+    bossRoundBonusCoins: Int,
+    ultraMomentBonusCoins: Int,
+    ultraMomentHits: Int,
+    perfectHits: Int,
+    greatHits: Int,
     accuracyPercent: Int,
     seasonXp: Int
 ) {
@@ -339,46 +559,151 @@ private fun PerformanceSummaryGrid(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // IntrinsicSize.Min + fillMaxHeight makes both cards in a row adopt the taller one's
+        // height. The prominent score card carries extra padding and a larger value style, so
+        // without this its neighbour would render visibly shorter.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SummaryMetricCard(
                 title = stringResource(R.string.score),
                 value = score.toString(),
                 accentColor = ArcadeCoral,
-                modifier = Modifier.weight(1f)
+                // Equal weight across both rows keeps the 2x2 grid aligned; the score card's
+                // emphasis comes from `prominent`, not from being wider than its neighbours.
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                prominent = true
             )
             SummaryMetricCard(
                 title = stringResource(R.string.best_score),
                 value = bestScore.toString(),
                 accentColor = ArcadeBlue,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             SummaryMetricCard(
                 title = stringResource(R.string.accuracy),
                 value = stringResource(R.string.percent_value, accuracyPercent),
                 accentColor = ArcadeCoral,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
             SummaryMetricCard(
                 title = stringResource(R.string.max_combo),
                 value = stringResource(R.string.combo_short_value, maxCombo),
                 accentColor = ArcadeGold,
-                modifier = Modifier.weight(1f)
-            )
-            SummaryMetricCard(
-                title = stringResource(R.string.game_over_season_xp),
-                value = seasonXp.toString(),
-                accentColor = ArcadeGold,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
         }
+        SecondarySummaryDetails(
+            maxFlawlessStreak = maxFlawlessStreak,
+            bossRoundBonusCoins = bossRoundBonusCoins,
+            ultraMomentBonusCoins = ultraMomentBonusCoins,
+            ultraMomentHits = ultraMomentHits,
+            perfectHits = perfectHits,
+            greatHits = greatHits,
+            seasonXp = seasonXp
+        )
+    }
+}
+
+@Composable
+private fun SecondarySummaryDetails(
+    maxFlawlessStreak: Int,
+    bossRoundBonusCoins: Int,
+    ultraMomentBonusCoins: Int,
+    ultraMomentHits: Int,
+    perfectHits: Int,
+    greatHits: Int,
+    seasonXp: Int
+) {
+    val details = listOf(
+        stringResource(R.string.flawless_streak_best) to maxFlawlessStreak.coerceAtLeast(0).toString(),
+        stringResource(R.string.boss_round_bonus) to stringResource(
+            R.string.coin_bonus_short_value,
+            bossRoundBonusCoins.coerceAtLeast(0)
+        ),
+        stringResource(R.string.ultra_moment_bonus) to stringResource(
+            R.string.coin_bonus_short_value,
+            ultraMomentBonusCoins.coerceAtLeast(0)
+        ),
+        stringResource(R.string.ultra_moment_hits) to ultraMomentHits.coerceAtLeast(0).toString(),
+        stringResource(R.string.timing_perfect) to perfectHits.coerceAtLeast(0).toString(),
+        stringResource(R.string.timing_great) to greatHits.coerceAtLeast(0).toString(),
+        stringResource(R.string.game_over_season_xp) to seasonXp.coerceAtLeast(0).toString()
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = ReflexGamePalette.cardGlassStrong,
+        border = androidx.compose.foundation.BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.22f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            details.chunked(2).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowItems.forEach { (title, value) ->
+                        SecondaryDetailText(
+                            title = title,
+                            value = value,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (rowItems.size == 1) {
+                        Box(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecondaryDetailText(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = ReflexGamePalette.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelMedium,
+            color = ReflexGamePalette.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -387,60 +712,16 @@ private fun SummaryMetricCard(
     title: String,
     value: String,
     accentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    prominent: Boolean = false
 ) {
-    Surface(
+    CompactStatCard(
+        title = title,
+        value = value,
+        accentColor = accentColor,
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = accentColor.copy(alpha = 0.13f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.28f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = ReflexGamePalette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleSmall,
-                color = ReflexGamePalette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompactRewardButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedButton(
-        enabled = enabled,
-        onClick = onClick,
-        modifier = modifier.height(44.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
-    }
+        prominent = prominent
+    )
 }
 
 @Composable
@@ -469,7 +750,31 @@ private fun isNearRecordScore(
     return score >= thresholdScore
 }
 
+@StringRes
+private fun smartGameSuggestionRes(
+    score: Int,
+    bestScore: Int,
+    isNewBestScore: Boolean,
+    maxCombo: Int,
+    accuracyPercent: Int
+): Int {
+    val safeScore = score.coerceAtLeast(0)
+    val safeCombo = maxCombo.coerceAtLeast(0)
+    return when {
+        isNearRecordScore(
+            score = safeScore,
+            bestScore = bestScore,
+            isNewBestScore = isNewBestScore
+        ) -> R.string.smart_suggestion_near_record
+        safeScore <= 5 && safeCombo <= 1 -> R.string.smart_suggestion_fast_loss
+        accuracyPercent.coerceIn(0, 100) < 55 -> R.string.smart_suggestion_low_accuracy
+        safeCombo < 3 -> R.string.smart_suggestion_low_combo
+        else -> R.string.smart_suggestion_keep_going
+    }
+}
+
 private const val NEAR_RECORD_THRESHOLD_PERCENT = 80
+
 
 @Composable
 private fun bonusIncludedText(

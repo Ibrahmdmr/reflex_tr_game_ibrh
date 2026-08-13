@@ -12,12 +12,12 @@ import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Mutex
 import java.util.Calendar
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.absoluteValue
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
 
 private const val DEFAULT_LEADERBOARD_PLAYER_NAME = "Oyuncu"
 
@@ -65,6 +65,18 @@ class LocalLeaderboardRepository : LeaderboardRepository {
         val weekKey = currentWeekKey()
         val safeName = sanitizeFirestorePlayerName(playerName)
         val safePlayerScore = sanitizeScore(playerScore)
+        if (!BuildConfig.DEBUG) {
+            return LeaderboardSnapshot(
+                weekKey = weekKey,
+                selectedMode = selectedMode,
+                selectedPeriod = selectedPeriod,
+                entries = emptyList(),
+                playerRank = 0,
+                refreshedTick = refreshTick,
+                isLoading = false,
+                isOffline = true
+            )
+        }
         val seed = (weekKey + safeName + selectedMode.storageKey + selectedPeriod.name + refreshTick).hashCode().absoluteValue
         val names = listOf("Nova", "Blitz", "Pulse", "Echo", "Shadow", "NeonX", "Cyber", "ReflexPro", "TargetKing", "Matrix")
             .shuffledSeeded(seed)

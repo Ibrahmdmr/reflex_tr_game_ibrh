@@ -9,6 +9,8 @@ internal fun ProfileTabContent(
     progressionState: ProgressionState,
     onEditNameClick: () -> Unit,
     onTitleSelect: (PlayerTitle) -> Unit,
+    onPersonalGoalClaim: () -> Unit,
+    onProfileBadgeSelect: (ProfileBadge) -> Unit,
     onQuickMenuSelected: (HomeTab) -> Unit
 ) {
     ProfileProgressCard(
@@ -17,6 +19,14 @@ internal fun ProfileTabContent(
         bestScore = bestScore,
         onEditNameClick = onEditNameClick,
         onTitleSelect = onTitleSelect
+    )
+    PersonalGoalCard(
+        state = progressionState.personalGoal,
+        onClaimClick = onPersonalGoalClaim
+    )
+    BadgeShowcaseCard(
+        progressionState = progressionState,
+        onBadgeSelected = onProfileBadgeSelect
     )
     ProfileQuickMenu(onTabSelected = onQuickMenuSelected)
 }

@@ -39,7 +39,8 @@ android {
             buildConfigField("boolean", "AD_LOGGING_ENABLED", "true")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             manifestPlaceholders["admobAppId"] = "ca-app-pub-2483444595618509~3630426306"
             buildConfigField("String", "ADMOB_APP_ID", "\"ca-app-pub-2483444595618509~3630426306\"")
             buildConfigField("String", "REWARDED_AD_UNIT_ID", "\"ca-app-pub-2483444595618509/5335804928\"")
@@ -58,6 +59,20 @@ android {
     kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
+        }
+    }
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+    bundle {
+        language {
+            // The app switches locale at runtime (see createLocalizedContext), so every
+            // language must ship in the base APK. With per-language splits enabled Play would
+            // deliver only the device language and the in-app TR/EN switch would silently
+            // fall back to the installed one.
+            enableSplit = false
         }
     }
 }
@@ -82,6 +97,9 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

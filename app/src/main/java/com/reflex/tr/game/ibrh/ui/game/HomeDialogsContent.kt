@@ -58,6 +58,36 @@ internal fun LevelUpPopup(
 }
 
 @Composable
+internal fun ModeMasteryLevelUpPopup(
+    levelUp: ModeMasteryLevelUp,
+    onDismiss: () -> Unit
+) {
+    PolishedGameDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            PrimaryGameButton(
+                text = stringResource(R.string.ok),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        title = stringResource(R.string.mode_mastery_level_up_title)
+    ) {
+        Text(
+            text = stringResource(
+                R.string.mode_mastery_level_up_message,
+                stringResource(levelUp.mode.titleRes),
+                levelUp.level,
+                levelUp.coinBonus
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 internal fun PlayerNameDialog(
     currentName: String,
     hasCurrentName: Boolean,
@@ -66,10 +96,19 @@ internal fun PlayerNameDialog(
 ) {
     val playerNameSuggestionsArray = stringArrayResource(R.array.player_name_suggestions)
     val playerNameSuggestions = remember(playerNameSuggestionsArray.contentHashCode()) {
-        playerNameSuggestionsArray.toList()
+        playerNameSuggestionsArray
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .ifEmpty { listOf(DefaultPlayerNameFallback) }
     }
     var name by remember(currentName, hasCurrentName) {
-        mutableStateOf(if (hasCurrentName) currentName else playerNameSuggestions.random())
+        mutableStateOf(
+            if (hasCurrentName) {
+                currentName
+            } else {
+                playerNameSuggestions.randomOrNull() ?: DefaultPlayerNameFallback
+            }
+        )
     }
     var hasError by remember { mutableStateOf(false) }
     val titleText = stringResource(R.string.player_name_dialog_title)
@@ -166,7 +205,7 @@ internal fun PlayerNameDialog(
                 SecondaryGameButton(
                     text = randomNameText,
                     onClick = {
-                        name = playerNameSuggestions.random()
+                        name = playerNameSuggestions.randomOrNull() ?: DefaultPlayerNameFallback
                         hasError = false
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -174,3 +213,5 @@ internal fun PlayerNameDialog(
             }
     }
 }
+
+private const val DefaultPlayerNameFallback = "Oyuncu"

@@ -5,6 +5,7 @@ import java.util.Calendar
 import java.util.Locale
 
 private const val DAILY_MODE_COIN_BONUS_PERCENT = 20
+private const val DAILY_MINI_TOURNAMENT_REWARD_COINS = 150
 private const val SEASON_XP_BOOST_PERCENT_BASE = 100
 
 internal fun addSeasonXp(
@@ -59,6 +60,87 @@ internal fun createDailyFeaturedMode(dateKey: String = todayDateKey()): DailyFea
         mode = modes[index],
         coinBonusPercent = DAILY_MODE_COIN_BONUS_PERCENT
     )
+}
+
+internal fun createDailyMiniTournamentState(
+    dateKey: String = todayDateKey(),
+    bestScore: Int = 0,
+    claimed: Boolean = false
+): DailyMiniTournamentState {
+    val mode = dailyMiniTournamentModeForToday()
+    val targetScore = dailyMiniTournamentTargetFor(mode)
+    val safeBestScore = bestScore.coerceAtLeast(0)
+    return DailyMiniTournamentState(
+        dateKey = dateKey,
+        mode = mode,
+        bestScore = safeBestScore,
+        targetScore = targetScore,
+        rewardCoins = DAILY_MINI_TOURNAMENT_REWARD_COINS,
+        completed = safeBestScore >= targetScore,
+        claimed = claimed && safeBestScore >= targetScore
+    )
+}
+
+internal fun advanceDailyMiniTournamentAfterGame(
+    tournament: DailyMiniTournamentState,
+    playedMode: GameMode,
+    score: Int
+): DailyMiniTournamentState {
+    val todayTournament = if (tournament.dateKey == todayDateKey()) {
+        tournament
+    } else {
+        createDailyMiniTournamentState()
+    }
+    if (playedMode != todayTournament.mode) return todayTournament.copy(rewardClaimedThisGame = false)
+
+    val nextBestScore = maxOf(todayTournament.bestScore, score.coerceAtLeast(0))
+    val completed = nextBestScore >= todayTournament.targetScore
+    val shouldClaimReward = completed && !todayTournament.claimed
+    return todayTournament.copy(
+        bestScore = nextBestScore,
+        completed = completed,
+        claimed = todayTournament.claimed || shouldClaimReward,
+        rewardClaimedThisGame = shouldClaimReward
+    )
+}
+
+internal fun dailyMiniTournamentRewardForGame(
+    tournament: DailyMiniTournamentState,
+    playedMode: GameMode,
+    score: Int
+): Int {
+    val todayTournament = if (tournament.dateKey == todayDateKey()) {
+        tournament
+    } else {
+        createDailyMiniTournamentState()
+    }
+    if (playedMode != todayTournament.mode || todayTournament.claimed) return 0
+    return if (score.coerceAtLeast(0) >= todayTournament.targetScore) {
+        todayTournament.rewardCoins.coerceAtLeast(0)
+    } else {
+        0
+    }
+}
+
+internal fun dailyMiniTournamentTargetFor(mode: GameMode): Int {
+    return when (mode) {
+        GameMode.Classic -> 35
+        GameMode.MovingTarget -> 30
+        GameMode.FakeTarget -> 20
+        GameMode.ColorReflex -> 25
+    }
+}
+
+private fun dailyMiniTournamentModeForToday(): GameMode {
+    return when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
+        Calendar.MONDAY -> GameMode.Classic
+        Calendar.TUESDAY -> GameMode.MovingTarget
+        Calendar.WEDNESDAY -> GameMode.FakeTarget
+        Calendar.THURSDAY -> GameMode.ColorReflex
+        Calendar.FRIDAY -> GameMode.Classic
+        Calendar.SATURDAY -> GameMode.MovingTarget
+        else -> GameMode.FakeTarget
+    }
 }
 
 internal fun calculateDailyModeBonusCoins(

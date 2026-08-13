@@ -365,6 +365,23 @@ class AdMobManager(
         )
     }
 
+    /**
+     * Drops every reference back to the host [Activity]. Must be called from `onDestroy()`:
+     * the retry runnables are posted with a delay of several seconds and would otherwise keep
+     * this manager — and through it the activity and the loaded ads — alive past its lifetime.
+     */
+    fun release() {
+        mainHandler.removeCallbacks(rewardedRetryRunnable)
+        mainHandler.removeCallbacks(interstitialRetryRunnable)
+        rewardedAd?.fullScreenContentCallback = null
+        interstitialAd?.fullScreenContentCallback = null
+        rewardedAd = null
+        interstitialAd = null
+        isRewardedLoading = false
+        isInterstitialLoading = false
+        onRewardedUiStateChanged = null
+    }
+
     private fun logDebug(message: String) {
         if (BuildConfig.AD_LOGGING_ENABLED) {
             Log.d(TAG, message)

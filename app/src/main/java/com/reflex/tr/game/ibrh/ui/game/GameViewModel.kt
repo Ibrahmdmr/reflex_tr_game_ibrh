@@ -1,10 +1,12 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-import android.app.Application
 import android.os.Bundle
 import android.os.SystemClock
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.AdAnalyticsTracker
@@ -13,6 +15,7 @@ import com.reflex.tr.game.ibrh.ads.adParams
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
+import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,34 +26,74 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 
-class GameViewModel(application: Application) : AndroidViewModel(application) {
+/**
+ * Collaborators are injected rather than constructed inline so the game logic can be unit tested
+ * against fakes. Production wiring lives in [GameViewModel.Factory]; obtain the view model with
+ * `viewModel(factory = GameViewModel.Factory)`.
+ */
+class GameViewModel internal constructor(
+    private val gamePreferences: GamePreferences,
+    private val leaderboardRepository: LeaderboardRepository,
+    private val targetEngine: GameTargetEngine,
+    private val adConfig: AdConfig,
+    private val defaultPlayerName: () -> String
+) : ViewModel() {
 
     companion object {
+        /** Production wiring for [GameViewModel]. */
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
+                    ?: error("APPLICATION_KEY is missing; GameViewModel needs an Application.")
+                val preferences = GamePreferences(application)
+                GameViewModel(
+                    gamePreferences = preferences,
+                    leaderboardRepository = FirestoreLeaderboardRepository(),
+                    targetEngine = GameTargetEngine(),
+                    adConfig = AdConfig.Default,
+                    // The app overrides the system locale, so the fallback name must be resolved
+                    // against the in-app language rather than through a plain getString().
+                    defaultPlayerName = {
+                        application.createHomeLanguageContext(preferences.currentLanguage)
+                            .getString(R.string.profile_default_player_name)
+                    }
+                )
+            }
+        }
+
         private const val INITIAL_LIVES = 3
-        private const val INITIAL_TIME_SECONDS = 30
         private const val REWARD_CONTINUE_GRACE_MILLIS = 2_000L
         private const val REWARDED_CALLBACK_DEDUPE_MILLIS = 2_000L
-        private const val COLOR_RULE_CHANGE_INTERVAL_MS = 5_000L
         private const val COMBO_WINDOW_MILLIS = 1_250L
+        private const val PERFECT_TIMING_THRESHOLD_MS = 300L
+        private const val GREAT_TIMING_THRESHOLD_MS = 700L
+        private const val PERFECT_TIMING_BONUS_COINS = 1
+        private const val FLAWLESS_STREAK_5_BONUS_COINS = 10
+        private const val FLAWLESS_STREAK_10_BONUS_COINS = 25
+        private const val FLAWLESS_STREAK_20_BONUS_COINS = 75
+        private const val BOSS_ROUND_DURATION_SECONDS = 5
+        private const val BOSS_ROUND_HIT_SCORE_BONUS = 1
+        private const val BOSS_ROUND_HIT_COIN_BONUS = 5
+        private const val BOSS_ROUND_SPEED_PERCENT = 65
+        private const val BOSS_ROUND_MIN_VISIBLE_DURATION_MILLIS = 850L
+        private val BOSS_ROUND_SCORE_THRESHOLDS = setOf(15, 30, 50)
+        private const val ULTRA_MOMENT_DURATION_SECONDS = 7
+        private const val ULTRA_MOMENT_HIT_COIN_BONUS = 1
+        private val ULTRA_MOMENT_COMBO_THRESHOLDS = setOf(10, 20)
         private const val LEVEL_UP_COIN_BONUS = 50
         private const val REWARDED_AD_XP_REWARD = 20
         private const val DAILY_CHALLENGE_XP_REWARD = 60
+        private const val INVITE_SHARE_REWARD_COINS = 100
         private const val SEASON_XP_GAME_PLAYED = 35
         private const val SEASON_XP_CHALLENGE_COMPLETED = 90
         private const val SEASON_XP_DAILY_STREAK = 70
         private const val SEASON_XP_ACHIEVEMENT_CLAIM = 120
         private const val SEASON_XP_REWARDED_AD = 30
-        private const val FALLBACK_PLAYER_NAME = "Oyuncu"
         private val REASON_TIME_UP = R.string.game_over_reason_time_up
         private val REASON_NO_LIVES = R.string.game_over_reason_no_lives
     }
 
-    private val adConfig = AdConfig.Default
-    private val gamePreferences = GamePreferences(application)
-    private val leaderboardRepository: LeaderboardRepository = FirestoreLeaderboardRepository()
-    private val targetEngine = GameTargetEngine()
     private var selectedLeaderboardMode = GameMode.Classic
     private var selectedLeaderboardPeriod = LeaderboardPeriod.AllTime
     private var leaderboardRefreshTick = 0
@@ -80,7 +123,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var movingTargetJob: Job? = null
     private var colorRuleJob: Job? = null
     private var comboResetJob: Job? = null
+    private var bossRoundJob: Job? = null
+    private var bossRoundResultClearJob: Job? = null
+    private var ultraMomentJob: Job? = null
+    private var ultraMomentResultClearJob: Job? = null
     private var leaderboardRefreshJob: Job? = null
+    private var bonusHourJob: Job? = null
     private var completedGameCount = 0
     private var nextInterstitialGameCount = randomInterstitialInterval()
     private var lastHitElapsedMillis = 0L
@@ -89,9 +137,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var lastRewardedAdElapsedMillis = 0L
     private var lastRewardedGrantAction: RewardedAction? = null
     private var lastRewardedGrantElapsedMillis = 0L
+    private var targetSpawnElapsedMillis = 0L
+    private var targetSpawnLifetimeKey = -1
 
     init {
         observeBestScore()
+        startBonusHourTicker()
         refreshProfileAndLeaderboard()
     }
 
@@ -100,6 +151,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             gamePreferences.saveStorePreviewModeEnabled(enabled)
         }
+    }
+
+    fun markModeTipShown(mode: GameMode) {
+        gamePreferences.markModeTipShown(mode)
+        _uiState.update { state ->
+            state.copy(
+                shownModeTips = state.shownModeTips + mode,
+                isPaused = if (
+                    state.hasGameStarted &&
+                    !state.isGameOver &&
+                    state.selectedMode == mode &&
+                    mode !in state.shownModeTips
+                ) {
+                    false
+                } else {
+                    state.isPaused
+                }
+            )
+        }
+        val currentState = _uiState.value
+        if (currentState.hasGameStarted && !currentState.isPaused && !currentState.isGameOver) {
+            startTimer()
+            startTargetTimeout()
+            startModeJobs()
+        }
+    }
+
+    fun resetModeTips() {
+        gamePreferences.resetModeTips()
+        _uiState.update { it.copy(shownModeTips = emptySet()) }
     }
 
     fun startGame() {
@@ -122,7 +203,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (state.progressionState.coins < boost.coinPrice) return false
 
         val updatedProgression = state.progressionState.copy(
-            coins = state.progressionState.coins - boost.coinPrice
+            coins = state.progressionState.coins - boost.coinPrice,
+            totalCoinsSpent = addSpentCoins(state.progressionState.totalCoinsSpent, boost.coinPrice)
         )
         saveProgressionAndUpdateState(updatedProgression)
         val refreshedState = refreshDailyFeaturedMode()
@@ -139,6 +221,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val refreshedState = refreshDailyFeaturedMode()
         trackGameStart(refreshedState.selectedMode)
         launchNewGame(mode = refreshedState.selectedMode, boost = boost)
+    }
+
+    fun startGameWithPowerUp(powerUp: GamePowerUp): Boolean {
+        if (isStorePreviewModeActive()) return false
+        val state = _uiState.value
+        if (state.progressionState.coins < powerUp.coinPrice) return false
+
+        val updatedProgression = state.progressionState.copy(
+            coins = (state.progressionState.coins - powerUp.coinPrice).coerceAtLeast(0),
+            totalCoinsSpent = addSpentCoins(state.progressionState.totalCoinsSpent, powerUp.coinPrice)
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+        val refreshedState = refreshDailyFeaturedMode()
+        trackGameStart(refreshedState.selectedMode)
+        launchNewGame(mode = refreshedState.selectedMode, powerUp = powerUp)
+        return true
     }
 
     fun selectMode(mode: GameMode) {
@@ -166,25 +264,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         val tappedTarget = currentState.targets.firstOrNull { it.id == targetId } ?: return
         if (tappedTarget.role != GameTargetRole.Correct) {
+            if (currentState.isBossRoundActive) {
+                endBossRound(refreshTarget = true)
+                return
+            }
             loseLife(countAttempt = true)
             return
         }
 
-        val nextCombo = calculateNextCombo(currentState.combo)
-        val updatedState = _uiState.updateAndGet {
-            val newScore = it.score + 1
+        val timingGrade = calculateTimingGrade(currentState.targetLifetimeKey)
+        val nextCombo = calculateNextCombo(
+            currentCombo = currentState.combo,
+            timingGrade = timingGrade
+        )
+        // Derive the next state from the state we already read instead of inside an update{}
+        // lambda: MutableStateFlow.update/updateAndGet may re-run the lambda on CAS contention,
+        // and targetEngine.generateTargets() is randomised, so a re-run would spawn
+        // different targets than the ones we act on below.
+        val updatedState = currentState.let {
+            val wasBossRoundActive = it.isBossRoundActive
+            val scoreGain = 1 + if (wasBossRoundActive) BOSS_ROUND_HIT_SCORE_BONUS else 0
+            val newScore = it.score + scoreGain
             val newDifficulty = calculateDifficultyLevel(newScore)
+            val nextFlawlessStreak = incrementStat(it.flawlessStreak)
+            val flawlessBonusCoins = flawlessStreakBonusFor(nextFlawlessStreak)
+            val bossHitCoinBonus = if (wasBossRoundActive) BOSS_ROUND_HIT_COIN_BONUS else 0
+            val bossThreshold = bossRoundThresholdForScore(
+                newScore = newScore,
+                triggeredThresholds = it.triggeredBossRoundScores
+            )
+            val shouldStartBossRound = bossThreshold != null && !wasBossRoundActive
+            val wasUltraMomentActive = it.isUltraMomentActive
+            val ultraHitCoinBonus = if (wasUltraMomentActive) ULTRA_MOMENT_HIT_COIN_BONUS else 0
+            val ultraThreshold = ultraMomentThresholdForCombo(
+                combo = nextCombo,
+                triggeredThresholds = it.triggeredUltraMomentCombos
+            )
+            val shouldStartUltraMoment = ultraThreshold != null && !wasUltraMomentActive
             val updatedDailyChallenge = advanceDailyChallengeForHit(
                 state = it.dailyChallengeState,
                 mode = it.selectedMode,
                 score = newScore,
                 combo = nextCombo
             )
+            val updatedComboChallenge = advanceComboChallengeDuringGame(
+                progression = it.progressionState,
+                combo = nextCombo
+            )
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
                 score = newScore,
                 currentTargets = it.targets,
-                activeColor = it.activeColor
+                activeColor = it.activeColor,
+                progression = it.progressionState
             )
             it.copy(
                 score = newScore,
@@ -200,22 +332,79 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     score = newScore,
                     mode = it.selectedMode,
                     progression = it.progressionState
-                ),
+                ).withBossRoundSpeed(shouldStartBossRound || wasBossRoundActive),
                 targetPosition = nextTargets.firstCorrectPosition(),
                 targets = nextTargets,
                 combo = nextCombo,
                 maxCombo = maxOf(it.maxCombo, nextCombo),
+                perfectHits = it.perfectHits + if (timingGrade == TimingGrade.Perfect) 1 else 0,
+                greatHits = it.greatHits + if (timingGrade == TimingGrade.Great) 1 else 0,
+                lastTimingGrade = timingGrade.takeIf { grade -> grade != TimingGrade.Normal },
+                flawlessStreak = nextFlawlessStreak,
+                maxFlawlessStreak = maxOf(it.maxFlawlessStreak, nextFlawlessStreak),
+                flawlessStreakBonusCoins = it.flawlessStreakBonusCoins + flawlessBonusCoins,
+                lastFlawlessStreakMilestone = nextFlawlessStreak.takeIf { flawlessBonusCoins > 0 },
+                isBossRoundActive = shouldStartBossRound || wasBossRoundActive,
+                bossRoundTimeLeftSeconds = when {
+                    shouldStartBossRound -> BOSS_ROUND_DURATION_SECONDS
+                    wasBossRoundActive -> it.bossRoundTimeLeftSeconds
+                    else -> 0
+                },
+                bossRoundHits = if (shouldStartBossRound) 0 else it.bossRoundHits + if (wasBossRoundActive) 1 else 0,
+                bossRoundBonusCoins = if (shouldStartBossRound) 0 else it.bossRoundBonusCoins + bossHitCoinBonus,
+                bossRoundTotalBonusCoins = it.bossRoundTotalBonusCoins + bossHitCoinBonus,
+                bossRoundResultHits = if (shouldStartBossRound) 0 else it.bossRoundResultHits,
+                bossRoundResultBonusCoins = if (shouldStartBossRound) 0 else it.bossRoundResultBonusCoins,
+                isBossRoundResultVisible = if (shouldStartBossRound) false else it.isBossRoundResultVisible,
+                bossRoundFeedbackKey = it.bossRoundFeedbackKey + if (shouldStartBossRound) 1 else 0,
+                triggeredBossRoundScores = bossThreshold?.takeIf { shouldStartBossRound }?.let { threshold ->
+                    it.triggeredBossRoundScores + threshold
+                } ?: it.triggeredBossRoundScores,
+                isUltraMomentActive = shouldStartUltraMoment || wasUltraMomentActive,
+                ultraMomentTimeLeftSeconds = when {
+                    shouldStartUltraMoment -> ULTRA_MOMENT_DURATION_SECONDS
+                    wasUltraMomentActive -> it.ultraMomentTimeLeftSeconds
+                    else -> 0
+                },
+                ultraMomentHits = if (shouldStartUltraMoment) {
+                    0
+                } else {
+                    it.ultraMomentHits + if (wasUltraMomentActive) 1 else 0
+                },
+                ultraMomentTotalHits = it.ultraMomentTotalHits + if (wasUltraMomentActive) 1 else 0,
+                ultraMomentBonusCoins = if (shouldStartUltraMoment) {
+                    0
+                } else {
+                    it.ultraMomentBonusCoins + ultraHitCoinBonus
+                },
+                ultraMomentTotalBonusCoins = it.ultraMomentTotalBonusCoins + ultraHitCoinBonus,
+                ultraMomentResultHits = if (shouldStartUltraMoment) 0 else it.ultraMomentResultHits,
+                ultraMomentResultBonusCoins = if (shouldStartUltraMoment) 0 else it.ultraMomentResultBonusCoins,
+                isUltraMomentResultVisible = if (shouldStartUltraMoment) false else it.isUltraMomentResultVisible,
+                ultraMomentFeedbackKey = it.ultraMomentFeedbackKey + if (shouldStartUltraMoment) 1 else 0,
+                triggeredUltraMomentCombos = ultraThreshold?.takeIf { shouldStartUltraMoment }?.let { threshold ->
+                    it.triggeredUltraMomentCombos + threshold
+                } ?: it.triggeredUltraMomentCombos,
                 successfulHits = it.successfulHits + 1,
                 totalAttempts = it.totalAttempts + 1,
                 dailyChallengeState = updatedDailyChallenge,
+                progressionState = updatedComboChallenge,
                 targetLifetimeKey = it.targetLifetimeKey + 1
             )
         }
+        _uiState.value = updatedState
+        gamePreferences.saveProgressionState(updatedState.progressionState)
         gamePreferences.saveDailyChallengeState(updatedState.dailyChallengeState)
         logChallengeCompletedIfNeeded(
             previous = currentState.dailyChallengeState,
             updated = updatedState.dailyChallengeState
         )
+        if (!currentState.isBossRoundActive && updatedState.isBossRoundActive) {
+            startBossRoundTimer()
+        }
+        if (!currentState.isUltraMomentActive && updatedState.isUltraMomentActive) {
+            startUltraMomentTimer()
+        }
         startComboResetTimer(expectedCombo = nextCombo)
         startTargetTimeout()
     }
@@ -225,6 +414,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
+        if (currentState.isBossRoundActive) {
+            endBossRound(refreshTarget = true)
+            return
+        }
         loseLife(countAttempt = true)
     }
 
@@ -260,6 +453,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun goToHome() {
         if (isStorePreviewModeActive()) return
         cancelGameplayJobs()
+        val pendingModeMasteryLevelUp = _uiState.value.progressionState.lastModeMasteryLevelUp
+        val storedProgression = gamePreferences.getProgressionState().copy(
+            lastModeMasteryLevelUp = pendingModeMasteryLevelUp
+        )
         _uiState.value = createInitialState(
             mode = _uiState.value.selectedMode,
             bestScores = _uiState.value.bestScoresByMode
@@ -267,11 +464,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bestScore = _uiState.value.bestScore,
             selectedMode = _uiState.value.selectedMode,
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
-            progressionState = gamePreferences.getProgressionState(),
+            progressionState = storedProgression,
             playerProfile = gamePreferences.getPlayerProfile(),
             leaderboardSnapshot = createLeaderboardSnapshot(
                 profile = gamePreferences.getPlayerProfile(),
-                progression = gamePreferences.getProgressionState(),
+                progression = storedProgression,
                 bestScoresByMode = _uiState.value.bestScoresByMode
             ),
             isNewBestScore = false
@@ -314,7 +511,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             mode = currentState.selectedMode,
             score = currentState.score,
             currentTargets = currentState.targets,
-            activeColor = currentState.activeColor
+            activeColor = currentState.activeColor,
+            progression = currentState.progressionState
         )
         _uiState.update {
             it.copy(
@@ -408,9 +606,67 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         claimDailyChallengeBaseRewardIfReady()
     }
 
+    fun claimWeeklyChallengeReward() {
+        if (isStorePreviewModeActive()) return
+        val freshProgression = gamePreferences.getProgressionState()
+        val challenge = freshProgression.weeklyChallenge
+        if (!challenge.completed || challenge.claimed) return
+
+        val updatedChallenge = challenge.copy(claimed = true)
+        val updatedProgression = addCoins(
+            progression = freshProgression.copy(weeklyChallenge = updatedChallenge),
+            coins = challenge.rewardCoins
+        )
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
+    }
+
+    fun claimDailyLeaderboardGoalReward() {
+        if (isStorePreviewModeActive()) return
+        val freshProgression = gamePreferences.getProgressionState()
+        val goal = freshProgression.dailyLeaderboardGoal
+        if (!goal.completed || goal.claimed) return
+
+        val updatedGoal = goal.copy(claimed = true)
+        val updatedProgression = addCoins(
+            progression = freshProgression.copy(dailyLeaderboardGoal = updatedGoal),
+            coins = goal.rewardCoins
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
+    fun claimPersonalGoalReward() {
+        if (isStorePreviewModeActive()) return
+        val freshProgression = gamePreferences.getProgressionState()
+        val goal = freshProgression.personalGoal
+        if (!goal.completed || goal.claimed) return
+
+        val updatedGoal = goal.copy(claimed = true)
+        val updatedProgression = addCoins(
+            progression = freshProgression.copy(personalGoal = updatedGoal),
+            coins = goal.rewardCoins
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
+    fun claimComboChallengeReward() {
+        if (isStorePreviewModeActive()) return
+        val freshProgression = gamePreferences.getProgressionState()
+        val challenge = freshProgression.comboChallenge
+        if (!challenge.completed || challenge.claimed) return
+
+        val updatedChallenge = challenge.copy(claimed = true)
+        val updatedProgression = addCoins(
+            progression = freshProgression.copy(comboChallenge = updatedChallenge),
+            coins = challenge.rewardCoins
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
     fun onLeaderboardOpenedForMission() {
         if (isStorePreviewModeActive()) return
         advanceDailyChallengeForVisit(DailyChallenge.OpenLeaderboard)
+        updateDailyLeaderboardGoalFromSnapshot(_uiState.value.leaderboardSnapshot)
     }
 
     fun onShopOpenedForMission() {
@@ -478,6 +734,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         gamePreferences.saveProgressionState(updatedProgression)
         logNewAchievementUnlocks(updatedProgression)
+    }
+
+    fun onInviteShareCompleted() {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        FirebaseGameServices.logEvent(event = FirebaseEvent.InviteShareClicked)
+        if (state.progressionState.inviteRewardClaimed) return
+
+        val updatedProgression = addCoins(
+            progression = state.progressionState,
+            coins = INVITE_SHARE_REWARD_COINS
+        ).copy(inviteRewardClaimed = true)
+        _uiState.update { it.copy(progressionState = updatedProgression) }
+        gamePreferences.saveProgressionState(updatedProgression)
+        FirebaseGameServices.logEvent(
+            event = FirebaseEvent.InviteRewardClaimed,
+            params = Bundle().apply {
+                putInt(FirebaseParam.CoinAmount.key, INVITE_SHARE_REWARD_COINS)
+            }
+        )
     }
 
     fun claimDailyReward() {
@@ -557,6 +833,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (isStorePreviewModeActive()) return
         gamePreferences.savePlayerTitle(title)
         refreshProfileAndLeaderboard()
+    }
+
+    fun selectProfileBadge(badge: ProfileBadge) {
+        if (isStorePreviewModeActive()) return
+        val progression = _uiState.value.progressionState
+        if (badge !in unlockedProfileBadges(progression)) return
+        val current = progression.selectedProfileBadgeIds
+        val updatedIds = if (badge.storageKey in current) {
+            current - badge.storageKey
+        } else {
+            (current + badge.storageKey).distinct().takeLast(3)
+        }
+        saveProgressionAndUpdateState(progression.copy(selectedProfileBadgeIds = updatedIds))
     }
 
     fun selectLeaderboardMode(mode: GameMode) {
@@ -661,6 +950,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val updatedProgression = updateAchievementProgress(
             progression.copy(
                 coins = progression.coins - theme.coinPrice,
+                totalCoinsSpent = addSpentCoins(progression.totalCoinsSpent, theme.coinPrice),
                 selectedTheme = theme,
                 unlockedThemes = progression.unlockedThemes + theme
             )
@@ -726,6 +1016,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun buyTargetSkin(skin: TargetSkin) {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        val progression = state.progressionState
+        if (skin in progression.unlockedTargetSkins || progression.coins < skin.coinPrice) return
+
+        val updatedProgression = progression.copy(
+            coins = (progression.coins - skin.coinPrice).coerceAtLeast(0),
+            totalCoinsSpent = addSpentCoins(progression.totalCoinsSpent, skin.coinPrice),
+            selectedTargetSkin = skin,
+            unlockedTargetSkins = progression.unlockedTargetSkins + skin
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
+    fun selectTargetSkin(skin: TargetSkin) {
+        if (isStorePreviewModeActive()) return
+        val state = _uiState.value
+        if (skin !in state.progressionState.unlockedTargetSkins) return
+
+        val updatedProgression = state.progressionState.copy(selectedTargetSkin = skin)
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
     fun onInterstitialAdRequestHandled(wasShown: Boolean) {
         if (isStorePreviewModeActive()) return
         if (wasShown) {
@@ -745,6 +1059,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         movingTargetJob?.cancel()
         colorRuleJob?.cancel()
         comboResetJob?.cancel()
+        bossRoundJob?.cancel()
+        bossRoundResultClearJob?.cancel()
+        ultraMomentJob?.cancel()
+        ultraMomentResultClearJob?.cancel()
     }
 
     private fun saveProgressionAndUpdateState(progression: ProgressionState) {
@@ -758,13 +1076,171 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun addCoins(progression: ProgressionState, coins: Int): ProgressionState {
-        val totalCoins = progression.coins.toLong() + coins.coerceAtLeast(0).toLong()
-        return progression.copy(coins = totalCoins.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
+        val safeCoins = coins.coerceAtLeast(0)
+        val totalCoins = progression.coins.toLong() + safeCoins.toLong()
+        val totalEarned = progression.totalCoinsEarned.toLong() + safeCoins.toLong()
+        return progression.copy(
+            coins = totalCoins.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
+            totalCoinsEarned = totalEarned.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        )
+    }
+
+    private fun addSpentCoins(currentSpent: Int, spentCoins: Int): Int {
+        return (currentSpent.coerceAtLeast(0).toLong() + spentCoins.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+    }
+
+    private fun updateDailyLeaderboardGoalAfterScore(
+        progression: ProgressionState,
+        score: Int,
+        leaderboardScoreSubmitted: Boolean
+    ): ProgressionState {
+        val goal = dailyLeaderboardGoalForToday(progression.dailyLeaderboardGoal)
+        if (goal.claimed) return progression.copy(dailyLeaderboardGoal = goal)
+
+        val nextProgress = when (goal.type) {
+            DailyLeaderboardGoalType.SubmitScore ->
+                if (leaderboardScoreSubmitted) goal.target else goal.progress
+            DailyLeaderboardGoalType.ImproveScore10 ->
+                maxOf(goal.progress, safeScore(score) - goal.initialScore)
+            DailyLeaderboardGoalType.Climb3Ranks,
+            DailyLeaderboardGoalType.ReachTop50 -> goal.progress
+        }.coerceIn(0, goal.target)
+        val nextGoal = goal.copy(
+            progress = nextProgress,
+            completed = nextProgress >= goal.target
+        )
+        return progression.copy(dailyLeaderboardGoal = nextGoal)
+    }
+
+    private fun updateDailyLeaderboardGoalFromSnapshot(snapshot: LeaderboardSnapshot) {
+        val updatedProgression = updateDailyLeaderboardGoalFromSnapshot(
+            progression = _uiState.value.progressionState,
+            snapshot = snapshot
+        )
+        if (updatedProgression == _uiState.value.progressionState) return
+
+        saveProgressionAndUpdateState(updatedProgression)
+    }
+
+    private fun updateDailyLeaderboardGoalFromSnapshot(
+        progression: ProgressionState,
+        snapshot: LeaderboardSnapshot
+    ): ProgressionState {
+        val goal = dailyLeaderboardGoalForToday(progression.dailyLeaderboardGoal)
+        if (goal.claimed || snapshot.playerRank <= 0) {
+            return progression.copy(dailyLeaderboardGoal = goal)
+        }
+
+        val currentRank = snapshot.playerRank.coerceAtLeast(0)
+        val seededGoal = if (goal.initialRank <= 0 && currentRank > 0) {
+            goal.copy(initialRank = currentRank)
+        } else {
+            goal
+        }
+        val nextProgress = when (seededGoal.type) {
+            DailyLeaderboardGoalType.ReachTop50 ->
+                if (currentRank in 1..50) seededGoal.target else seededGoal.progress
+            DailyLeaderboardGoalType.Climb3Ranks ->
+                if (seededGoal.initialRank > 0) seededGoal.initialRank - currentRank else seededGoal.progress
+            DailyLeaderboardGoalType.SubmitScore,
+            DailyLeaderboardGoalType.ImproveScore10 -> seededGoal.progress
+        }.coerceIn(0, seededGoal.target)
+        val nextGoal = seededGoal.copy(
+            progress = nextProgress,
+            completed = nextProgress >= seededGoal.target
+        )
+        return progression.copy(dailyLeaderboardGoal = nextGoal)
+    }
+
+    private fun dailyLeaderboardGoalForToday(goal: DailyLeaderboardGoalState): DailyLeaderboardGoalState {
+        return if (goal.createdDate == todayDateKey()) {
+            goal
+        } else {
+            gamePreferences.getProgressionState().dailyLeaderboardGoal
+        }
+    }
+
+    private fun personalGoalForToday(goal: PersonalGoalState): PersonalGoalState {
+        return if (goal.createdDate == todayDateKey()) {
+            goal
+        } else {
+            gamePreferences.getProgressionState().personalGoal
+        }
+    }
+
+    private fun updatePersonalGoalAfterScore(
+        progression: ProgressionState,
+        score: Int
+    ): ProgressionState {
+        val goal = personalGoalForToday(progression.personalGoal)
+        if (goal.claimed) return progression.copy(personalGoal = goal)
+
+        val nextProgressScore = maxOf(goal.progressScore, safeScore(score))
+        val nextGoal = goal.copy(
+            progressScore = nextProgressScore,
+            completed = nextProgressScore >= goal.targetScore
+        )
+        return progression.copy(personalGoal = nextGoal)
+    }
+
+    private fun comboChallengeForToday(challenge: ComboChallengeState): ComboChallengeState {
+        return if (challenge.createdDate == todayDateKey()) {
+            challenge
+        } else {
+            gamePreferences.getProgressionState().comboChallenge
+        }
+    }
+
+    private fun advanceComboChallengeDuringGame(
+        progression: ProgressionState,
+        combo: Int
+    ): ProgressionState {
+        val challenge = comboChallengeForToday(progression.comboChallenge)
+        if (challenge.claimed || challenge.completed) return progression.copy(comboChallenge = challenge)
+
+        val nextProgress = when (challenge.type) {
+            ComboChallengeType.Combo5,
+            ComboChallengeType.Combo10,
+            ComboChallengeType.NoMistake10Hits -> maxOf(challenge.progress, combo)
+            ComboChallengeType.TotalCombo20In3Games -> challenge.progress
+        }.coerceIn(0, challenge.target)
+        val nextChallenge = challenge.copy(
+            progress = nextProgress,
+            completed = nextProgress >= challenge.target
+        )
+        return progression.copy(comboChallenge = nextChallenge)
+    }
+
+    private fun updateComboChallengeAfterGame(
+        progression: ProgressionState,
+        maxCombo: Int
+    ): ProgressionState {
+        val challenge = comboChallengeForToday(progression.comboChallenge)
+        if (
+            challenge.claimed ||
+            challenge.completed ||
+            challenge.type != ComboChallengeType.TotalCombo20In3Games
+        ) {
+            return progression.copy(comboChallenge = challenge)
+        }
+
+        val nextGamesUsed = (challenge.gamesUsed + 1).coerceIn(0, 3)
+        val nextProgress = (challenge.progress + maxCombo.coerceAtLeast(0)).coerceIn(0, challenge.target)
+        val nextChallenge = challenge.copy(
+            progress = nextProgress,
+            gamesUsed = nextGamesUsed,
+            completed = nextProgress >= challenge.target
+        )
+        return progression.copy(comboChallenge = nextChallenge)
     }
 
     private fun safePlayerName(profile: PlayerProfile): String {
-        return profile.name.trim().takeIf { it.isNotBlank() } ?: FALLBACK_PLAYER_NAME
+        return profile.name.trim().takeIf { it.isNotBlank() } ?: fallbackPlayerName()
     }
+
+    private fun fallbackPlayerName(): String = defaultPlayerName()
 
     private fun safeTheme(progression: ProgressionState): PlayerTheme {
         return progression.activeTheme.takeIf {
@@ -774,6 +1250,191 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun safeScore(score: Int): Int {
         return score.coerceAtLeast(0)
+    }
+
+    private fun incrementStat(value: Int): Int {
+        return (value.coerceAtLeast(0).toLong() + 1L)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+    }
+
+    private fun flawlessStreakBonusFor(streak: Int): Int {
+        return when (streak) {
+            5 -> FLAWLESS_STREAK_5_BONUS_COINS
+            10 -> FLAWLESS_STREAK_10_BONUS_COINS
+            20 -> FLAWLESS_STREAK_20_BONUS_COINS
+            else -> 0
+        }
+    }
+
+    private fun bossRoundThresholdForScore(
+        newScore: Int,
+        triggeredThresholds: Set<Int>
+    ): Int? {
+        return BOSS_ROUND_SCORE_THRESHOLDS
+            .filter { it !in triggeredThresholds && newScore >= it }
+            .minOrNull()
+    }
+
+    private fun ultraMomentThresholdForCombo(
+        combo: Int,
+        triggeredThresholds: Set<Int>
+    ): Int? {
+        return ULTRA_MOMENT_COMBO_THRESHOLDS
+            .filter { it !in triggeredThresholds && combo >= it }
+            .minOrNull()
+    }
+
+    private fun Long.withBossRoundSpeed(isBossRoundActive: Boolean): Long {
+        if (!isBossRoundActive) return this
+        return (this * BOSS_ROUND_SPEED_PERCENT / 100L)
+            .coerceAtLeast(BOSS_ROUND_MIN_VISIBLE_DURATION_MILLIS)
+    }
+
+    private fun startBossRoundTimer() {
+        bossRoundJob?.cancel()
+        bossRoundJob = viewModelScope.launch {
+            repeat(BOSS_ROUND_DURATION_SECONDS) {
+                delay(1_000L)
+                val shouldContinue = _uiState.updateAndGet { state ->
+                    if (!state.canAcceptGameplayInput() || !state.isBossRoundActive) {
+                        state
+                    } else {
+                        state.copy(
+                            bossRoundTimeLeftSeconds = (state.bossRoundTimeLeftSeconds - 1).coerceAtLeast(0)
+                        )
+                    }
+                }.isBossRoundActive
+                if (!shouldContinue) return@launch
+            }
+            endBossRound(cancelTimer = false)
+        }
+    }
+
+    private fun endBossRound(
+        refreshTarget: Boolean = false,
+        cancelTimer: Boolean = true
+    ) {
+        if (cancelTimer) {
+            bossRoundJob?.cancel()
+        }
+        // generateTargets() is randomised, so it must not run inside an update{} lambda.
+        val endedState = _uiState.value.let { state ->
+            if (!state.isBossRoundActive) return@let state
+
+            val nextTargets = if (refreshTarget) {
+                targetEngine.generateTargets(
+                    mode = state.selectedMode,
+                    score = state.score,
+                    currentTargets = state.targets,
+                    activeColor = state.activeColor,
+                    progression = state.progressionState
+                )
+            } else {
+                state.targets
+            }
+            state.copy(
+                isBossRoundActive = false,
+                bossRoundTimeLeftSeconds = 0,
+                bossRoundResultHits = state.bossRoundHits.coerceAtLeast(0),
+                bossRoundResultBonusCoins = state.bossRoundBonusCoins.coerceAtLeast(0),
+                isBossRoundResultVisible = true,
+                bossRoundHits = 0,
+                bossRoundBonusCoins = 0,
+                bossRoundFeedbackKey = state.bossRoundFeedbackKey + 1,
+                targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(
+                    score = state.score,
+                    mode = state.selectedMode,
+                    progression = state.progressionState
+                ),
+                targetPosition = nextTargets.firstCorrectPosition(),
+                targets = nextTargets,
+                targetLifetimeKey = state.targetLifetimeKey + if (refreshTarget) 1 else 0
+            )
+        }
+        _uiState.value = endedState
+        if (refreshTarget && endedState.canAcceptGameplayInput()) {
+            startTargetTimeout()
+            startModeJobs()
+        }
+        scheduleBossRoundResultClear(endedState.bossRoundFeedbackKey)
+    }
+
+    private fun scheduleBossRoundResultClear(feedbackKey: Int) {
+        bossRoundResultClearJob?.cancel()
+        bossRoundResultClearJob = viewModelScope.launch {
+            delay(2_000L)
+            _uiState.update { state ->
+                if (state.bossRoundFeedbackKey != feedbackKey || state.isBossRoundActive) {
+                    state
+                } else {
+                    state.copy(
+                        bossRoundResultHits = 0,
+                        bossRoundResultBonusCoins = 0,
+                        isBossRoundResultVisible = false
+                    )
+                }
+            }
+        }
+    }
+
+    private fun startUltraMomentTimer() {
+        ultraMomentJob?.cancel()
+        ultraMomentJob = viewModelScope.launch {
+            repeat(ULTRA_MOMENT_DURATION_SECONDS) {
+                delay(1_000L)
+                val shouldContinue = _uiState.updateAndGet { state ->
+                    if (!state.canAcceptGameplayInput() || !state.isUltraMomentActive) {
+                        state
+                    } else {
+                        state.copy(
+                            ultraMomentTimeLeftSeconds = (state.ultraMomentTimeLeftSeconds - 1).coerceAtLeast(0)
+                        )
+                    }
+                }.isUltraMomentActive
+                if (!shouldContinue) return@launch
+            }
+            endUltraMoment(cancelTimer = false)
+        }
+    }
+
+    private fun endUltraMoment(cancelTimer: Boolean = true) {
+        if (cancelTimer) {
+            ultraMomentJob?.cancel()
+        }
+        val endedState = _uiState.updateAndGet { state ->
+            if (!state.isUltraMomentActive) return@updateAndGet state
+
+            state.copy(
+                isUltraMomentActive = false,
+                ultraMomentTimeLeftSeconds = 0,
+                ultraMomentResultHits = state.ultraMomentHits.coerceAtLeast(0),
+                ultraMomentResultBonusCoins = state.ultraMomentBonusCoins.coerceAtLeast(0),
+                isUltraMomentResultVisible = true,
+                ultraMomentHits = 0,
+                ultraMomentBonusCoins = 0,
+                ultraMomentFeedbackKey = state.ultraMomentFeedbackKey + 1
+            )
+        }
+        scheduleUltraMomentResultClear(endedState.ultraMomentFeedbackKey)
+    }
+
+    private fun scheduleUltraMomentResultClear(feedbackKey: Int) {
+        ultraMomentResultClearJob?.cancel()
+        ultraMomentResultClearJob = viewModelScope.launch {
+            delay(2_000L)
+            _uiState.update { state ->
+                if (state.ultraMomentFeedbackKey != feedbackKey || state.isUltraMomentActive) {
+                    state
+                } else {
+                    state.copy(
+                        ultraMomentResultHits = 0,
+                        ultraMomentResultBonusCoins = 0,
+                        isUltraMomentResultVisible = false
+                    )
+                }
+            }
+        }
     }
 
     private fun tryConsumeRewardedCallback(action: RewardedAction): Boolean {
@@ -787,25 +1448,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    private fun launchNewGame(mode: GameMode, boost: GameBoost? = null) {
+    private fun launchNewGame(
+        mode: GameMode,
+        boost: GameBoost? = null,
+        powerUp: GamePowerUp? = null
+    ) {
         cancelGameplayJobs()
         val initialState = createInitialState(
             mode = mode,
             bestScores = _uiState.value.bestScoresByMode
         )
+        val shouldPauseForModeTip = mode !in initialState.shownModeTips
         val currentProgression = gamePreferences.getProgressionState().copy(
             trialTheme = _uiState.value.progressionState.trialTheme,
             trialGamesRemaining = _uiState.value.progressionState.trialGamesRemaining
         )
         lastHitElapsedMillis = 0L
+        targetSpawnElapsedMillis = 0L
+        targetSpawnLifetimeKey = -1
         gameStartedElapsedMillis = SystemClock.elapsedRealtime()
         _uiState.value = initialState.copy(
             bestScore = _uiState.value.bestScore,
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
             progressionState = currentProgression,
             activeBoost = boost,
-            lives = initialState.lives + if (boost == GameBoost.ExtraLife) 1 else 0,
-            timeLeftSeconds = initialState.timeLeftSeconds + if (boost == GameBoost.ExtraTime) 5 else 0,
+            activePowerUp = powerUp,
+            isPowerUpConsumed = false,
+            lives = initialState.lives +
+                if (boost == GameBoost.ExtraLife || powerUp == GamePowerUp.ExtraLife) 1 else 0,
+            timeLeftSeconds = initialState.timeLeftSeconds +
+                if (boost == GameBoost.ExtraTime || powerUp == GamePowerUp.ExtraTime) 5 else 0,
             combo = if (boost == GameBoost.ComboStart) 5 else initialState.combo,
             maxCombo = if (boost == GameBoost.ComboStart) 5 else initialState.maxCombo,
             earnedCoinsThisGame = 0,
@@ -813,11 +1485,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             isCoinDoubleClaimed = false,
             oneMoreGameBonusEarnedThisGame = 0,
             hasGameStarted = true,
+            isPaused = shouldPauseForModeTip,
             isNewBestScore = false
         )
-        startTimer()
-        startTargetTimeout()
-        startModeJobs()
+        if (!shouldPauseForModeTip) {
+            startTimer()
+            startTargetTimeout()
+            startModeJobs()
+        }
     }
 
     private fun observeBestScore() {
@@ -879,7 +1554,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     totalAttempts = it.totalAttempts + 1,
-                    combo = 0
+                    combo = 0,
+                    flawlessStreak = 0,
+                    lastFlawlessStreakMilestone = null
                 )
             }
         }
@@ -895,6 +1572,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (!currentState.canAcceptGameplayInput()) return
 
         val targetLifetimeKey = currentState.targetLifetimeKey
+        if (targetSpawnLifetimeKey != targetLifetimeKey) {
+            targetSpawnElapsedMillis = SystemClock.elapsedRealtime()
+            targetSpawnLifetimeKey = targetLifetimeKey
+        }
         val visibleDurationMillis = currentState.targetVisibleDurationMillis
         targetTimeoutJob = viewModelScope.launch {
             delay(visibleDurationMillis)
@@ -915,23 +1596,35 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
+        if (currentState.isBossRoundActive) {
+            endBossRound(refreshTarget = true)
+            return
+        }
+
+        if (consumeFirstMistakeForgiveness(countAttempt = false)) return
+
         val remainingLives = currentState.lives - 1
         if (remainingLives <= 0) {
             endGame()
             return
         }
 
-        _uiState.update {
-            lastHitElapsedMillis = 0L
+        lastHitElapsedMillis = 0L
+        // generateTargets() is randomised, so it must not run inside an update{} lambda.
+        _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
                 score = it.score,
                 currentTargets = it.targets,
-                activeColor = it.activeColor
+                activeColor = it.activeColor,
+                progression = it.progressionState
             )
             it.copy(
                 lives = remainingLives,
-                combo = 0,
+                combo = if (shouldProtectCombo(it)) it.combo else 0,
+                flawlessStreak = 0,
+                lastFlawlessStreakMilestone = null,
+                isPowerUpConsumed = it.isPowerUpConsumed || it.activePowerUp == GamePowerUp.ComboProtection,
                 targetPosition = nextTargets.firstCorrectPosition(),
                 targets = nextTargets,
                 targetLifetimeKey = it.targetLifetimeKey + 1
@@ -963,13 +1656,36 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         val previousModeBestScore = stateBeforeFinish.bestScoresByMode[stateBeforeFinish.selectedMode] ?: 0
         val previousDailyChallenge = stateBeforeFinish.dailyChallengeState
-        val finalState = completeGameState(
+        val completedState = completeGameState(
             lives = lives,
             timeLeftSeconds = timeLeftSeconds,
             reason = reason,
             reasonRes = reasonRes,
+            gameDurationMillis = gameDurationMillis,
             shouldRequestInterstitialAd = shouldRequestInterstitialAd
         )
+        val finalProgression = updateDailyLeaderboardGoalAfterScore(
+            progression = completedState.progressionState,
+            score = completedState.score,
+            leaderboardScoreSubmitted = completedState.score > safeScore(previousModeBestScore)
+        ).let { progression ->
+            updatePersonalGoalAfterScore(
+                progression = progression,
+                score = completedState.score
+            )
+        }.let { progression ->
+            updateComboChallengeAfterGame(
+                progression = progression,
+                maxCombo = completedState.maxCombo
+            )
+        }
+        val finalState = if (finalProgression == completedState.progressionState) {
+            completedState
+        } else {
+            completedState.copy(progressionState = finalProgression).also { updatedState ->
+                _uiState.update { it.copy(progressionState = updatedState.progressionState) }
+            }
+        }
 
         persistCompletedGame(
             finalState = finalState,
@@ -987,6 +1703,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         timeLeftSeconds: Int,
         reason: String?,
         reasonRes: Int?,
+        gameDurationMillis: Long,
         shouldRequestInterstitialAd: Boolean
     ): GameUiState {
         return _uiState.updateAndGet { state ->
@@ -1000,12 +1717,38 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 isNewModeBest = isNewModeBest,
                 progressionBeforeGame = progressionBeforeGame
             )
+            val accuracyPercent = accuracyPercent(
+                hits = state.successfulHits,
+                attempts = state.totalAttempts
+            )
+            val survivalSeconds = (gameDurationMillis / 1_000L)
+                .coerceIn(0L, Int.MAX_VALUE.toLong())
+                .toInt()
+            val newPersonalRecords = personalRecordsBrokenByGame(
+                progression = progressionBeforeGame,
+                bestScoresByMode = state.bestScoresByMode,
+                mode = state.selectedMode,
+                score = finalScore,
+                maxCombo = state.maxCombo,
+                accuracyPercent = accuracyPercent,
+                survivalSeconds = survivalSeconds,
+                earnedCoins = rewards.totalCoins
+            )
+            val unlockedBadgesBeforeGame = unlockedProfileBadges(progressionBeforeGame)
             val updatedProgression = updateProgressionAfterGame(
                 progression = progressionBeforeGame,
                 score = finalScore,
+                mode = state.selectedMode,
                 hits = state.successfulHits,
+                misses = (state.totalAttempts - state.successfulHits).coerceAtLeast(0),
                 maxCombo = state.maxCombo,
+                maxFlawlessStreak = state.maxFlawlessStreak,
                 earnedCoins = rewards.totalCoins,
+                accuracyPercent = accuracyPercent,
+                survivalSeconds = survivalSeconds,
+                bossRoundHits = state.bossRoundResultHits + state.bossRoundHits,
+                ultraMomentHits = state.ultraMomentTotalHits,
+                dailyMiniTournamentRewardCoins = rewards.dailyMiniTournamentCoins,
                 isNewBestScore = isNewModeBest
             ).copy(
                 oneMoreGameBonus = advanceOneMoreGameBonusAfterCompletedGame(
@@ -1016,6 +1759,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     rewards.firstTargetBonusCoins > 0
             )
             val trialAwareProgression = consumeTrialThemeGame(updatedProgression)
+            val newlyUnlockedBadges = unlockedProfileBadges(trialAwareProgression) - unlockedBadgesBeforeGame
             val updatedBestScores = if (isNewModeBest) {
                 state.bestScoresByMode + (state.selectedMode to finalScore)
             } else {
@@ -1047,10 +1791,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 bestScore = maxOf(currentModeBest, finalScore),
                 bestScoresByMode = updatedBestScores,
                 isNewBestScore = state.isNewBestScore || isNewModeBest,
-                progressionState = trialAwareProgression,
+                progressionState = trialAwareProgression.copy(latestUnlockedProfileBadges = newlyUnlockedBadges),
+                newPersonalRecords = newPersonalRecords,
                 playerProfile = updatedProfile,
                 leaderboardSnapshot = updatedLeaderboard,
                 activeBoost = null,
+                activePowerUp = null,
+                isPowerUpConsumed = false,
                 baseCoinsThisGame = rewards.baseCoins,
                 earnedCoinsThisGame = rewards.totalCoins,
                 isCoinDoubleClaimed = false,
@@ -1066,6 +1813,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val baseCoins: Int,
         val firstTargetBonusCoins: Int,
         val oneMoreBonusCoins: Int,
+        val dailyMiniTournamentCoins: Int,
         val totalCoins: Int
     )
 
@@ -1075,8 +1823,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             dailyReward = progressionFromStorage.dailyReward,
             achievements = progressionFromStorage.achievements,
             weeklyChallenge = progressionFromStorage.weeklyChallenge,
+            dailyLeaderboardGoal = progressionFromStorage.dailyLeaderboardGoal,
+            bonusHour = progressionFromStorage.bonusHour,
+            dailyMiniTournament = progressionFromStorage.dailyMiniTournament,
+            season = progressionFromStorage.season,
             oneMoreGameBonus = progressionFromStorage.oneMoreGameBonus,
-            firstTargetBonusClaimed = progressionFromStorage.firstTargetBonusClaimed
+            firstTargetBonusClaimed = progressionFromStorage.firstTargetBonusClaimed,
+            inviteRewardClaimed = progressionFromStorage.inviteRewardClaimed
         )
     }
 
@@ -1109,13 +1862,38 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             playedMode = state.selectedMode,
             dailyFeaturedMode = state.dailyFeaturedMode
         )
+        val bonusHourCoins = calculateBonusHourCoins(
+            baseCoins = baseCoins,
+            bonusHour = progressionBeforeGame.bonusHour
+        )
+        val dailyMiniTournamentCoins = dailyMiniTournamentRewardForGame(
+            tournament = progressionBeforeGame.dailyMiniTournament,
+            playedMode = state.selectedMode,
+            score = score
+        )
+        val perfectTimingCoins = state.perfectHits.coerceAtLeast(0) * PERFECT_TIMING_BONUS_COINS
+        val flawlessStreakCoins = state.flawlessStreakBonusCoins.coerceAtLeast(0)
+        val bossRoundCoins = state.bossRoundTotalBonusCoins.coerceAtLeast(0)
+        val ultraMomentCoins = state.ultraMomentTotalBonusCoins.coerceAtLeast(0)
 
         return CompletedGameRewards(
             baseCoins = baseCoins,
             firstTargetBonusCoins = firstTargetBonusCoins,
             oneMoreBonusCoins = oneMoreBonusCoins,
-            totalCoins = baseCoins + firstTargetBonusCoins + oneMoreBonusCoins + dailyModeBonusCoins
+            dailyMiniTournamentCoins = dailyMiniTournamentCoins,
+            totalCoins = baseCoins + firstTargetBonusCoins + oneMoreBonusCoins +
+                dailyModeBonusCoins + bonusHourCoins + dailyMiniTournamentCoins +
+                perfectTimingCoins + flawlessStreakCoins + bossRoundCoins + ultraMomentCoins
         )
+    }
+
+    private fun calculateBonusHourCoins(
+        baseCoins: Int,
+        bonusHour: BonusHourState
+    ): Int {
+        if (!bonusHour.isActive || baseCoins <= 0) return 0
+
+        return (baseCoins * bonusHour.coinBonusPercent / 100).coerceAtLeast(1)
     }
 
     private fun consumeTrialThemeGame(progression: ProgressionState): ProgressionState {
@@ -1202,6 +1980,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         mode: GameMode = GameMode.Classic,
         bestScores: Map<GameMode, Int> = GameMode.entries.associateWith { 0 }
     ): GameUiState {
+        val progression = gamePreferences.getProgressionState()
+        val playerProfile = gamePreferences.getPlayerProfile()
         val activeColor = if (mode == GameMode.ColorReflex) {
             targetEngine.randomTargetColor()
         } else {
@@ -1210,13 +1990,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val targets = targetEngine.generateTargets(
             mode = mode,
             score = 0,
-            activeColor = activeColor
+            activeColor = activeColor,
+            progression = progression
         )
-        val progression = gamePreferences.getProgressionState()
-        val playerProfile = gamePreferences.getPlayerProfile()
         return GameUiState(
             lives = INITIAL_LIVES,
-            timeLeftSeconds = INITIAL_TIME_SECONDS,
+            timeLeftSeconds = GameDifficultyConfig.initialTimeSeconds(mode),
             difficultyLevel = calculateDifficultyLevel(score = 0),
             targetSizeDp = calculateTargetSizeDp(score = 0, mode = mode, progression = progression),
             targetVisibleDurationMillis = calculateTargetVisibleDurationMillis(
@@ -1239,6 +2018,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 progression = progression,
                 bestScoresByMode = bestScores
             ),
+            shownModeTips = gamePreferences.getShownModeTips(),
             shouldAutoShowDailyRewardDialog = gamePreferences.shouldShowDailyRewardDialog(progression.dailyReward)
         )
     }
@@ -1266,6 +2046,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
+        if (consumeFirstMistakeForgiveness(countAttempt = countAttempt)) return
+
         lastHitElapsedMillis = 0L
         val remainingLives = currentState.lives - 1
         if (remainingLives <= 0) {
@@ -1273,16 +2055,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        _uiState.update {
+        // generateTargets() is randomised, so it must not run inside an update{} lambda.
+        _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
                 score = it.score,
                 currentTargets = it.targets,
-                activeColor = it.activeColor
+                activeColor = it.activeColor,
+                progression = it.progressionState
             )
             it.copy(
                 lives = remainingLives,
-                combo = 0,
+                combo = if (shouldProtectCombo(it)) it.combo else 0,
+                flawlessStreak = 0,
+                lastFlawlessStreakMilestone = null,
+                isPowerUpConsumed = it.isPowerUpConsumed || it.activePowerUp == GamePowerUp.ComboProtection,
                 totalAttempts = it.totalAttempts + if (countAttempt) 1 else 0,
                 targetPosition = nextTargets.firstCorrectPosition(),
                 targets = nextTargets,
@@ -1291,6 +2078,45 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         startTargetTimeout()
         startModeJobs()
+    }
+
+    private fun consumeFirstMistakeForgiveness(countAttempt: Boolean): Boolean {
+        val currentState = _uiState.value
+        if (
+            currentState.activePowerUp != GamePowerUp.FirstMistakeForgiveness ||
+            currentState.isPowerUpConsumed
+        ) {
+            return false
+        }
+
+        lastHitElapsedMillis = 0L
+        // generateTargets() is randomised, so it must not run inside an update{} lambda.
+        _uiState.value = currentState.let {
+            val nextTargets = targetEngine.generateTargets(
+                mode = it.selectedMode,
+                score = it.score,
+                currentTargets = it.targets,
+                activeColor = it.activeColor,
+                progression = it.progressionState
+            )
+            it.copy(
+                combo = 0,
+                flawlessStreak = 0,
+                lastFlawlessStreakMilestone = null,
+                isPowerUpConsumed = true,
+                totalAttempts = it.totalAttempts + if (countAttempt) 1 else 0,
+                targetPosition = nextTargets.firstCorrectPosition(),
+                targets = nextTargets,
+                targetLifetimeKey = it.targetLifetimeKey + 1
+            )
+        }
+        startTargetTimeout()
+        startModeJobs()
+        return true
+    }
+
+    private fun shouldProtectCombo(state: GameUiState): Boolean {
+        return state.activePowerUp == GamePowerUp.ComboProtection && !state.isPowerUpConsumed
     }
 
     private fun GameUiState.canAcceptGameplayInput(): Boolean {
@@ -1309,7 +2135,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (state.selectedMode == GameMode.MovingTarget) {
             movingTargetJob = viewModelScope.launch {
                 while (_uiState.value.canAcceptGameplayInput() && _uiState.value.selectedMode == GameMode.MovingTarget) {
-                    delay(targetEngine.calculateMovementIntervalMillis(_uiState.value.score))
+                    val latestState = _uiState.value
+                    delay(
+                        targetEngine.calculateMovementIntervalMillis(
+                            score = latestState.score,
+                            mode = latestState.selectedMode,
+                            progression = latestState.progressionState
+                        )
+                    )
                     moveTargets()
                 }
             }
@@ -1318,19 +2151,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (state.selectedMode == GameMode.ColorReflex) {
             colorRuleJob = viewModelScope.launch {
                 while (_uiState.value.canAcceptGameplayInput() && _uiState.value.selectedMode == GameMode.ColorReflex) {
-                    delay(COLOR_RULE_CHANGE_INTERVAL_MS)
+                    val latestState = _uiState.value
+                    delay(
+                        GameDifficultyConfig.colorRuleIntervalMillis(
+                            score = latestState.score,
+                            mode = latestState.selectedMode,
+                            progression = latestState.progressionState
+                        )
+                    )
                     rotateColorRule()
                 }
             }
         }
     }
 
-    private fun calculateNextCombo(currentCombo: Int): Int {
+    private fun calculateTimingGrade(targetLifetimeKey: Int): TimingGrade {
+        val elapsedMillis = if (targetSpawnLifetimeKey == targetLifetimeKey && targetSpawnElapsedMillis > 0L) {
+            SystemClock.elapsedRealtime() - targetSpawnElapsedMillis
+        } else {
+            Long.MAX_VALUE
+        }
+        return when {
+            elapsedMillis <= PERFECT_TIMING_THRESHOLD_MS -> TimingGrade.Perfect
+            elapsedMillis <= GREAT_TIMING_THRESHOLD_MS -> TimingGrade.Great
+            else -> TimingGrade.Normal
+        }
+    }
+
+    private fun calculateNextCombo(
+        currentCombo: Int,
+        timingGrade: TimingGrade
+    ): Int {
         val now = SystemClock.elapsedRealtime()
         val isComboContinuing = lastHitElapsedMillis > 0L &&
             now - lastHitElapsedMillis <= COMBO_WINDOW_MILLIS
         lastHitElapsedMillis = now
-        return if (isComboContinuing) currentCombo + 1 else 1
+        val baseCombo = if (isComboContinuing) currentCombo + 1 else 1
+        return baseCombo + if (timingGrade == TimingGrade.Perfect) 1 else 0
     }
 
     private fun startComboResetTimer(expectedCombo: Int) {
@@ -1368,6 +2225,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             addCoins(state.progressionState, challenge.rewardCoins),
             DAILY_CHALLENGE_XP_REWARD
         ).let { addSeasonXp(it, SEASON_XP_CHALLENGE_COMPLETED) }
+            .let { advanceSeasonQuestForDailyMissionClaim(it) }
         _uiState.update {
             it.copy(
                 dailyChallengeState = updatedChallenge,
@@ -1396,27 +2254,115 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateProgressionAfterGame(
         progression: ProgressionState,
         score: Int,
+        mode: GameMode,
         hits: Int,
+        misses: Int,
         maxCombo: Int,
+        maxFlawlessStreak: Int,
         earnedCoins: Int,
+        accuracyPercent: Int,
+        survivalSeconds: Int,
+        bossRoundHits: Int,
+        ultraMomentHits: Int,
+        dailyMiniTournamentRewardCoins: Int,
         isNewBestScore: Boolean
     ): ProgressionState {
         val earnedXp = calculateEarnedXp(score, hits, maxCombo, isNewBestScore)
-        val nextTotalGames = progression.totalGames + 1
-        val nextTotalHits = progression.totalHits + hits
+        val nextTotalGames = incrementStat(progression.totalGames)
+        val nextTotalScore = (progression.totalScore.coerceAtLeast(0).toLong() + score.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        val nextGamesPlayedByMode = progression.gamesPlayedByMode +
+            (mode to incrementStat(progression.gamesPlayedByMode[mode] ?: 0))
+        val nextTotalHits = (progression.totalHits.coerceAtLeast(0).toLong() + hits.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        val nextTotalMisses = (progression.totalMisses.coerceAtLeast(0).toLong() + misses.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
         val nextMaxCombo = maxOf(progression.lifetimeMaxCombo, maxCombo)
-        val weeklyProgress = (progression.weeklyChallenge.progress + score)
-            .coerceAtMost(progression.weeklyChallenge.target)
-        val weeklyChallenge = progression.weeklyChallenge.copy(
-            progress = weeklyProgress,
-            completed = weeklyProgress >= progression.weeklyChallenge.target
+        val nextMaxFlawlessStreak = maxOf(progression.lifetimeMaxFlawlessStreak, maxFlawlessStreak)
+        val nextPersonalRecords = progression.personalRecords.copy(
+            bestScore = maxOf(progression.personalRecords.bestScore, score.coerceAtLeast(0)),
+            bestCombo = maxOf(progression.personalRecords.bestCombo, maxCombo.coerceAtLeast(0)),
+            bestAccuracyPercent = maxOf(
+                progression.personalRecords.bestAccuracyPercent,
+                accuracyPercent.coerceIn(0, 100)
+            ),
+            longestSurvivalSeconds = maxOf(
+                progression.personalRecords.longestSurvivalSeconds,
+                survivalSeconds.coerceAtLeast(0)
+            ),
+            mostCoinsInGame = maxOf(progression.personalRecords.mostCoinsInGame, earnedCoins.coerceAtLeast(0))
         )
+        val nextTotalBossRoundHits = (progression.totalBossRoundHits.coerceAtLeast(0).toLong() +
+            bossRoundHits.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        val nextTotalUltraMomentHits = (progression.totalUltraMomentHits.coerceAtLeast(0).toLong() +
+            ultraMomentHits.coerceAtLeast(0).toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        val masteryResult = advanceModeMastery(
+            progression = progression,
+            mode = mode,
+            score = score,
+            maxCombo = maxCombo
+        )
+        val weeklyChallenge = advanceWeeklyChallenge(
+            challenge = progression.weeklyChallenge,
+            mode = mode,
+            score = score,
+            maxCombo = maxCombo
+        )
+        val weeklyGoalBoard = advanceWeeklyGoalBoardAfterGame(
+            board = progression.weeklyGoalBoard,
+            score = score,
+            maxCombo = maxCombo
+        )
+        val dailyMiniTournament = advanceDailyMiniTournamentAfterGame(
+            tournament = progression.dailyMiniTournament,
+            playedMode = mode,
+            score = score
+        ).let { tournament ->
+            if (dailyMiniTournamentRewardCoins > 0) {
+                tournament.copy(claimed = true, rewardClaimedThisGame = true)
+            } else {
+                tournament
+            }
+        }
+        val seasonWithQuestProgress = advanceSeasonQuestsAfterGame(
+            season = progression.season,
+            score = score,
+            maxCombo = maxCombo,
+            theme = progression.activeTheme,
+            targetSkin = progression.selectedTargetSkin
+        )
+        val seasonQuestRewardCoins = seasonWithQuestProgress.seasonQuestRewardCoinsThisGame
+        val seasonHunterUnlocked = progression.seasonHunterBadgeUnlocked ||
+            seasonWithQuestProgress.seasonQuestsCompleted
 
-        val gameProgression = addCoins(progression, earnedCoins).copy(
+        val gameProgression = addCoins(
+            progression,
+            earnedCoins + masteryResult.coinBonus + weeklyGoalBoard.totalRewardCoins + seasonQuestRewardCoins
+        ).copy(
             totalGames = nextTotalGames,
+            totalScore = nextTotalScore,
+            gamesPlayedByMode = nextGamesPlayedByMode,
+            modeMasteryXpByMode = masteryResult.xpByMode,
             totalHits = nextTotalHits,
+            totalMisses = nextTotalMisses,
             lifetimeMaxCombo = nextMaxCombo,
-            weeklyChallenge = weeklyChallenge
+            lifetimeMaxFlawlessStreak = nextMaxFlawlessStreak,
+            personalRecords = nextPersonalRecords,
+            totalBossRoundHits = nextTotalBossRoundHits,
+            totalUltraMomentHits = nextTotalUltraMomentHits,
+            weeklyChallenge = weeklyChallenge,
+            weeklyGoalBoard = weeklyGoalBoard,
+            dailyMiniTournament = dailyMiniTournament,
+            season = seasonWithQuestProgress,
+            seasonHunterBadgeUnlocked = seasonHunterUnlocked,
+            lastModeMasteryLevelUp = masteryResult.levelUp
         )
 
         return addSeasonXp(
@@ -1430,6 +2376,207 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 isNewBestScore = isNewBestScore
             )
         }
+    }
+
+    private fun personalRecordsBrokenByGame(
+        progression: ProgressionState,
+        bestScoresByMode: Map<GameMode, Int>,
+        mode: GameMode,
+        score: Int,
+        maxCombo: Int,
+        accuracyPercent: Int,
+        survivalSeconds: Int,
+        earnedCoins: Int
+    ): Set<PersonalRecordType> {
+        val records = mutableSetOf<PersonalRecordType>()
+        if (score > progression.personalRecords.bestScore.coerceAtLeast(0)) {
+            records += PersonalRecordType.HighestScore
+        }
+        if (maxCombo > progression.personalRecords.bestCombo.coerceAtLeast(0)) {
+            records += PersonalRecordType.HighestCombo
+        }
+        if (accuracyPercent.coerceIn(0, 100) > progression.personalRecords.bestAccuracyPercent.coerceIn(0, 100)) {
+            records += PersonalRecordType.BestAccuracy
+        }
+        if (survivalSeconds > progression.personalRecords.longestSurvivalSeconds.coerceAtLeast(0)) {
+            records += PersonalRecordType.LongestSurvival
+        }
+        if (earnedCoins > progression.personalRecords.mostCoinsInGame.coerceAtLeast(0)) {
+            records += PersonalRecordType.MostCoinsInGame
+        }
+        if (score > (bestScoresByMode[mode] ?: 0).coerceAtLeast(0)) {
+            records += when (mode) {
+                GameMode.Classic -> PersonalRecordType.ClassicBest
+                GameMode.MovingTarget -> PersonalRecordType.MovingTargetBest
+                GameMode.FakeTarget -> PersonalRecordType.FakeTargetBest
+                GameMode.ColorReflex -> PersonalRecordType.ColorReflexBest
+            }
+        }
+        return records
+    }
+
+    private fun accuracyPercent(hits: Int, attempts: Int): Int {
+        val safeAttempts = attempts.coerceAtLeast(0)
+        if (safeAttempts == 0) return 0
+        return ((hits.coerceAtLeast(0) * 100f) / safeAttempts).toInt().coerceIn(0, 100)
+    }
+
+    private fun advanceModeMastery(
+        progression: ProgressionState,
+        mode: GameMode,
+        score: Int,
+        maxCombo: Int
+    ): ModeMasteryAdvanceResult {
+        val currentXp = progression.modeMasteryXpByMode[mode]?.coerceAtLeast(0) ?: 0
+        val currentProgress = ModeMasteryProgress(currentXp)
+        val earnedXp = calculateModeMasteryXp(score = score, maxCombo = maxCombo)
+        val maxXp = (MODE_MASTERY_MAX_LEVEL - 1) * MODE_MASTERY_XP_PER_LEVEL
+        val nextXp = (currentXp.toLong() + earnedXp.toLong())
+            .coerceIn(0L, maxXp.toLong())
+            .toInt()
+        val nextProgress = ModeMasteryProgress(nextXp)
+        val crossedLevels = ((currentProgress.level + 1)..nextProgress.level).toList()
+        val coinBonus = crossedLevels.sumOf { level -> modeMasteryLevelReward(level) }
+        return ModeMasteryAdvanceResult(
+            xpByMode = progression.modeMasteryXpByMode + (mode to nextXp),
+            coinBonus = coinBonus,
+            levelUp = crossedLevels.lastOrNull()?.let { level ->
+                ModeMasteryLevelUp(
+                    mode = mode,
+                    level = level,
+                    coinBonus = coinBonus
+                )
+            }
+        )
+    }
+
+    private fun calculateModeMasteryXp(score: Int, maxCombo: Int): Int {
+        return 20 + score.coerceIn(0, 30) + maxCombo.coerceIn(0, 10)
+    }
+
+    private fun modeMasteryLevelReward(level: Int): Int {
+        return when (level) {
+            10 -> 750
+            5 -> 300
+            else -> 100
+        }
+    }
+
+    private data class ModeMasteryAdvanceResult(
+        val xpByMode: Map<GameMode, Int>,
+        val coinBonus: Int,
+        val levelUp: ModeMasteryLevelUp?
+    )
+
+    private fun advanceWeeklyChallenge(
+        challenge: ChallengeState,
+        mode: GameMode,
+        score: Int,
+        maxCombo: Int
+    ): ChallengeState {
+        if (challenge.claimed) return challenge
+        val nextProgress = when (challenge.type) {
+            WeeklyChallengeType.ClassicScore50 ->
+                if (mode == GameMode.Classic) maxOf(challenge.progress, score) else challenge.progress
+            WeeklyChallengeType.ColorReflexScore30 ->
+                if (mode == GameMode.ColorReflex) maxOf(challenge.progress, score) else challenge.progress
+            WeeklyChallengeType.FakeTargetScore20 ->
+                if (mode == GameMode.FakeTarget) maxOf(challenge.progress, score) else challenge.progress
+            WeeklyChallengeType.Play20Games ->
+                challenge.progress + 1
+            WeeklyChallengeType.Combo10 ->
+                maxOf(challenge.progress, maxCombo)
+        }.coerceIn(0, challenge.target)
+        return challenge.copy(
+            progress = nextProgress,
+            completed = nextProgress >= challenge.target
+        )
+    }
+
+    private fun advanceWeeklyGoalBoardAfterGame(
+        board: WeeklyGoalBoardState,
+        score: Int,
+        maxCombo: Int
+    ): WeeklyGoalBoardState {
+        val freshBoard = gamePreferences.getProgressionState().weeklyGoalBoard
+        val currentBoard = if (board.weekKey == freshBoard.weekKey) board else freshBoard
+        val updatedGoals = currentBoard.goals.map { goal ->
+            val nextProgress = when (goal.type) {
+                WeeklyGoalType.Play20Games -> goal.progress + 1
+                WeeklyGoalType.Score500 -> goal.progress + score.coerceAtLeast(0)
+                WeeklyGoalType.Combo10FiveTimes -> goal.progress + if (maxCombo >= 10) 1 else 0
+            }.coerceIn(0, goal.target)
+            val shouldClaimReward = nextProgress >= goal.target && !goal.claimed
+            goal.copy(
+                progress = nextProgress,
+                claimed = goal.claimed || shouldClaimReward,
+                rewardClaimedThisGame = shouldClaimReward
+            )
+        }
+        val shouldClaimBonus = updatedGoals.all { it.completed } && !currentBoard.bonusClaimed
+        return currentBoard.copy(
+            goals = updatedGoals,
+            bonusClaimed = currentBoard.bonusClaimed || shouldClaimBonus,
+            bonusUnlockedThisGame = shouldClaimBonus
+        )
+    }
+
+    private fun advanceSeasonQuestsAfterGame(
+        season: SeasonState,
+        score: Int,
+        maxCombo: Int,
+        theme: PlayerTheme,
+        targetSkin: TargetSkin
+    ): SeasonState {
+        val currentSeason = seasonForToday(season)
+        val usedCosmetics = currentSeason.usedCosmeticKeys +
+            "theme:${theme.storageKey}" +
+            "skin:${targetSkin.storageKey}"
+        val updatedQuests = currentSeason.quests.map { quest ->
+            val nextProgress = when (quest.type) {
+                SeasonQuestType.Play100Games -> quest.progress + 1
+                SeasonQuestType.Score3000 -> quest.progress + score.coerceAtLeast(0)
+                SeasonQuestType.Combo10TwentyFiveTimes -> quest.progress + if (maxCombo >= 10) 1 else 0
+                SeasonQuestType.Complete10DailyMissions -> quest.progress
+                SeasonQuestType.Use5Cosmetics -> usedCosmetics.size
+            }.coerceIn(0, quest.target)
+            val shouldClaimReward = nextProgress >= quest.target && !quest.claimed
+            quest.copy(
+                progress = nextProgress,
+                claimed = quest.claimed || shouldClaimReward,
+                rewardClaimedThisGame = shouldClaimReward
+            )
+        }
+        return currentSeason.copy(
+            quests = updatedQuests,
+            usedCosmeticKeys = usedCosmetics
+        )
+    }
+
+    private fun advanceSeasonQuestForDailyMissionClaim(progression: ProgressionState): ProgressionState {
+        val season = seasonForToday(progression.season)
+        val updatedQuests = season.quests.map { quest ->
+            if (quest.type != SeasonQuestType.Complete10DailyMissions) {
+                return@map quest.copy(rewardClaimedThisGame = false)
+            }
+            val nextProgress = (quest.progress + 1).coerceIn(0, quest.target)
+            val shouldClaimReward = nextProgress >= quest.target && !quest.claimed
+            quest.copy(
+                progress = nextProgress,
+                claimed = quest.claimed || shouldClaimReward,
+                rewardClaimedThisGame = shouldClaimReward
+            )
+        }
+        val updatedSeason = season.copy(quests = updatedQuests)
+        val seasonHunterUnlocked = progression.seasonHunterBadgeUnlocked ||
+            updatedSeason.seasonQuestsCompleted
+        return addCoins(
+            progression.copy(
+                season = updatedSeason,
+                seasonHunterBadgeUnlocked = seasonHunterUnlocked
+            ),
+            updatedSeason.seasonQuestRewardCoinsThisGame
+        )
     }
 
     private fun recordRewardedAdWatched(progression: ProgressionState): ProgressionState {
@@ -1520,6 +2667,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun startBonusHourTicker() {
+        bonusHourJob?.cancel()
+        bonusHourJob = viewModelScope.launch {
+            while (true) {
+                refreshBonusHourState()
+                delay(60_000L)
+            }
+        }
+    }
+
+    private fun refreshBonusHourState() {
+        val bonusHour = gamePreferences.getBonusHourState()
+        val freshDailyMiniTournament = gamePreferences.getDailyMiniTournamentState()
+        _uiState.update { state ->
+            val dailyMiniTournament = if (state.isGameOver) {
+                state.progressionState.dailyMiniTournament
+            } else {
+                freshDailyMiniTournament
+            }
+            if (
+                state.progressionState.bonusHour == bonusHour &&
+                state.progressionState.dailyMiniTournament == dailyMiniTournament
+            ) {
+                state
+            } else {
+                state.copy(
+                    progressionState = state.progressionState.copy(
+                        bonusHour = bonusHour,
+                        dailyMiniTournament = dailyMiniTournament
+                    )
+                )
+            }
+        }
+    }
+
     private fun refreshProfileAndLeaderboard(showLoading: Boolean = false) {
         val profile = gamePreferences.getPlayerProfile()
         _uiState.update {
@@ -1560,7 +2742,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadRemoteLeaderboard(showLoading: Boolean) {
-        leaderboardRefreshJob?.cancel()
+        if (leaderboardRefreshJob?.isActive == true) return
         leaderboardRefreshJob = viewModelScope.launch {
             val state = _uiState.value
             val profile = gamePreferences.getPlayerProfile()
@@ -1580,9 +2762,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 refreshTick = leaderboardRefreshTick
             ).copy(isLoading = false)
 
+            val currentState = _uiState.value
+            val updatedProgression = updateDailyLeaderboardGoalFromSnapshot(
+                progression = currentState.progressionState,
+                snapshot = snapshot
+            )
+            if (updatedProgression != currentState.progressionState) {
+                gamePreferences.saveProgressionState(updatedProgression)
+            }
             _uiState.update {
                 it.copy(
                     playerProfile = profile,
+                    progressionState = updatedProgression,
                     leaderboardSnapshot = snapshot
                 )
             }
@@ -1657,20 +2848,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
-        _uiState.update {
-            val movedTargets = it.targets.map { target ->
-                target.copy(
-                    position = targetEngine.generateRandomTargetPosition(
-                        currentX = target.position.xFraction,
-                        currentY = target.position.yFraction
-                    )
+        // Randomised positions are generated once, outside the update{} lambda.
+        val movedTargets = currentState.targets.map { target ->
+            target.copy(
+                position = targetEngine.generateRandomTargetPosition(
+                    currentX = target.position.xFraction,
+                    currentY = target.position.yFraction
                 )
-            }
-            it.copy(
-                targets = movedTargets,
-                targetPosition = movedTargets.firstCorrectPosition()
             )
         }
+        _uiState.value = currentState.copy(
+            targets = movedTargets,
+            targetPosition = movedTargets.firstCorrectPosition()
+        )
     }
 
     private fun rotateColorRule() {
@@ -1678,12 +2868,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (!currentState.canAcceptGameplayInput()) return
 
         val newColor = targetEngine.nextColorRule(currentState.activeColor)
-        _uiState.update {
+        // generateTargets() is randomised, so it must not run inside an update{} lambda.
+        _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = GameMode.ColorReflex,
                 score = it.score,
                 currentTargets = it.targets,
-                activeColor = newColor
+                activeColor = newColor,
+                progression = it.progressionState
             )
             it.copy(
                 activeColor = newColor,

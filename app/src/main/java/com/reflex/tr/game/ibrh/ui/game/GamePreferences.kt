@@ -2,13 +2,13 @@ package com.reflex.tr.game.ibrh.ui.game
 
 import android.content.Context
 import android.content.SharedPreferences
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 private const val GAME_PREFERENCES_NAME = "game_preferences"
 private const val BEST_SCORE_KEY = "best_score"
@@ -21,10 +21,12 @@ private const val NOTIFICATION_STREAK_KEY = "notification_streak"
 private const val NOTIFICATION_NEW_MISSION_KEY = "notification_new_mission"
 private const val ONBOARDING_COMPLETED_KEY = "onboarding_completed"
 private const val FIRST_TARGET_BONUS_CLAIMED_KEY = "first_target_bonus_claimed"
+private const val INVITE_REWARD_CLAIMED_KEY = "invite_reward_claimed"
 private const val STORE_PREVIEW_MODE_KEY = "store_preview_mode"
 private const val FIRST_OPEN_DATE_KEY = "first_open_date"
 private const val REVIEW_LAST_PROMPT_TIME_KEY = "review_last_prompt_time"
 private const val REVIEW_AUTO_COMPLETED_KEY = "review_auto_completed"
+private const val SHOWN_MODE_TIPS_KEY = "shown_mode_tips"
 private const val LANGUAGE_TURKISH = "tr"
 private const val LANGUAGE_ENGLISH = "en"
 private const val DAILY_CHALLENGE_ID_KEY = "daily_challenge_id"
@@ -37,13 +39,29 @@ private const val DAILY_CHALLENGE_REWARD_CLAIMED_KEY = "daily_challenge_reward_c
 private const val DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY = "daily_challenge_double_reward_claimed"
 private const val DAILY_CHALLENGE_REWARD_COINS_KEY = "daily_challenge_reward_coins"
 private const val COINS_KEY = "coins"
+private const val TOTAL_COINS_EARNED_KEY = "total_coins_earned"
+private const val TOTAL_COINS_SPENT_KEY = "total_coins_spent"
 private const val XP_KEY = "xp"
 private const val TOTAL_GAMES_KEY = "total_games"
+private const val TOTAL_SCORE_KEY = "total_score"
 private const val TOTAL_HITS_KEY = "total_hits"
+private const val TOTAL_MISSES_KEY = "total_misses"
 private const val LIFETIME_MAX_COMBO_KEY = "lifetime_max_combo"
+private const val LIFETIME_MAX_FLAWLESS_STREAK_KEY = "lifetime_max_flawless_streak"
+private const val PERSONAL_RECORD_BEST_SCORE_KEY = "personal_record_best_score"
+private const val PERSONAL_RECORD_BEST_COMBO_KEY = "personal_record_best_combo"
+private const val PERSONAL_RECORD_BEST_ACCURACY_KEY = "personal_record_best_accuracy"
+private const val PERSONAL_RECORD_LONGEST_SURVIVAL_KEY = "personal_record_longest_survival"
+private const val PERSONAL_RECORD_MOST_COINS_KEY = "personal_record_most_coins"
+private const val SELECTED_PROFILE_BADGES_KEY = "selected_profile_badges"
+private const val TOTAL_BOSS_ROUND_HITS_KEY = "total_boss_round_hits"
+private const val TOTAL_ULTRA_MOMENT_HITS_KEY = "total_ultra_moment_hits"
+private const val SEASON_HUNTER_BADGE_UNLOCKED_KEY = "season_hunter_badge_unlocked"
 private const val REWARDED_AD_WATCH_COUNT_KEY = "rewarded_ad_watch_count"
 private const val SELECTED_THEME_KEY = "selected_theme"
 private const val UNLOCKED_THEMES_KEY = "unlocked_themes"
+private const val SELECTED_TARGET_SKIN_KEY = "selected_target_skin"
+private const val UNLOCKED_TARGET_SKINS_KEY = "unlocked_target_skins"
 private const val DAILY_REWARD_LAST_CLAIM_DATE_KEY = "daily_reward_last_claim_date"
 private const val DAILY_DIALOG_LAST_SHOWN_DATE_KEY = "daily_dialog_last_shown_date"
 private const val DAILY_REWARD_STREAK_KEY = "daily_reward_streak"
@@ -58,6 +76,31 @@ private const val ONE_MORE_GAME_BONUS_CLAIMED_KEY = "one_more_game_bonus_claimed
 private const val ACHIEVEMENT_CLAIMED_IDS_KEY = "achievement_claimed_ids"
 private const val WEEKLY_CHALLENGE_PROGRESS_KEY = "weekly_challenge_progress"
 private const val WEEKLY_CHALLENGE_CREATED_DATE_KEY = "weekly_challenge_created_date"
+private const val WEEKLY_CHALLENGE_TYPE_KEY = "weekly_challenge_type"
+private const val WEEKLY_CHALLENGE_CLAIMED_KEY = "weekly_challenge_claimed"
+private const val WEEKLY_GOAL_BOARD_WEEK_KEY = "weekly_goal_board_week"
+private const val WEEKLY_GOAL_BONUS_CLAIMED_KEY = "weekly_goal_bonus_claimed"
+private const val DAILY_LEADERBOARD_GOAL_DATE_KEY = "daily_leaderboard_goal_date"
+private const val DAILY_LEADERBOARD_GOAL_TYPE_KEY = "daily_leaderboard_goal_type"
+private const val DAILY_LEADERBOARD_GOAL_PROGRESS_KEY = "daily_leaderboard_goal_progress"
+private const val DAILY_LEADERBOARD_GOAL_CLAIMED_KEY = "daily_leaderboard_goal_claimed"
+private const val DAILY_LEADERBOARD_GOAL_INITIAL_SCORE_KEY = "daily_leaderboard_goal_initial_score"
+private const val DAILY_LEADERBOARD_GOAL_INITIAL_RANK_KEY = "daily_leaderboard_goal_initial_rank"
+private const val PERSONAL_GOAL_DATE_KEY = "personal_goal_date"
+private const val PERSONAL_GOAL_TARGET_SCORE_KEY = "personal_goal_target_score"
+private const val PERSONAL_GOAL_INITIAL_BEST_SCORE_KEY = "personal_goal_initial_best_score"
+private const val PERSONAL_GOAL_PROGRESS_SCORE_KEY = "personal_goal_progress_score"
+private const val PERSONAL_GOAL_CLAIMED_KEY = "personal_goal_claimed"
+private const val PERSONAL_GOAL_REWARD_COINS_KEY = "personal_goal_reward_coins"
+private const val COMBO_CHALLENGE_DATE_KEY = "combo_challenge_date"
+private const val COMBO_CHALLENGE_TYPE_KEY = "combo_challenge_type"
+private const val COMBO_CHALLENGE_PROGRESS_KEY = "combo_challenge_progress"
+private const val COMBO_CHALLENGE_GAMES_USED_KEY = "combo_challenge_games_used"
+private const val COMBO_CHALLENGE_CLAIMED_KEY = "combo_challenge_claimed"
+private const val DAILY_MINI_TOURNAMENT_DATE_KEY = "daily_mini_tournament_date"
+private const val DAILY_MINI_TOURNAMENT_MODE_KEY = "daily_mini_tournament_mode"
+private const val DAILY_MINI_TOURNAMENT_BEST_SCORE_KEY = "daily_mini_tournament_best_score"
+private const val DAILY_MINI_TOURNAMENT_CLAIMED_KEY = "daily_mini_tournament_claimed"
 private const val SEASON_NUMBER_KEY = "season_number"
 private const val SEASON_START_DATE_KEY = "season_start_date"
 private const val SEASON_XP_KEY = "season_xp"
@@ -69,6 +112,8 @@ private const val SEASON_MISSION_PLAY_COUNT_KEY = "season_mission_play_count"
 private const val SEASON_MISSION_REWARDED_COUNT_KEY = "season_mission_rewarded_count"
 private const val SEASON_MISSION_XP_EARNED_KEY = "season_mission_xp_earned"
 private const val SEASON_MISSION_CLAIMED_IDS_KEY = "season_mission_claimed_ids"
+private const val SEASON_QUEST_CLAIMED_IDS_KEY = "season_quest_claimed_ids"
+private const val SEASON_QUEST_USED_COSMETICS_KEY = "season_quest_used_cosmetics"
 private const val PLAYER_NAME_KEY = "player_name"
 private const val PLAYER_NAME_PROMPT_COMPLETED_KEY = "player_name_prompt_completed"
 private const val PLAYER_TITLE_KEY = "player_title"
@@ -76,9 +121,9 @@ private const val PLAYER_WEEKLY_SCORE_KEY = "player_weekly_score"
 private const val PLAYER_WEEKLY_SCORE_DATE_KEY = "player_weekly_score_date"
 private const val DAY_IN_MILLIS = 24L * 60L * 60L * 1000L
 private const val REVIEW_COOLDOWN_MILLIS = 14L * DAY_IN_MILLIS
-private const val DEFAULT_PLAYER_NAME = "Oyuncu"
 private const val DATE_PATTERN = "yyyy-MM-dd"
 private const val PROGRESSION_XP_PER_LEVEL = 250
+private val BONUS_HOUR_CANDIDATES = listOf(12, 18, 20, 21)
 
 enum class AppLanguage(val code: String) {
     Turkish(LANGUAGE_TURKISH),
@@ -110,6 +155,9 @@ class GamePreferences(private val context: Context) {
 
     val bestScoresFlow: Flow<Map<GameMode, Int>> = bestScoresState.asStateFlow()
     val languageFlow: Flow<AppLanguage> = languageState.asStateFlow()
+
+    /** Seçili dilin anlık değeri — Compose dışındaki katmanların string lokalize etmesi için. */
+    val currentLanguage: AppLanguage get() = languageState.value
     val soundEnabledFlow: Flow<Boolean> = soundEnabledState.asStateFlow()
     val effectSoundEnabledFlow: Flow<Boolean> = effectSoundEnabledState.asStateFlow()
     val vibrationEnabledFlow: Flow<Boolean> = vibrationEnabledState.asStateFlow()
@@ -208,6 +256,23 @@ class GamePreferences(private val context: Context) {
         return storePreviewModeState.value
     }
 
+    fun getShownModeTips(): Set<GameMode> {
+        return loadShownModeTips()
+    }
+
+    fun markModeTipShown(mode: GameMode) {
+        val updatedModes = loadShownModeTips() + mode
+        sharedPreferences.edit()
+            .putString(SHOWN_MODE_TIPS_KEY, updatedModes.joinToString(separator = ",") { it.storageKey })
+            .commitSafely()
+    }
+
+    fun resetModeTips() {
+        sharedPreferences.edit()
+            .remove(SHOWN_MODE_TIPS_KEY)
+            .commitSafely()
+    }
+
     fun getDailyChallengeState(): DailyChallengeState {
         val today = todayDateKey()
         val savedDate = sharedPreferences.getString(DAILY_CHALLENGE_CREATED_DATE_KEY, null)
@@ -260,25 +325,56 @@ class GamePreferences(private val context: Context) {
 
     fun getProgressionState(): ProgressionState {
         val safeXp = safeProgressionXp(sharedPreferences.getInt(XP_KEY, 0))
+        val unlockedTargetSkins = loadUnlockedTargetSkins()
+        val selectedTargetSkin = safeSelectedTargetSkin(loadSelectedTargetSkin(), unlockedTargetSkins)
         return ProgressionState(
             coins = sharedPreferences.getInt(COINS_KEY, 0).coerceAtLeast(0),
+            totalCoinsEarned = sharedPreferences.getInt(TOTAL_COINS_EARNED_KEY, 0).coerceAtLeast(0),
+            totalCoinsSpent = sharedPreferences.getInt(TOTAL_COINS_SPENT_KEY, 0).coerceAtLeast(0),
             xp = safeXp,
             level = calculateLevel(safeXp),
             totalGames = sharedPreferences.getInt(TOTAL_GAMES_KEY, 0).coerceAtLeast(0),
+            totalScore = sharedPreferences.getInt(TOTAL_SCORE_KEY, 0).coerceAtLeast(0),
+            gamesPlayedByMode = loadGamesPlayedByMode(),
+            modeMasteryXpByMode = loadModeMasteryXpByMode(),
             totalHits = sharedPreferences.getInt(TOTAL_HITS_KEY, 0).coerceAtLeast(0),
+            totalMisses = sharedPreferences.getInt(TOTAL_MISSES_KEY, 0).coerceAtLeast(0),
             lifetimeMaxCombo = sharedPreferences.getInt(LIFETIME_MAX_COMBO_KEY, 0).coerceAtLeast(0),
+            lifetimeMaxFlawlessStreak = sharedPreferences.getInt(LIFETIME_MAX_FLAWLESS_STREAK_KEY, 0).coerceAtLeast(0),
             rewardedAdWatchCount = sharedPreferences.getInt(REWARDED_AD_WATCH_COUNT_KEY, 0).coerceAtLeast(0),
             selectedTheme = loadSelectedTheme(),
             unlockedThemes = loadUnlockedThemes(),
+            selectedTargetSkin = selectedTargetSkin,
+            unlockedTargetSkins = unlockedTargetSkins,
             coinChest = loadCoinChestState(),
             shopCoinReward = loadShopCoinRewardState(),
             oneMoreGameBonus = loadOneMoreGameBonusState(),
             dailyReward = loadDailyRewardState(),
+            bonusHour = loadBonusHourState(),
+            dailyMiniTournament = loadDailyMiniTournament(),
             season = loadSeasonState(),
             achievements = loadAchievements(),
             weeklyChallenge = loadWeeklyChallenge(),
-            firstTargetBonusClaimed = sharedPreferences.getBoolean(FIRST_TARGET_BONUS_CLAIMED_KEY, false)
+            weeklyGoalBoard = loadWeeklyGoalBoard(),
+            dailyLeaderboardGoal = loadDailyLeaderboardGoal(),
+            personalGoal = loadPersonalGoal(),
+            comboChallenge = loadComboChallenge(),
+            personalRecords = loadPersonalRecords(),
+            selectedProfileBadgeIds = loadSelectedProfileBadgeIds(),
+            totalBossRoundHits = sharedPreferences.getInt(TOTAL_BOSS_ROUND_HITS_KEY, 0).coerceAtLeast(0),
+            totalUltraMomentHits = sharedPreferences.getInt(TOTAL_ULTRA_MOMENT_HITS_KEY, 0).coerceAtLeast(0),
+            seasonHunterBadgeUnlocked = sharedPreferences.getBoolean(SEASON_HUNTER_BADGE_UNLOCKED_KEY, false),
+            firstTargetBonusClaimed = sharedPreferences.getBoolean(FIRST_TARGET_BONUS_CLAIMED_KEY, false),
+            inviteRewardClaimed = sharedPreferences.getBoolean(INVITE_REWARD_CLAIMED_KEY, false)
         )
+    }
+
+    fun getBonusHourState(): BonusHourState {
+        return loadBonusHourState()
+    }
+
+    fun getDailyMiniTournamentState(): DailyMiniTournamentState {
+        return loadDailyMiniTournament()
     }
 
     fun getPlayerProfile(): PlayerProfile {
@@ -304,7 +400,7 @@ class GamePreferences(private val context: Context) {
                 0
             },
             weeklyBestScoresByMode = weeklyScoresByMode,
-            hasCompletedNamePrompt = savedName != DEFAULT_PLAYER_NAME ||
+            hasCompletedNamePrompt = savedName.isNotBlank() ||
                 sharedPreferences.getBoolean(PLAYER_NAME_PROMPT_COMPLETED_KEY, false)
         )
     }
@@ -347,19 +443,52 @@ class GamePreferences(private val context: Context) {
         val oneMoreGameBonus = oneMoreGameBonusForToday(state.oneMoreGameBonus)
         val safeUnlockedThemes = safeUnlockedThemes(state.unlockedThemes, state.selectedTheme)
         val safeSelectedTheme = safeSelectedTheme(state.selectedTheme, safeUnlockedThemes)
+        val safeUnlockedTargetSkins = safeUnlockedTargetSkins(state.unlockedTargetSkins, state.selectedTargetSkin)
+        val safeSelectedTargetSkin = safeSelectedTargetSkin(state.selectedTargetSkin, safeUnlockedTargetSkins)
         val safeWeeklyChallengeDate = state.weeklyChallenge.createdDate.takeIf { isValidWeekKey(it) } ?: weekDateKey()
         sharedPreferences.edit()
             .putInt(COINS_KEY, state.coins.coerceAtLeast(0))
+            .putInt(TOTAL_COINS_EARNED_KEY, state.totalCoinsEarned.coerceAtLeast(0))
+            .putInt(TOTAL_COINS_SPENT_KEY, state.totalCoinsSpent.coerceAtLeast(0))
             .putInt(XP_KEY, safeProgressionXp(state.xp))
             .putInt(TOTAL_GAMES_KEY, state.totalGames.coerceAtLeast(0))
+            .putInt(TOTAL_SCORE_KEY, state.totalScore.coerceAtLeast(0))
+            .apply {
+                GameMode.entries.forEach { mode ->
+                    putInt(mode.gamesPlayedPreferenceKey(), state.gamesPlayedByMode[mode]?.coerceAtLeast(0) ?: 0)
+                    putInt(
+                        mode.masteryXpPreferenceKey(),
+                        state.modeMasteryXpByMode[mode]
+                            ?.coerceIn(0, (MODE_MASTERY_MAX_LEVEL - 1) * MODE_MASTERY_XP_PER_LEVEL)
+                            ?: 0
+                    )
+                }
+            }
             .putInt(TOTAL_HITS_KEY, state.totalHits.coerceAtLeast(0))
+            .putInt(TOTAL_MISSES_KEY, state.totalMisses.coerceAtLeast(0))
             .putInt(LIFETIME_MAX_COMBO_KEY, state.lifetimeMaxCombo.coerceAtLeast(0))
+            .putInt(LIFETIME_MAX_FLAWLESS_STREAK_KEY, state.lifetimeMaxFlawlessStreak.coerceAtLeast(0))
+            .putInt(PERSONAL_RECORD_BEST_SCORE_KEY, state.personalRecords.bestScore.coerceAtLeast(0))
+            .putInt(PERSONAL_RECORD_BEST_COMBO_KEY, state.personalRecords.bestCombo.coerceAtLeast(0))
+            .putInt(PERSONAL_RECORD_BEST_ACCURACY_KEY, state.personalRecords.bestAccuracyPercent.coerceIn(0, 100))
+            .putInt(PERSONAL_RECORD_LONGEST_SURVIVAL_KEY, state.personalRecords.longestSurvivalSeconds.coerceAtLeast(0))
+            .putInt(PERSONAL_RECORD_MOST_COINS_KEY, state.personalRecords.mostCoinsInGame.coerceAtLeast(0))
+            .putString(SELECTED_PROFILE_BADGES_KEY, safeProfileBadgeIds(state.selectedProfileBadgeIds).joinToString(","))
+            .putInt(TOTAL_BOSS_ROUND_HITS_KEY, state.totalBossRoundHits.coerceAtLeast(0))
+            .putInt(TOTAL_ULTRA_MOMENT_HITS_KEY, state.totalUltraMomentHits.coerceAtLeast(0))
+            .putBoolean(SEASON_HUNTER_BADGE_UNLOCKED_KEY, state.seasonHunterBadgeUnlocked)
             .putInt(REWARDED_AD_WATCH_COUNT_KEY, state.rewardedAdWatchCount.coerceAtLeast(0))
             .putBoolean(FIRST_TARGET_BONUS_CLAIMED_KEY, state.firstTargetBonusClaimed)
+            .putBoolean(INVITE_REWARD_CLAIMED_KEY, state.inviteRewardClaimed)
             .putString(SELECTED_THEME_KEY, safeSelectedTheme.storageKey)
             .putString(
                 UNLOCKED_THEMES_KEY,
                 safeUnlockedThemes.joinToString(separator = ",") { it.storageKey }
+            )
+            .putString(SELECTED_TARGET_SKIN_KEY, safeSelectedTargetSkin.storageKey)
+            .putString(
+                UNLOCKED_TARGET_SKINS_KEY,
+                safeUnlockedTargetSkins.joinToString(separator = ",") { it.storageKey }
             )
             .putString(
                 ACHIEVEMENT_CLAIMED_IDS_KEY,
@@ -375,6 +504,46 @@ class GamePreferences(private val context: Context) {
             .putBoolean(ONE_MORE_GAME_BONUS_CLAIMED_KEY, oneMoreGameBonus.bonusClaimedToday)
             .putInt(WEEKLY_CHALLENGE_PROGRESS_KEY, safeCount(state.weeklyChallenge.progress, state.weeklyChallenge.target))
             .putString(WEEKLY_CHALLENGE_CREATED_DATE_KEY, safeWeeklyChallengeDate)
+            .putString(WEEKLY_CHALLENGE_TYPE_KEY, state.weeklyChallenge.type.name)
+            .putBoolean(WEEKLY_CHALLENGE_CLAIMED_KEY, state.weeklyChallenge.claimed)
+            .putString(
+                WEEKLY_GOAL_BOARD_WEEK_KEY,
+                state.weeklyGoalBoard.weekKey.takeIf { isValidWeekKey(it) } ?: weekDateKey()
+            )
+            .putBoolean(WEEKLY_GOAL_BONUS_CLAIMED_KEY, state.weeklyGoalBoard.bonusClaimed)
+            .apply {
+                state.weeklyGoalBoard.goals.forEach { goal ->
+                    putInt(goal.type.weeklyGoalProgressKey(), safeCount(goal.progress, goal.target))
+                    putBoolean(goal.type.weeklyGoalClaimedKey(), goal.claimed)
+                }
+            }
+            .putString(DAILY_LEADERBOARD_GOAL_DATE_KEY, safeDateKeyOrToday(state.dailyLeaderboardGoal.createdDate))
+            .putString(DAILY_LEADERBOARD_GOAL_TYPE_KEY, state.dailyLeaderboardGoal.type.name)
+            .putInt(
+                DAILY_LEADERBOARD_GOAL_PROGRESS_KEY,
+                safeCount(state.dailyLeaderboardGoal.progress, state.dailyLeaderboardGoal.target)
+            )
+            .putBoolean(DAILY_LEADERBOARD_GOAL_CLAIMED_KEY, state.dailyLeaderboardGoal.claimed)
+            .putInt(DAILY_LEADERBOARD_GOAL_INITIAL_SCORE_KEY, state.dailyLeaderboardGoal.initialScore.coerceAtLeast(0))
+            .putInt(DAILY_LEADERBOARD_GOAL_INITIAL_RANK_KEY, state.dailyLeaderboardGoal.initialRank.coerceAtLeast(0))
+            .putString(PERSONAL_GOAL_DATE_KEY, safeDateKeyOrToday(state.personalGoal.createdDate))
+            .putInt(PERSONAL_GOAL_TARGET_SCORE_KEY, state.personalGoal.targetScore.coerceAtLeast(1))
+            .putInt(PERSONAL_GOAL_INITIAL_BEST_SCORE_KEY, state.personalGoal.initialBestScore.coerceAtLeast(0))
+            .putInt(PERSONAL_GOAL_PROGRESS_SCORE_KEY, state.personalGoal.progressScore.coerceAtLeast(0))
+            .putBoolean(PERSONAL_GOAL_CLAIMED_KEY, state.personalGoal.claimed)
+            .putInt(PERSONAL_GOAL_REWARD_COINS_KEY, state.personalGoal.rewardCoins.coerceAtLeast(0))
+            .putString(COMBO_CHALLENGE_DATE_KEY, safeDateKeyOrToday(state.comboChallenge.createdDate))
+            .putString(COMBO_CHALLENGE_TYPE_KEY, state.comboChallenge.type.name)
+            .putInt(COMBO_CHALLENGE_PROGRESS_KEY, safeCount(state.comboChallenge.progress, state.comboChallenge.target))
+            .putInt(COMBO_CHALLENGE_GAMES_USED_KEY, state.comboChallenge.gamesUsed.coerceIn(0, 3))
+            .putBoolean(COMBO_CHALLENGE_CLAIMED_KEY, state.comboChallenge.claimed)
+            .putString(DAILY_MINI_TOURNAMENT_DATE_KEY, safeDateKeyOrToday(state.dailyMiniTournament.dateKey))
+            .putString(DAILY_MINI_TOURNAMENT_MODE_KEY, state.dailyMiniTournament.mode.storageKey)
+            .putInt(
+                DAILY_MINI_TOURNAMENT_BEST_SCORE_KEY,
+                state.dailyMiniTournament.bestScore.coerceAtLeast(0)
+            )
+            .putBoolean(DAILY_MINI_TOURNAMENT_CLAIMED_KEY, state.dailyMiniTournament.claimed)
             .putInt(SEASON_NUMBER_KEY, state.season.seasonNumber.coerceAtLeast(1))
             .putString(SEASON_START_DATE_KEY, safeDateKeyOrToday(state.season.startDateKey))
             .putInt(SEASON_XP_KEY, safeSeasonXp(state.season.xp))
@@ -386,6 +555,13 @@ class GamePreferences(private val context: Context) {
             .putInt(SEASON_MISSION_REWARDED_COUNT_KEY, state.season.rewardedAdsWatchedToday.coerceAtLeast(0))
             .putInt(SEASON_MISSION_XP_EARNED_KEY, state.season.seasonXpEarnedToday.coerceIn(0, maxSeasonXp()))
             .putString(SEASON_MISSION_CLAIMED_IDS_KEY, state.season.claimedMissionIds.joinToString(","))
+            .putString(SEASON_QUEST_CLAIMED_IDS_KEY, state.season.quests.filter { it.claimed }.joinToString(",") { it.type.name })
+            .putString(SEASON_QUEST_USED_COSMETICS_KEY, state.season.usedCosmeticKeys.joinToString(","))
+            .apply {
+                state.season.quests.forEach { quest ->
+                    putInt(quest.type.seasonQuestProgressKey(), safeCount(quest.progress, quest.target))
+                }
+            }
             .commitSafely()
     }
 
@@ -555,6 +731,42 @@ class GamePreferences(private val context: Context) {
         return unlocked + PlayerTheme.NeonRed
     }
 
+    private fun loadShownModeTips(): Set<GameMode> {
+        return sharedPreferences.getString(SHOWN_MODE_TIPS_KEY, null)
+            .orEmpty()
+            .split(",")
+            .mapNotNull { key -> GameMode.entries.firstOrNull { it.storageKey == key } }
+            .toSet()
+    }
+
+    private fun loadGamesPlayedByMode(): Map<GameMode, Int> {
+        return GameMode.entries.associateWith { mode ->
+            sharedPreferences.getInt(mode.gamesPlayedPreferenceKey(), 0).coerceAtLeast(0)
+        }
+    }
+
+    private fun loadModeMasteryXpByMode(): Map<GameMode, Int> {
+        return GameMode.entries.associateWith { mode ->
+            sharedPreferences.getInt(mode.masteryXpPreferenceKey(), 0)
+                .coerceIn(0, (MODE_MASTERY_MAX_LEVEL - 1) * MODE_MASTERY_XP_PER_LEVEL)
+        }
+    }
+
+    private fun loadSelectedTargetSkin(): TargetSkin {
+        val savedKey = sharedPreferences.getString(SELECTED_TARGET_SKIN_KEY, TargetSkin.ClassicTarget.storageKey)
+        return TargetSkin.entries.firstOrNull { it.storageKey == savedKey } ?: TargetSkin.ClassicTarget
+    }
+
+    private fun loadUnlockedTargetSkins(): Set<TargetSkin> {
+        val saved = sharedPreferences.getString(UNLOCKED_TARGET_SKINS_KEY, null)
+        val unlocked = saved
+            ?.split(",")
+            ?.mapNotNull { key -> TargetSkin.entries.firstOrNull { it.storageKey == key } }
+            ?.toSet()
+            .orEmpty()
+        return unlocked + TargetSkin.ClassicTarget
+    }
+
     private fun loadCoinChestState(): CoinChestState {
         val today = todayDateKey()
         val savedDate = sharedPreferences.getString(COIN_CHEST_OPEN_DATE_KEY, "").orEmpty()
@@ -634,6 +846,12 @@ class GamePreferences(private val context: Context) {
             )
         }
         val isMissionToday = savedMissionDate == today
+        val claimedQuestIds = sharedPreferences.getString(SEASON_QUEST_CLAIMED_IDS_KEY, "")
+            .orEmpty()
+            .toStringSet()
+        val usedCosmetics = sharedPreferences.getString(SEASON_QUEST_USED_COSMETICS_KEY, "")
+            .orEmpty()
+            .toStringSet()
         return SeasonState(
             seasonNumber = sharedPreferences.getInt(SEASON_NUMBER_KEY, 1).coerceAtLeast(1),
             startDateKey = savedStart,
@@ -655,8 +873,28 @@ class GamePreferences(private val context: Context) {
                 sharedPreferences.getString(SEASON_MISSION_CLAIMED_IDS_KEY, "").orEmpty().toStringSet()
             } else {
                 emptySet()
-            }
+            },
+            quests = loadSeasonQuests(claimedQuestIds, usedCosmetics),
+            usedCosmeticKeys = usedCosmetics
         )
+    }
+
+    private fun loadSeasonQuests(
+        claimedQuestIds: Set<String>,
+        usedCosmetics: Set<String>
+    ): List<SeasonQuestState> {
+        return SeasonQuestType.entries.map { type ->
+            val storedProgress = sharedPreferences.getInt(type.seasonQuestProgressKey(), 0)
+            val progress = when (type) {
+                SeasonQuestType.Use5Cosmetics -> maxOf(storedProgress, usedCosmetics.size)
+                else -> storedProgress
+            }.coerceIn(0, type.target)
+            SeasonQuestState(
+                type = type,
+                progress = progress,
+                claimed = type.name in claimedQuestIds && progress >= type.target
+            )
+        }
     }
 
     private fun loadDailyRewardState(): DailyRewardState {
@@ -755,17 +993,325 @@ class GamePreferences(private val context: Context) {
         val weekKey = weekDateKey()
         val savedWeek = sharedPreferences.getString(WEEKLY_CHALLENGE_CREATED_DATE_KEY, null)
             ?.takeIf { isValidWeekKey(it) }
+        val savedType = sharedPreferences.getString(WEEKLY_CHALLENGE_TYPE_KEY, null)
+            ?.let { value -> WeeklyChallengeType.entries.firstOrNull { it.name == value } }
+        val type = if (savedWeek == weekKey && savedType != null) {
+            savedType
+        } else {
+            chooseWeeklyChallengeType(weekKey)
+        }
         val progress = if (savedWeek == weekKey) {
             sharedPreferences.getInt(WEEKLY_CHALLENGE_PROGRESS_KEY, 0)
         } else {
             0
         }
-        return ChallengeState.defaultWeekly().copy(
-            id = "weekly_score_$weekKey",
-            progress = progress.coerceIn(0, ChallengeState.defaultWeekly().target),
-            completed = progress >= ChallengeState.defaultWeekly().target,
-            createdDate = weekKey
+        val safeProgress = progress.coerceIn(0, type.target)
+        return ChallengeState(
+            id = "weekly_${type.name.lowercase(Locale.US)}_$weekKey",
+            type = type,
+            titleRes = type.titleRes,
+            descriptionRes = type.descriptionRes,
+            target = type.target,
+            progress = safeProgress,
+            completed = safeProgress >= type.target,
+            claimed = savedWeek == weekKey && sharedPreferences.getBoolean(WEEKLY_CHALLENGE_CLAIMED_KEY, false),
+            rewardCoins = type.rewardCoins,
+            createdDate = weekKey,
+            remainingDays = remainingDaysInWeek()
         )
+    }
+
+    private fun loadWeeklyGoalBoard(): WeeklyGoalBoardState {
+        val weekKey = weekDateKey()
+        val savedWeek = sharedPreferences.getString(WEEKLY_GOAL_BOARD_WEEK_KEY, null)
+            ?.takeIf { isValidWeekKey(it) }
+        val isCurrentWeek = savedWeek == weekKey
+        val goals = WeeklyGoalType.entries.map { type ->
+            val progress = if (isCurrentWeek) {
+                sharedPreferences.getInt(type.weeklyGoalProgressKey(), 0)
+            } else {
+                0
+            }.coerceIn(0, type.target)
+            WeeklyGoalState(
+                type = type,
+                progress = progress,
+                claimed = isCurrentWeek &&
+                    progress >= type.target &&
+                    sharedPreferences.getBoolean(type.weeklyGoalClaimedKey(), false)
+            )
+        }
+        return WeeklyGoalBoardState(
+            weekKey = weekKey,
+            goals = goals,
+            bonusClaimed = isCurrentWeek &&
+                goals.all { it.completed } &&
+                sharedPreferences.getBoolean(WEEKLY_GOAL_BONUS_CLAIMED_KEY, false),
+            bonusRewardCoins = 500
+        )
+    }
+
+    private fun loadDailyLeaderboardGoal(): DailyLeaderboardGoalState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(DAILY_LEADERBOARD_GOAL_DATE_KEY, null)
+            ?.takeIf { isValidDateKey(it) }
+        val savedType = sharedPreferences.getString(DAILY_LEADERBOARD_GOAL_TYPE_KEY, null)
+            ?.let { value -> DailyLeaderboardGoalType.entries.firstOrNull { it.name == value } }
+        val type = if (savedDate == today && savedType != null) {
+            savedType
+        } else {
+            chooseDailyLeaderboardGoalType(today)
+        }
+        val initialScore = if (savedDate == today) {
+            sharedPreferences.getInt(DAILY_LEADERBOARD_GOAL_INITIAL_SCORE_KEY, currentAllTimeBestScore())
+        } else {
+            currentAllTimeBestScore()
+        }.coerceAtLeast(0)
+        val initialRank = if (savedDate == today) {
+            sharedPreferences.getInt(DAILY_LEADERBOARD_GOAL_INITIAL_RANK_KEY, 0)
+        } else {
+            0
+        }.coerceAtLeast(0)
+        val progress = if (savedDate == today) {
+            sharedPreferences.getInt(DAILY_LEADERBOARD_GOAL_PROGRESS_KEY, 0)
+        } else {
+            0
+        }.coerceIn(0, type.target)
+        return DailyLeaderboardGoalState(
+            id = "daily_leaderboard_${type.name.lowercase(Locale.US)}_$today",
+            type = type,
+            titleRes = type.titleRes,
+            descriptionRes = type.descriptionRes,
+            target = type.target,
+            progress = progress,
+            completed = progress >= type.target,
+            claimed = savedDate == today && sharedPreferences.getBoolean(DAILY_LEADERBOARD_GOAL_CLAIMED_KEY, false),
+            rewardCoins = type.rewardCoins,
+            createdDate = today,
+            initialScore = initialScore,
+            initialRank = initialRank
+        )
+    }
+
+    private fun chooseDailyLeaderboardGoalType(dateKey: String): DailyLeaderboardGoalType {
+        val seed = dateKey.fold(0) { acc, char -> acc + char.code }
+        return DailyLeaderboardGoalType.entries.getOrNull(
+            seed % DailyLeaderboardGoalType.entries.size.coerceAtLeast(1)
+        ) ?: DailyLeaderboardGoalType.SubmitScore
+    }
+
+    private fun loadPersonalGoal(): PersonalGoalState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(PERSONAL_GOAL_DATE_KEY, null)
+            ?.takeIf { isValidDateKey(it) }
+        val initialBestScore = if (savedDate == today) {
+            sharedPreferences.getInt(PERSONAL_GOAL_INITIAL_BEST_SCORE_KEY, currentAllTimeBestScore())
+        } else {
+            currentAllTimeBestScore()
+        }.coerceAtLeast(0)
+        val targetScore = if (savedDate == today) {
+            sharedPreferences.getInt(PERSONAL_GOAL_TARGET_SCORE_KEY, personalGoalTargetFor(initialBestScore))
+        } else {
+            personalGoalTargetFor(initialBestScore)
+        }.coerceAtLeast(
+            (initialBestScore.toLong() + 1L)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
+        )
+        val progressScore = if (savedDate == today) {
+            sharedPreferences.getInt(PERSONAL_GOAL_PROGRESS_SCORE_KEY, initialBestScore)
+        } else {
+            initialBestScore
+        }.coerceAtLeast(0)
+        return PersonalGoalState(
+            createdDate = today,
+            targetScore = targetScore,
+            initialBestScore = initialBestScore,
+            progressScore = progressScore,
+            completed = progressScore >= targetScore,
+            claimed = savedDate == today && sharedPreferences.getBoolean(PERSONAL_GOAL_CLAIMED_KEY, false),
+            rewardCoins = if (savedDate == today) {
+                sharedPreferences.getInt(PERSONAL_GOAL_REWARD_COINS_KEY, personalGoalRewardFor(initialBestScore))
+            } else {
+                personalGoalRewardFor(initialBestScore)
+            }.coerceAtLeast(0)
+        )
+    }
+
+    private fun personalGoalTargetFor(bestScore: Int): Int {
+        val safeBestScore = bestScore.coerceAtLeast(0)
+        val increment = when {
+            safeBestScore < 50 -> 5
+            safeBestScore < 100 -> 10
+            else -> 15
+        }
+        return (safeBestScore.toLong() + increment.toLong())
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+    }
+
+    private fun personalGoalRewardFor(bestScore: Int): Int {
+        return when {
+            bestScore < 50 -> 100
+            bestScore < 100 -> 250
+            else -> 500
+        }
+    }
+
+    private fun loadComboChallenge(): ComboChallengeState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(COMBO_CHALLENGE_DATE_KEY, null)
+            ?.takeIf { isValidDateKey(it) }
+        val savedType = sharedPreferences.getString(COMBO_CHALLENGE_TYPE_KEY, null)
+            ?.let { value -> ComboChallengeType.entries.firstOrNull { it.name == value } }
+        val type = if (savedDate == today && savedType != null) {
+            savedType
+        } else {
+            chooseComboChallengeType(today)
+        }
+        val progress = if (savedDate == today) {
+            sharedPreferences.getInt(COMBO_CHALLENGE_PROGRESS_KEY, 0)
+        } else {
+            0
+        }.coerceIn(0, type.target)
+        return ComboChallengeState(
+            createdDate = today,
+            type = type,
+            titleRes = type.titleRes,
+            descriptionRes = type.descriptionRes,
+            target = type.target,
+            progress = progress,
+            gamesUsed = if (savedDate == today) {
+                sharedPreferences.getInt(COMBO_CHALLENGE_GAMES_USED_KEY, 0).coerceIn(0, 3)
+            } else {
+                0
+            },
+            completed = progress >= type.target,
+            claimed = savedDate == today && sharedPreferences.getBoolean(COMBO_CHALLENGE_CLAIMED_KEY, false),
+            rewardCoins = type.rewardCoins
+        )
+    }
+
+    private fun loadDailyMiniTournament(): DailyMiniTournamentState {
+        val today = todayDateKey()
+        val savedDate = sharedPreferences.getString(DAILY_MINI_TOURNAMENT_DATE_KEY, null)
+            ?.takeIf { isValidDateKey(it) }
+        val baseState = createDailyMiniTournamentState(dateKey = today)
+        val savedMode = sharedPreferences.getString(DAILY_MINI_TOURNAMENT_MODE_KEY, null)
+            ?.let { key -> GameMode.entries.firstOrNull { it.storageKey == key } }
+        val mode = if (savedDate == today && savedMode != null) savedMode else baseState.mode
+        val bestScore = if (savedDate == today) {
+            sharedPreferences.getInt(DAILY_MINI_TOURNAMENT_BEST_SCORE_KEY, 0)
+        } else {
+            0
+        }.coerceAtLeast(0)
+        val targetScore = dailyMiniTournamentTargetFor(mode)
+        return DailyMiniTournamentState(
+            dateKey = today,
+            mode = mode,
+            bestScore = bestScore,
+            targetScore = targetScore,
+            rewardCoins = baseState.rewardCoins,
+            completed = bestScore >= targetScore,
+            claimed = savedDate == today &&
+                bestScore >= targetScore &&
+                sharedPreferences.getBoolean(DAILY_MINI_TOURNAMENT_CLAIMED_KEY, false)
+        )
+    }
+
+    private fun loadPersonalRecords(): PersonalRecordsState {
+        val legacyBestScore = loadBestScores().values.maxOrNull()?.coerceAtLeast(0) ?: 0
+        val legacyBestCombo = sharedPreferences.getInt(LIFETIME_MAX_COMBO_KEY, 0).coerceAtLeast(0)
+        return PersonalRecordsState(
+            bestScore = maxOf(
+                sharedPreferences.getInt(PERSONAL_RECORD_BEST_SCORE_KEY, 0).coerceAtLeast(0),
+                legacyBestScore
+            ),
+            bestCombo = maxOf(
+                sharedPreferences.getInt(PERSONAL_RECORD_BEST_COMBO_KEY, 0).coerceAtLeast(0),
+                legacyBestCombo
+            ),
+            bestAccuracyPercent = sharedPreferences.getInt(PERSONAL_RECORD_BEST_ACCURACY_KEY, 0).coerceIn(0, 100),
+            longestSurvivalSeconds = sharedPreferences.getInt(PERSONAL_RECORD_LONGEST_SURVIVAL_KEY, 0).coerceAtLeast(0),
+            mostCoinsInGame = sharedPreferences.getInt(PERSONAL_RECORD_MOST_COINS_KEY, 0).coerceAtLeast(0)
+        )
+    }
+
+    private fun loadSelectedProfileBadgeIds(): List<String> {
+        return safeProfileBadgeIds(
+            sharedPreferences.getString(SELECTED_PROFILE_BADGES_KEY, "")
+                .orEmpty()
+                .split(",")
+        )
+    }
+
+    private fun safeProfileBadgeIds(ids: List<String>): List<String> {
+        val validKeys = ProfileBadge.entries.map { it.storageKey }.toSet()
+        return ids
+            .map { it.trim() }
+            .filter { it in validKeys }
+            .distinct()
+            .take(3)
+    }
+
+    private fun chooseComboChallengeType(dateKey: String): ComboChallengeType {
+        val seed = dateKey.fold(0) { acc, char -> acc + char.code }
+        return ComboChallengeType.entries.getOrNull(
+            seed % ComboChallengeType.entries.size.coerceAtLeast(1)
+        ) ?: ComboChallengeType.Combo5
+    }
+
+    private fun currentAllTimeBestScore(): Int {
+        return GameMode.entries.maxOfOrNull { mode ->
+            sharedPreferences.getInt(mode.bestScorePreferenceKey(), 0)
+        }?.coerceAtLeast(0) ?: 0
+    }
+
+    private fun loadBonusHourState(): BonusHourState {
+        val calendar = Calendar.getInstance()
+        val startHour = chooseBonusHourStart(todayDateKey())
+        val endHour = (startHour + 1) % 24
+        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(Calendar.MINUTE)
+        val currentMinuteOfDay = currentHour * 60 + currentMinute
+        val startMinuteOfDay = startHour * 60
+        val endMinuteOfDay = startMinuteOfDay + 60
+        val isActive = currentMinuteOfDay in startMinuteOfDay until endMinuteOfDay
+        val minutesUntilStart = when {
+            isActive -> 0
+            currentMinuteOfDay < startMinuteOfDay -> startMinuteOfDay - currentMinuteOfDay
+            else -> (24 * 60 - currentMinuteOfDay) + startMinuteOfDay
+        }
+        return BonusHourState(
+            startHour = startHour,
+            endHour = endHour,
+            isActive = isActive,
+            minutesUntilStart = minutesUntilStart.coerceIn(0, 24 * 60),
+            coinBonusPercent = 25
+        )
+    }
+
+    private fun chooseBonusHourStart(dateKey: String): Int {
+        val seed = dateKey.fold(0) { acc, char -> acc + char.code }
+        return BONUS_HOUR_CANDIDATES.getOrNull(seed % BONUS_HOUR_CANDIDATES.size.coerceAtLeast(1)) ?: 20
+    }
+
+    private fun chooseWeeklyChallengeType(weekKey: String): WeeklyChallengeType {
+        val seed = weekKey.fold(0) { acc, char -> acc + char.code }
+        return WeeklyChallengeType.entries.getOrNull(seed % WeeklyChallengeType.entries.size.coerceAtLeast(1))
+            ?: WeeklyChallengeType.ClassicScore50
+    }
+
+    private fun remainingDaysInWeek(): Int {
+        val calendar = Calendar.getInstance()
+        val lastDayOfWeek = calendar.firstDayOfWeek + 6
+        val normalizedLastDay = if (lastDayOfWeek > Calendar.SATURDAY) {
+            lastDayOfWeek - Calendar.SATURDAY
+        } else {
+            lastDayOfWeek
+        }
+        val today = calendar.get(Calendar.DAY_OF_WEEK)
+        val remaining = (normalizedLastDay - today).let { if (it < 0) it + 7 else it }
+        return remaining.coerceIn(0, 6)
     }
 
     private fun calculateLevel(xp: Int): Int {
@@ -805,8 +1351,28 @@ private fun GameMode.bestScorePreferenceKey(): String {
     return "best_score_${storageKey}"
 }
 
+private fun GameMode.gamesPlayedPreferenceKey(): String {
+    return "games_played_${storageKey}"
+}
+
+private fun GameMode.masteryXpPreferenceKey(): String {
+    return "mode_mastery_xp_${storageKey}"
+}
+
 private fun GameMode.weeklyScorePreferenceKey(): String {
     return "weekly_score_${storageKey}"
+}
+
+private fun WeeklyGoalType.weeklyGoalProgressKey(): String {
+    return "weekly_goal_${name.lowercase(Locale.US)}_progress"
+}
+
+private fun WeeklyGoalType.weeklyGoalClaimedKey(): String {
+    return "weekly_goal_${name.lowercase(Locale.US)}_claimed"
+}
+
+private fun SeasonQuestType.seasonQuestProgressKey(): String {
+    return "season_quest_${name.lowercase(Locale.US)}_progress"
 }
 
 private fun String.toIntSet(): Set<Int> {
@@ -823,16 +1389,24 @@ private fun String.toStringSet(): Set<String> {
         .toSet()
 }
 
+/**
+ * Hands the write off to the background. [SharedPreferences.Editor.commit] writes to disk
+ * synchronously and would block the main thread during the game loop, whereas
+ * [SharedPreferences.Editor.apply] updates the in-memory value immediately and defers the
+ * disk write. Android guarantees pending apply() writes are flushed before the process dies.
+ */
 private fun SharedPreferences.Editor.commitSafely() {
-    if (!commit()) {
-        apply()
-    }
+    apply()
 }
 
+/**
+ * Normalises the name, returning an empty string when none was entered. The displayed
+ * default is deliberately not produced here: persisting a fixed Turkish value would show
+ * "Oyuncu" to English users too. The UI resolves the fallback per language via
+ * `ifBlank { ... }`.
+ */
 private fun safePlayerName(name: String): String {
-    return name.trim()
-        .take(12)
-        .ifBlank { DEFAULT_PLAYER_NAME }
+    return name.trim().take(12)
 }
 
 private fun safeProgressionXp(xp: Int): Int {
@@ -869,6 +1443,20 @@ private fun safeSelectedTheme(
     unlockedThemes: Set<PlayerTheme>
 ): PlayerTheme {
     return selectedTheme.takeIf { it in unlockedThemes } ?: PlayerTheme.NeonRed
+}
+
+private fun safeUnlockedTargetSkins(
+    unlockedTargetSkins: Set<TargetSkin>,
+    selectedTargetSkin: TargetSkin
+): Set<TargetSkin> {
+    return unlockedTargetSkins + selectedTargetSkin + TargetSkin.ClassicTarget
+}
+
+private fun safeSelectedTargetSkin(
+    selectedTargetSkin: TargetSkin,
+    unlockedTargetSkins: Set<TargetSkin>
+): TargetSkin {
+    return selectedTargetSkin.takeIf { it in unlockedTargetSkins } ?: TargetSkin.ClassicTarget
 }
 
 private fun safeDateKeyOrBlank(dateKey: String): String {

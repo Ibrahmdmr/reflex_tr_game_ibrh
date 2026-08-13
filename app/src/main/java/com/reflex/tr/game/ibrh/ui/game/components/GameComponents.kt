@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -52,11 +53,124 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ui.game.PremiumCardPadding
+import com.reflex.tr.game.ibrh.ui.game.PremiumCardRadius
+import com.reflex.tr.game.ibrh.ui.game.PremiumCompactRadius
+import com.reflex.tr.game.ibrh.ui.game.PremiumPanelRadius
+import com.reflex.tr.game.ibrh.ui.game.PremiumSectionSpacing
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberAnimatedPressScale
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
+
+@Composable
+fun PremiumSurfaceCard(
+    modifier: Modifier = Modifier,
+    accentColor: Color = ArcadeBlue,
+    containerColor: Color = ReflexGamePalette.cardGlassStrong,
+    selected: Boolean = false,
+    contentPadding: Dp = PremiumCardPadding,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = if (selected) accentColor.copy(alpha = 0.14f) else containerColor,
+        shape = RoundedCornerShape(PremiumCardRadius),
+        border = BorderStroke(
+            width = 1.dp,
+            color = accentColor.copy(alpha = if (selected) 0.48f else 0.26f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(PremiumSectionSpacing),
+            content = content
+        )
+    }
+}
+
+@Composable
+fun SectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    accentColor: Color = ArcadeGold,
+    textAlign: TextAlign = TextAlign.Start
+) {
+    Text(
+        text = text,
+        modifier = modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.titleSmall,
+        color = accentColor,
+        textAlign = textAlign,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+fun InfoChip(
+    text: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false
+) {
+    Surface(
+        modifier = modifier,
+        color = accentColor.copy(alpha = if (selected) 0.18f else 0.1f),
+        shape = RoundedCornerShape(PremiumCompactRadius),
+        border = BorderStroke(
+            width = 1.dp,
+            color = accentColor.copy(alpha = if (selected) 0.42f else 0.24f)
+        )
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun CompactStatCard(
+    title: String,
+    value: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+    prominent: Boolean = false
+) {
+    PremiumSurfaceCard(
+        modifier = modifier,
+        accentColor = accentColor,
+        containerColor = accentColor.copy(alpha = if (prominent) 0.17f else 0.11f),
+        selected = prominent,
+        contentPadding = if (prominent) 10.dp else 8.dp
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = ReflexGamePalette.textSecondary,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = value,
+            style = if (prominent) MaterialTheme.typography.titleSmall else MaterialTheme.typography.labelLarge,
+            color = ReflexGamePalette.textPrimary,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
 
 @Composable
 fun GamePanelCard(
@@ -68,13 +182,13 @@ fun GamePanelCard(
 ) {
     Surface(
         modifier = modifier
-            .shadow(tonalElevation, RoundedCornerShape(30.dp), clip = false)
+            .shadow(tonalElevation, RoundedCornerShape(PremiumPanelRadius), clip = false)
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(30.dp)
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(PremiumPanelRadius)
             ),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(PremiumPanelRadius),
         color = containerColor,
         shadowElevation = 0.dp
     ) {
@@ -90,8 +204,8 @@ fun GameStatCard(
     label: String,
     value: String,
     accentColor: Color,
-    alertTrigger: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    alertTrigger: Int = 0
 ) {
     val cardScale = remember { Animatable(1f) }
     val glowAlpha = remember { Animatable(0f) }
@@ -108,13 +222,13 @@ fun GameStatCard(
     Surface(
         modifier = modifier
             .scale(cardScale.value)
-            .shadow(10.dp, RoundedCornerShape(22.dp), clip = false)
+            .shadow(8.dp, RoundedCornerShape(PremiumCardRadius), clip = false)
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(22.dp)
+                color = Color.White.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(PremiumCardRadius)
             ),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         color = ReflexGamePalette.cardGlassStrong,
         shadowElevation = 0.dp
     ) {
@@ -148,8 +262,8 @@ fun LivesStatCard(
     label: String,
     lives: Int,
     accentColor: Color,
-    alertTrigger: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    alertTrigger: Int = 0
 ) {
     val cardScale = remember { Animatable(1f) }
     val glowAlpha = remember { Animatable(0f) }
@@ -166,13 +280,13 @@ fun LivesStatCard(
     Surface(
         modifier = modifier
             .scale(cardScale.value)
-            .shadow(10.dp, RoundedCornerShape(22.dp), clip = false)
+            .shadow(8.dp, RoundedCornerShape(PremiumCardRadius), clip = false)
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(22.dp)
+                color = Color.White.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(PremiumCardRadius)
             ),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         color = ReflexGamePalette.cardGlassStrong,
         shadowElevation = 0.dp
     ) {
@@ -243,7 +357,7 @@ fun PrimaryGameButton(
             .height(height)
             .scale(scale)
             .graphicsLayer {
-                shadowElevation = 16f + pulse * 18f
+                shadowElevation = 10f + pulse * 12f
             },
         interactionSource = interactionSource,
         shape = RoundedCornerShape(18.dp),
@@ -260,15 +374,15 @@ fun PrimaryGameButton(
                     Brush.horizontalGradient(
                         colors = listOf(
                             ArcadeBlue.copy(alpha = 0.92f),
-                            ReflexGamePalette.neonPurple.copy(alpha = 0.95f),
-                            ArcadeGold.copy(alpha = 0.82f + pulse * 0.12f)
+                            ReflexGamePalette.neonPurple.copy(alpha = 0.9f),
+                            ArcadeGold.copy(alpha = 0.76f + pulse * 0.08f)
                         )
                     ),
                     RoundedCornerShape(16.dp)
                 )
                 .border(
                     1.dp,
-                    Color.White.copy(alpha = 0.28f + pulse * 0.18f),
+                    Color.White.copy(alpha = 0.24f + pulse * 0.12f),
                     RoundedCornerShape(16.dp)
                 )
                 .padding(horizontal = 14.dp),
@@ -289,9 +403,9 @@ fun PrimaryGameButton(
 fun SecondaryGameButton(
     text: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    isLoading: Boolean = false,
-    modifier: Modifier = Modifier
+    isLoading: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scale = rememberAnimatedPressScale(interactionSource)
@@ -306,10 +420,10 @@ fun SecondaryGameButton(
         interactionSource = interactionSource,
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White.copy(alpha = 0.1f),
+            containerColor = Color.White.copy(alpha = 0.095f),
             contentColor = ReflexGamePalette.textPrimary,
-            disabledContainerColor = Color.White.copy(alpha = 0.06f),
-            disabledContentColor = ReflexGamePalette.textSecondary.copy(alpha = 0.55f)
+            disabledContainerColor = Color.White.copy(alpha = 0.075f),
+            disabledContentColor = ReflexGamePalette.textSecondary.copy(alpha = 0.7f)
         )
     ) {
         Row(

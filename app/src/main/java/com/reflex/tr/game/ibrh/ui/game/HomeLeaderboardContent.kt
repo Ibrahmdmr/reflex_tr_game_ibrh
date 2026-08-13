@@ -40,12 +40,16 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun LeaderboardTabContent(
     leaderboardSnapshot: LeaderboardSnapshot,
+    dailyLeaderboardGoal: DailyLeaderboardGoalState,
+    onDailyLeaderboardGoalClaim: () -> Unit,
     onModeSelected: (GameMode) -> Unit,
     onPeriodSelected: (LeaderboardPeriod) -> Unit,
     onRefreshClick: () -> Unit
 ) {
     LeaderboardSection(
         snapshot = leaderboardSnapshot,
+        dailyLeaderboardGoal = dailyLeaderboardGoal,
+        onDailyLeaderboardGoalClaim = onDailyLeaderboardGoalClaim,
         onModeSelected = onModeSelected,
         onPeriodSelected = onPeriodSelected,
         onRefreshClick = onRefreshClick
@@ -56,6 +60,8 @@ internal fun LeaderboardTabContent(
 @Composable
 internal fun LeaderboardSection(
     snapshot: LeaderboardSnapshot,
+    dailyLeaderboardGoal: DailyLeaderboardGoalState,
+    onDailyLeaderboardGoalClaim: () -> Unit,
     onModeSelected: (GameMode) -> Unit,
     onPeriodSelected: (LeaderboardPeriod) -> Unit,
     onRefreshClick: () -> Unit,
@@ -94,8 +100,10 @@ internal fun LeaderboardSection(
             }
             Surface(
                 modifier = Modifier.clickable {
-                    isRefreshing = true
-                    onRefreshClick()
+                    if (!isRefreshing && !snapshot.isLoading) {
+                        isRefreshing = true
+                        onRefreshClick()
+                    }
                 },
                 color = ArcadeBlue.copy(alpha = 0.18f),
                 shape = CircleShape,
@@ -117,6 +125,10 @@ internal fun LeaderboardSection(
         LeaderboardModeSelector(
             selectedMode = snapshot.selectedMode,
             onModeSelected = onModeSelected
+        )
+        DailyLeaderboardGoalCard(
+            state = dailyLeaderboardGoal,
+            onClaimClick = onDailyLeaderboardGoalClaim
         )
         val statusMessageRes = snapshot.statusMessageRes
         if (showRefreshMessage && statusMessageRes != null) {
@@ -221,6 +233,96 @@ internal fun LeaderboardSection(
 }
 
 @Composable
+private fun DailyLeaderboardGoalCard(
+    state: DailyLeaderboardGoalState,
+    onClaimClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.daily_leaderboard_goal_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(state.titleRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ArcadeGold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.daily_leaderboard_goal_reward, state.rewardCoins),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ArcadeTeal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = stringResource(state.descriptionRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = ReflexGamePalette.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = if (state.claimed) {
+                    stringResource(R.string.daily_leaderboard_goal_claimed)
+                } else {
+                    stringResource(
+                        R.string.daily_leaderboard_goal_progress,
+                        state.progress.coerceIn(0, state.target),
+                        state.target.coerceAtLeast(1)
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.completed) ArcadeTeal else ReflexGamePalette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (state.completed && !state.claimed) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onClaimClick() },
+                    color = ArcadeGold.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
+                ) {
+                    Text(
+                        text = stringResource(R.string.daily_leaderboard_goal_claim),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ReflexGamePalette.textPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun LeaderboardPeriodSelector(
     selectedPeriod: LeaderboardPeriod,
     onPeriodSelected: (LeaderboardPeriod) -> Unit
@@ -292,5 +394,3 @@ internal fun LeaderboardModeSelector(
         }
     }
 }
-
-

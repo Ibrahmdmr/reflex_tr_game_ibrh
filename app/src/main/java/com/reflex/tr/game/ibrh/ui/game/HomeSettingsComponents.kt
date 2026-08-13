@@ -28,13 +28,15 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-private fun appVersionLabel(): String {
+internal fun getDisplayVersionName(): String {
     return if (BuildConfig.DEBUG) {
         BuildConfig.VERSION_NAME
     } else {
         BuildConfig.VERSION_NAME.substringBefore("-debug")
     }
 }
+
+internal fun shouldShowDeveloperTools(): Boolean = BuildConfig.DEBUG
 
 @Composable
 internal fun SettingsSectionCard(
@@ -45,12 +47,12 @@ internal fun SettingsSectionCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.24f))
+        shape = RoundedCornerShape(PremiumCardRadius),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.28f))
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(PremiumCardPadding),
+            verticalArrangement = Arrangement.spacedBy(PremiumSectionSpacing)
         ) {
             Text(
                 text = title,
@@ -78,7 +80,7 @@ internal fun NotificationStatusMessage(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = accent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.28f))
     ) {
         Text(
@@ -101,11 +103,11 @@ internal fun NotificationToggleRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.055f),
-        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(
             1.dp,
-            if (checked) ArcadeTeal.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.1f)
+            if (checked) ArcadeTeal.copy(alpha = 0.36f) else Color.White.copy(alpha = 0.12f)
         )
     ) {
         Row(

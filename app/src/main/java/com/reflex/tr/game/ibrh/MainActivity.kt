@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -42,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,7 +57,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
@@ -81,10 +84,10 @@ import com.reflex.tr.game.ibrh.ui.game.HowToPlayScreen
 import com.reflex.tr.game.ibrh.ui.game.PolishedGameDialog
 import com.reflex.tr.game.ibrh.ui.game.RewardedAction
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 private const val SplashDurationMillis = 3_000L
 private const val MainActivityLogTag = "MainActivityAds"
@@ -197,6 +200,13 @@ class MainActivity : ComponentActivity() {
         logNotificationClickIfPresent(intent)
     }
 
+    override fun onDestroy() {
+        // AdMobManager posts delayed retry runnables and holds this activity through its ad
+        // callbacks; without this the activity stays reachable for seconds after finishing.
+        adMobManager.release()
+        super.onDestroy()
+    }
+
     private fun initializeMobileAds() {
         lifecycleScope.launch(Dispatchers.IO) {
             logDebug("MobileAds initialization started")
@@ -250,7 +260,7 @@ class MainActivity : ComponentActivity() {
 
     private fun openPlayStorePage() {
         val packageName = BuildConfig.APPLICATION_ID
-        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).apply {
+        val marketIntent = Intent(Intent.ACTION_VIEW, "market://details?id=$packageName".toUri()).apply {
             setPackage("com.android.vending")
         }
         runCatching {
@@ -258,7 +268,7 @@ class MainActivity : ComponentActivity() {
         }.onFailure {
             val webIntent = Intent(
                 Intent.ACTION_VIEW,
-                Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
+                "https://play.google.com/store/apps/details?id=$packageName".toUri()
             )
             runCatching { startActivity(webIntent) }
         }
@@ -388,7 +398,9 @@ fun AppRoot(
         }
     }
 
-    LaunchedEffect(Unit) {
+    // Re-read on every resume: the permission can be flipped from system settings while the app
+    // is in the background, and a one-shot LaunchedEffect(Unit) would keep showing a stale value.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         notificationPermissionGranted = hasNotificationPermission()
     }
 
@@ -594,114 +606,120 @@ private fun FirstLaunchOnboardingDialog(
             )
         )
     }
-    var pageIndex by rememberSaveable { mutableStateOf(0) }
+    var pageIndex by rememberSaveable { mutableIntStateOf(0) }
     val safePageIndex = pageIndex.coerceIn(0, pages.lastIndex.coerceAtLeast(0))
     val page = pages.getOrNull(safePageIndex) ?: return
+
+    // Same reason as PolishedGameDialog: a dialog window brings its own context, which would
+    // override the in-app language for every string resolved inside it.
+    val hostContext = LocalContext.current
 
     Dialog(
         onDismissRequest = {},
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(GameDialogScrimColor)
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
+        CompositionLocalProvider(LocalContext provides hostContext) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 380.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)
-                ),
-                tonalElevation = 8.dp
+                    .fillMaxSize()
+                    .background(GameDialogScrimColor)
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 26.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .widthIn(max = 380.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)
+                    ),
+                    tonalElevation = 8.dp
                 ) {
-                    Text(
-                        text = context.getString(R.string.onboarding_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = page.icon,
-                        style = MaterialTheme.typography.displayMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = context.getString(page.titleRes),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = context.getString(page.bodyRes),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = context.getString(R.string.onboarding_step_value, safePageIndex + 1, pages.size),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 26.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        TextButton(
-                            modifier = Modifier.weight(1f),
-                            onClick = onFinish
+                        Text(
+                            text = context.getString(R.string.onboarding_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = page.icon,
+                            style = MaterialTheme.typography.displayMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = context.getString(page.titleRes),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = context.getString(page.bodyRes),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = context.getString(R.string.onboarding_step_value, safePageIndex + 1, pages.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = context.getString(R.string.onboarding_skip),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Button(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            onClick = {
-                                if (safePageIndex == pages.lastIndex) {
-                                    onFinish()
-                                } else {
-                                    pageIndex = safePageIndex + 1
-                                }
+                            TextButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = onFinish
+                            ) {
+                                Text(
+                                    text = context.getString(R.string.onboarding_skip),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
-                        ) {
-                            Text(
-                                text = if (safePageIndex == pages.lastIndex) {
-                                    context.getString(R.string.onboarding_start)
-                                } else {
-                                    context.getString(R.string.onboarding_next)
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Button(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(50.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                onClick = {
+                                    if (safePageIndex == pages.lastIndex) {
+                                        onFinish()
+                                    } else {
+                                        pageIndex = safePageIndex + 1
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = if (safePageIndex == pages.lastIndex) {
+                                        context.getString(R.string.onboarding_start)
+                                    } else {
+                                        context.getString(R.string.onboarding_next)
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -744,8 +762,6 @@ fun AppRootPreview() {
                 selectedLanguage = AppLanguage.Turkish,
                 isSoundEnabled = true,
                 onStartClick = {},
-                onBoostCoinClick = { true },
-                onBoostAdClick = {},
                 onModeStartClick = {},
                 onHowToPlayClick = {},
                 onLanguageSelected = {},
@@ -753,12 +769,14 @@ fun AppRootPreview() {
                 onDailyRewardClaim = {},
                 onSeasonRewardClaim = {},
                 onDailyStreakProtect = {},
+                onPowerUpClick = { true },
                 onAchievementClaim = {},
                 onThemeSelect = {},
                 onThemeBuy = {},
                 onThemeTrial = {},
                 onPlayerNameChange = { true },
                 onPlayerTitleSelect = {},
+                onProfileBadgeSelect = {},
                 onLeaderboardModeSelected = {},
                 onLeaderboardPeriodSelected = {},
                 onLeaderboardRefresh = {},

@@ -35,9 +35,12 @@ import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 internal fun MissionRewardsCard(
     dailyChallengeState: DailyChallengeState,
     weeklyChallengeState: ChallengeState,
+    comboChallengeState: ComboChallengeState,
     achievements: List<AchievementState>,
     rewardedAdUiState: RewardedAdUiState,
     onDailyChallengeClaim: () -> Unit,
+    onComboChallengeClaim: () -> Unit,
+    onWeeklyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -47,6 +50,7 @@ internal fun MissionRewardsCard(
         .sortedWith(compareBy<AchievementState> { it.claimed }.thenBy { it.id })
     val hasCompletedReward = dailyChallengeState.completed ||
         weeklyChallengeState.completed ||
+        comboChallengeState.completed ||
         completedAchievements.isNotEmpty()
 
     Surface(
@@ -135,10 +139,11 @@ internal fun MissionRewardsCard(
             MissionRewardRow(
                 icon = if (weeklyChallengeState.completed) "✓" else "#",
                 title = stringResource(R.string.weekly_challenge_title),
-                detail = if (weeklyChallengeState.completed) {
-                    stringResource(R.string.mission_reward_weekly_completed, weeklyChallengeState.rewardCoins)
-                } else {
-                    stringResource(
+                detail = when {
+                    weeklyChallengeState.claimed -> stringResource(R.string.weekly_challenge_claimed)
+                    weeklyChallengeState.completed ->
+                        stringResource(R.string.mission_reward_weekly_completed, weeklyChallengeState.rewardCoins)
+                    else -> stringResource(
                         R.string.weekly_challenge_progress,
                         weeklyChallengeState.progress,
                         weeklyChallengeState.target,
@@ -146,7 +151,40 @@ internal fun MissionRewardsCard(
                     )
                 },
                 accent = if (weeklyChallengeState.completed) ArcadeTeal else ArcadeBlue
-            )
+            ) {
+                if (weeklyChallengeState.completed && !weeklyChallengeState.claimed) {
+                    SecondaryGameButton(
+                        text = stringResource(R.string.claim_reward),
+                        onClick = onWeeklyChallengeClaim,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            MissionRewardRow(
+                icon = if (comboChallengeState.completed) "✓" else "x",
+                title = stringResource(R.string.combo_challenge_title),
+                detail = when {
+                    comboChallengeState.claimed -> stringResource(R.string.combo_challenge_claimed)
+                    comboChallengeState.completed ->
+                        stringResource(R.string.mission_reward_ready_value, comboChallengeState.rewardCoins)
+                    else -> stringResource(
+                        R.string.combo_challenge_progress,
+                        comboChallengeState.progress,
+                        comboChallengeState.target,
+                        comboChallengeState.rewardCoins
+                    )
+                },
+                accent = if (comboChallengeState.completed) ArcadeTeal else ArcadeGold
+            ) {
+                if (comboChallengeState.completed && !comboChallengeState.claimed) {
+                    SecondaryGameButton(
+                        text = stringResource(R.string.claim_reward),
+                        onClick = onComboChallengeClaim,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
             completedAchievements.forEach { achievement ->
                 MissionRewardRow(

@@ -73,6 +73,27 @@ internal fun ProfileQuickMenu(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ProfileQuickMenuCard(
+                    title = stringResource(R.string.statistics_title),
+                    description = stringResource(R.string.profile_quick_statistics_description),
+                    icon = "%",
+                    accent = ArcadeBlue,
+                    onClick = { onTabSelected(HomeTab.Statistics) },
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileQuickMenuCard(
+                    title = stringResource(R.string.collection_title),
+                    description = stringResource(R.string.profile_quick_collection_description),
+                    icon = "▣",
+                    accent = ArcadeGold,
+                    onClick = { onTabSelected(HomeTab.Collection) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ProfileQuickMenuCard(
                     title = stringResource(R.string.nav_missions),
                     description = stringResource(R.string.profile_quick_missions_description),
                     icon = "✓",
@@ -80,6 +101,11 @@ internal fun ProfileQuickMenu(
                     onClick = { onTabSelected(HomeTab.Missions) },
                     modifier = Modifier.weight(1f)
                 )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 ProfileQuickMenuCard(
                     title = stringResource(R.string.nav_settings),
                     description = stringResource(R.string.profile_quick_settings_description),

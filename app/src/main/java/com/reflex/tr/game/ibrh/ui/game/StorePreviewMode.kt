@@ -64,14 +64,30 @@ private fun storePreviewProgression(): ProgressionState {
     )
     return ProgressionState(
         coins = 74250,
+        totalCoinsEarned = 128400,
         xp = 5_860,
         level = 24,
         totalGames = 186,
+        totalScore = 8_940,
+        gamesPlayedByMode = mapOf(
+            GameMode.Classic to 78,
+            GameMode.MovingTarget to 42,
+            GameMode.FakeTarget to 31,
+            GameMode.ColorReflex to 35
+        ),
+        modeMasteryXpByMode = mapOf(
+            GameMode.Classic to 640,
+            GameMode.MovingTarget to 420,
+            GameMode.FakeTarget to 310,
+            GameMode.ColorReflex to 360
+        ),
         totalHits = 4_820,
         lifetimeMaxCombo = 34,
         rewardedAdWatchCount = 28,
         selectedTheme = PlayerTheme.ToxicPulse,
         unlockedThemes = unlockedThemes,
+        selectedTargetSkin = TargetSkin.FireCore,
+        unlockedTargetSkins = setOf(TargetSkin.ClassicTarget, TargetSkin.NeonRing, TargetSkin.FireCore),
         coinChest = CoinChestState(
             openedToday = 1,
             maxOpensPerDay = 3,
@@ -115,18 +131,57 @@ private fun storePreviewProgression(): ProgressionState {
         ),
         achievements = storePreviewAchievements(),
         weeklyChallenge = ChallengeState(
-            id = "weekly_score_100",
-            titleRes = R.string.weekly_challenge_title_value,
-            descriptionRes = R.string.weekly_challenge_description,
-            target = 100,
-            progress = 91,
+            id = "weekly_classic_50_preview",
+            type = WeeklyChallengeType.ClassicScore50,
+            titleRes = R.string.weekly_challenge_classic_50_title,
+            descriptionRes = R.string.weekly_challenge_classic_50_description,
+            target = 50,
+            progress = 41,
             completed = false,
-            rewardCoins = 300,
-            createdDate = "store-preview"
+            claimed = false,
+            rewardCoins = 500,
+            createdDate = "store-preview",
+            remainingDays = 3
+        ),
+        dailyLeaderboardGoal = DailyLeaderboardGoalState(
+            id = "daily_leaderboard_preview",
+            type = DailyLeaderboardGoalType.ImproveScore10,
+            titleRes = R.string.daily_leaderboard_goal_improve_score_title,
+            descriptionRes = R.string.daily_leaderboard_goal_improve_score_description,
+            target = 10,
+            progress = 7,
+            completed = false,
+            claimed = false,
+            rewardCoins = 250,
+            createdDate = "store-preview",
+            initialScore = 84,
+            initialRank = 12
+        ),
+        personalGoal = PersonalGoalState(
+            createdDate = "store-preview",
+            targetScore = 94,
+            initialBestScore = 84,
+            progressScore = 90,
+            completed = false,
+            claimed = false,
+            rewardCoins = 250
+        ),
+        comboChallenge = ComboChallengeState(
+            createdDate = "store-preview",
+            type = ComboChallengeType.Combo10,
+            titleRes = R.string.combo_challenge_combo_10_title,
+            descriptionRes = R.string.combo_challenge_combo_10_description,
+            target = 10,
+            progress = 7,
+            gamesUsed = 0,
+            completed = false,
+            claimed = false,
+            rewardCoins = 250
         ),
         latestUnlockedAchievementIds = listOf("combo_master"),
         lastLevelUp = null,
-        firstTargetBonusClaimed = true
+        firstTargetBonusClaimed = true,
+        inviteRewardClaimed = true
     )
 }
 

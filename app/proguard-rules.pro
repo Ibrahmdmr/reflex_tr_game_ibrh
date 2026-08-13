@@ -1,21 +1,23 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# Reflex Avı — R8 / ProGuard rules
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Note: Firestore access in LeaderboardRepository reads fields manually
+# (document.getString / getLong). No reflection-based POJO mapping (toObject) is used,
+# so the model classes need no keep rules. If that changes — i.e. toObject/@PropertyName
+# start being used — the affected model classes must be kept explicitly.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# --- Crashlytics: readable stack traces ---
+# Without the source file and line number attributes, Crashlytics reports come back
+# obfuscated and cannot be traced.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# --- Kotlin ---
+-keepattributes *Annotation*
+-dontwarn kotlinx.coroutines.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# --- Google Mobile Ads (AdMob) ---
+# The AAR ships its own consumer rules; we only silence warnings here.
+-dontwarn com.google.android.gms.**
+
+# --- Firebase ---
+-dontwarn com.google.firebase.**

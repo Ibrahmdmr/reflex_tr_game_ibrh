@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
+import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
@@ -104,6 +106,7 @@ internal fun PlayTabContent(
     onHowToPlayClick: () -> Unit,
     onDailyStreakProtect: () -> Unit,
     onDailyRewardCardClick: () -> Unit,
+    onSuggestionTabClick: (HomeTab) -> Unit,
     onDailyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit
 ) {
@@ -119,34 +122,169 @@ internal fun PlayTabContent(
         bestScore = bestScore,
         progressionState = progressionState
     )
-    HomeLevelProgressCard(progressionState = progressionState)
-    if (isOnboardingCompleted && !progressionState.firstTargetBonusClaimed) {
-        FirstTargetCard()
-    }
-    SeasonMiniCard(season = progressionState.season)
-    DailyModeCard(
-        state = dailyFeaturedMode,
-        onPlayClick = onModeStartClick
-    )
-    AchievementCounterCard(achievements = progressionState.achievements)
-    DailyStreakMiniCard(
-        state = progressionState.dailyReward,
-        onClick = onDailyRewardCardClick,
-        onProtectClick = onDailyStreakProtect
-    )
-    DailyChallengeCard(
-        state = dailyChallengeState,
-        rewardedAdUiState = rewardedAdUiState,
-        onClaimClick = onDailyChallengeClaim,
-        onDoubleRewardClick = onDailyChallengeDoubleRewardClick
-    )
-    ThemeTargetCard(progressionState = progressionState)
     GameModeSection(
         bestScoresByMode = bestScoresByMode,
+        modeMasteryXpByMode = progressionState.modeMasteryXpByMode,
         selectedMode = selectedMode,
         onModeStartClick = onModeStartClick
     )
+    NextGoalSuggestionCard(
+        bestScore = bestScore,
+        progressionState = progressionState,
+        dailyChallengeState = dailyChallengeState,
+        onDailyRewardClick = onDailyRewardCardClick,
+        onTabClick = onSuggestionTabClick
+    )
+    if (isOnboardingCompleted && !progressionState.firstTargetBonusClaimed) {
+        FirstTargetCard()
+    }
+    DailyModeCard(
+        state = dailyFeaturedMode,
+        masteryProgress = modeMasteryProgressFor(progressionState.modeMasteryXpByMode, dailyFeaturedMode.mode),
+        onPlayClick = onModeStartClick
+    )
+    DailyMiniTournamentCard(
+        state = progressionState.dailyMiniTournament,
+        onPlayClick = onModeStartClick
+    )
     HowToPlayEntryCard(onClick = onHowToPlayClick)
+}
+
+@Composable
+private fun NextGoalSuggestionCard(
+    bestScore: Int,
+    progressionState: ProgressionState,
+    dailyChallengeState: DailyChallengeState,
+    onDailyRewardClick: () -> Unit,
+    onTabClick: (HomeTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val suggestion = nextGoalSuggestion(
+        bestScore = bestScore,
+        progressionState = progressionState,
+        dailyChallengeState = dailyChallengeState,
+        onDailyRewardClick = onDailyRewardClick,
+        onTabClick = onTabClick
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.32f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeBlue.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "→",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ArcadeGold
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = stringResource(suggestion.titleRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(suggestion.descriptionRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SecondaryGameButton(
+                text = stringResource(suggestion.buttonRes),
+                onClick = suggestion.onClick
+            )
+        }
+    }
+}
+
+private data class NextGoalSuggestion(
+    val titleRes: Int,
+    val descriptionRes: Int,
+    val buttonRes: Int,
+    val onClick: () -> Unit
+)
+
+private fun nextGoalSuggestion(
+    bestScore: Int,
+    progressionState: ProgressionState,
+    dailyChallengeState: DailyChallengeState,
+    onDailyRewardClick: () -> Unit,
+    onTabClick: (HomeTab) -> Unit
+): NextGoalSuggestion {
+    val currentCoins = progressionState.coins.coerceAtLeast(0)
+    val nearestLockedTheme = PlayerTheme.entries
+        .filter { it.coinPrice > 0 && it !in progressionState.unlockedThemes }
+        .minByOrNull { it.coinPrice }
+    val canBuyTheme = nearestLockedTheme?.let { currentCoins >= it.coinPrice } == true
+    val canClaimSeasonReward = progressionState.season.rewards.any { reward ->
+        reward.level <= progressionState.season.level && !reward.claimed
+    }
+
+    return when {
+        progressionState.dailyReward.canClaim -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_daily_reward_title,
+            descriptionRes = R.string.next_goal_daily_reward_description,
+            buttonRes = R.string.next_goal_daily_reward_button,
+            onClick = onDailyRewardClick
+        )
+        canClaimSeasonReward -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_season_reward_title,
+            descriptionRes = R.string.next_goal_season_reward_description,
+            buttonRes = R.string.next_goal_season_reward_button,
+            onClick = { onTabClick(HomeTab.Season) }
+        )
+        !dailyChallengeState.completed -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_daily_mission_title,
+            descriptionRes = R.string.next_goal_daily_mission_description,
+            buttonRes = R.string.next_goal_daily_mission_button,
+            onClick = { onTabClick(HomeTab.Missions) }
+        )
+        canBuyTheme -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_unlock_theme_title,
+            descriptionRes = R.string.next_goal_unlock_theme_description,
+            buttonRes = R.string.next_goal_unlock_theme_button,
+            onClick = { onTabClick(HomeTab.Shop) }
+        )
+        bestScore < 20 || !progressionState.dailyLeaderboardGoal.claimed -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_leaderboard_title,
+            descriptionRes = R.string.next_goal_leaderboard_description,
+            buttonRes = R.string.next_goal_leaderboard_button,
+            onClick = { onTabClick(HomeTab.Leaderboard) }
+        )
+        nearestLockedTheme != null && currentCoins < nearestLockedTheme.coinPrice -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_coin_title,
+            descriptionRes = R.string.next_goal_coin_description,
+            buttonRes = R.string.next_goal_coin_button,
+            onClick = { onTabClick(HomeTab.Shop) }
+        )
+        else -> NextGoalSuggestion(
+            titleRes = R.string.next_goal_daily_mission_title,
+            descriptionRes = R.string.next_goal_daily_mission_description,
+            buttonRes = R.string.next_goal_daily_mission_button,
+            onClick = { onTabClick(HomeTab.Missions) }
+        )
+    }
 }
 
 @Composable
@@ -204,6 +342,7 @@ internal fun FirstTargetCard(
 @Composable
 internal fun DailyModeCard(
     state: DailyFeaturedModeState,
+    masteryProgress: ModeMasteryProgress,
     onPlayClick: (GameMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -273,6 +412,13 @@ internal fun DailyModeCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Text(
+                        text = stringResource(R.string.mode_mastery_level_value, masteryProgress.level),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 Surface(
                     color = accent.copy(alpha = 0.18f),
@@ -280,7 +426,7 @@ internal fun DailyModeCard(
                     border = BorderStroke(1.dp, accent.copy(alpha = 0.42f))
                 ) {
                     Text(
-                        text = stringResource(R.string.daily_mode_bonus),
+                        text = stringResource(R.string.daily_mode_bonus, state.coinBonusPercent),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                         style = MaterialTheme.typography.labelMedium,
                         color = ReflexGamePalette.textPrimary,
@@ -290,6 +436,14 @@ internal fun DailyModeCard(
                     )
                 }
             }
+            LinearProgressIndicator(
+                progress = { masteryProgress.progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                color = accent,
+                trackColor = ReflexGamePalette.textPrimary.copy(alpha = 0.08f)
+            )
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -311,5 +465,3 @@ internal fun DailyModeCard(
         }
     }
 }
-
-

@@ -51,15 +51,16 @@ import com.reflex.tr.game.ibrh.ui.game.GameTargetRole
 import com.reflex.tr.game.ibrh.ui.game.PlayerTheme
 import com.reflex.tr.game.ibrh.ui.game.ReflexTargetColor
 import com.reflex.tr.game.ibrh.ui.game.TargetPosition
+import com.reflex.tr.game.ibrh.ui.game.TargetSkin
 import com.reflex.tr.game.ibrh.ui.game.themeVisualSpec
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
-import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.launch
 
 @Composable
 fun TargetMarker(
@@ -69,6 +70,7 @@ fun TargetMarker(
     spawnKey: Any = Unit,
     comboLevel: Int = 0,
     theme: PlayerTheme = PlayerTheme.NeonRed,
+    skin: TargetSkin = TargetSkin.ClassicTarget,
     onTap: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -109,9 +111,10 @@ fun TargetMarker(
     }
     val baseColor = remember(targetColor) { targetColor.toComposeColor() }
     val themeGlowColor = remember(theme) { themeVisualSpec(theme).primary }
-    val ringAlpha = if (role == GameTargetRole.Correct) 0.9f else 0.62f
-    val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.78f
-    val borderAlpha = if (role == GameTargetRole.Correct) 0.92f else 0.5f
+    val skinAccent = remember(skin, baseColor) { targetSkinAccentColor(skin, baseColor) }
+    val ringAlpha = if (role == GameTargetRole.Correct) 0.9f else 0.7f
+    val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.84f
+    val borderAlpha = if (role == GameTargetRole.Correct) 0.92f else 0.58f
     val comboBoost = (comboLevel / 5f).coerceIn(0f, 1f)
     val highComboBoost = (comboLevel / 20f).coerceIn(0f, 1f)
     val roleScale = if (role == GameTargetRole.Correct) 1f else 0.96f
@@ -150,7 +153,7 @@ fun TargetMarker(
                     Brush.radialGradient(
                         colors = listOf(
                             baseColor.copy(alpha = ringAlpha),
-                            themeGlowColor.copy(alpha = 0.42f + highComboBoost * 0.22f),
+                            skinAccent.copy(alpha = 0.42f + highComboBoost * 0.22f),
                             Color.Transparent
                         )
                     )
@@ -181,7 +184,7 @@ fun TargetMarker(
                     Brush.radialGradient(
                         colors = listOf(
                             Color.White.copy(alpha = if (role == GameTargetRole.Correct) 0.95f else 0.62f),
-                            baseColor.copy(alpha = if (role == GameTargetRole.Correct) 0.32f else 0.2f)
+                            skinAccent.copy(alpha = if (role == GameTargetRole.Correct) 0.32f else 0.2f)
                         )
                     )
                 )
@@ -195,7 +198,7 @@ fun TargetMarker(
                     Brush.radialGradient(
                         colors = listOf(
                             Color.White.copy(alpha = if (role == GameTargetRole.Correct) 0.28f else 0.14f),
-                            baseColor.copy(alpha = 0.76f),
+                            skinAccent.copy(alpha = 0.76f),
                             baseColor.copy(alpha = coreAlpha)
                         )
                     )
@@ -220,17 +223,17 @@ fun TargetMarker(
             )
             if (role == GameTargetRole.Fake) {
                 drawLine(
-                    color = Color.White.copy(alpha = 0.34f),
-                    start = androidx.compose.ui.geometry.Offset(size.width * 0.26f, size.height * 0.28f),
-                    end = androidx.compose.ui.geometry.Offset(size.width * 0.74f, size.height * 0.72f),
-                    strokeWidth = size.minDimension * 0.055f,
+                    color = Color.White.copy(alpha = 0.24f),
+                    start = androidx.compose.ui.geometry.Offset(size.width * 0.3f, size.height * 0.32f),
+                    end = androidx.compose.ui.geometry.Offset(size.width * 0.7f, size.height * 0.68f),
+                    strokeWidth = size.minDimension * 0.04f,
                     cap = StrokeCap.Round
                 )
                 drawLine(
-                    color = baseColor.copy(alpha = 0.42f),
-                    start = androidx.compose.ui.geometry.Offset(size.width * 0.74f, size.height * 0.28f),
-                    end = androidx.compose.ui.geometry.Offset(size.width * 0.26f, size.height * 0.72f),
-                    strokeWidth = size.minDimension * 0.04f,
+                    color = baseColor.copy(alpha = 0.34f),
+                    start = androidx.compose.ui.geometry.Offset(size.width * 0.7f, size.height * 0.32f),
+                    end = androidx.compose.ui.geometry.Offset(size.width * 0.3f, size.height * 0.68f),
+                    strokeWidth = size.minDimension * 0.032f,
                     cap = StrokeCap.Round
                 )
             } else {
@@ -261,6 +264,19 @@ private fun ReflexTargetColor.toComposeColor(): Color {
         ReflexTargetColor.Blue -> Color(0xFF39A8FF)
         ReflexTargetColor.Gold -> Color(0xFFFFD84D)
         ReflexTargetColor.Teal -> Color(0xFF22F2A6)
+    }
+}
+
+private fun targetSkinAccentColor(
+    skin: TargetSkin,
+    fallback: Color
+): Color {
+    return when (skin) {
+        TargetSkin.ClassicTarget -> fallback
+        TargetSkin.NeonRing -> Color(0xFF41F2FF)
+        TargetSkin.CyberDot -> Color(0xFF9F7BFF)
+        TargetSkin.FireCore -> Color(0xFFFF6B3D)
+        TargetSkin.MatrixOrb -> Color(0xFF49FF91)
     }
 }
 
@@ -386,6 +402,70 @@ fun HitFeedbackEffect(
     }
 }
 
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTargetSkinDetails(
+    skin: TargetSkin,
+    baseColor: Color,
+    accentColor: Color,
+    isFake: Boolean
+) {
+    if (isFake) return
+
+    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+    val min = size.minDimension
+    when (skin) {
+        TargetSkin.ClassicTarget -> Unit
+        TargetSkin.NeonRing -> {
+            drawCircle(
+                color = accentColor.copy(alpha = 0.72f),
+                radius = min * 0.34f,
+                center = center,
+                style = Stroke(width = min * 0.035f)
+            )
+        }
+        TargetSkin.CyberDot -> {
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.38f),
+                radius = min * 0.11f,
+                center = center
+            )
+            drawCircle(
+                color = accentColor.copy(alpha = 0.9f),
+                radius = min * 0.045f,
+                center = center
+            )
+        }
+        TargetSkin.FireCore -> {
+            drawCircle(
+                color = Color(0xFFFFD05A).copy(alpha = 0.78f),
+                radius = min * 0.13f,
+                center = center
+            )
+            drawCircle(
+                color = baseColor.copy(alpha = 0.42f),
+                radius = min * 0.3f,
+                center = center,
+                style = Stroke(width = min * 0.055f)
+            )
+        }
+        TargetSkin.MatrixOrb -> {
+            repeat(4) { index ->
+                val angle = (index * 90f) * (PI.toFloat() / 180f)
+                val end = androidx.compose.ui.geometry.Offset(
+                    x = center.x + cos(angle) * min * 0.34f,
+                    y = center.y + sin(angle) * min * 0.34f
+                )
+                drawLine(
+                    color = accentColor.copy(alpha = 0.56f),
+                    start = center,
+                    end = end,
+                    strokeWidth = min * 0.022f,
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun rememberShakeTranslationX(trigger: Int): Float {
     val translation = remember { Animatable(0f) }
@@ -413,7 +493,13 @@ fun rememberShakeTranslationX(trigger: Int): Float {
 internal data class GameSoundHooks(
     val onHit: () -> Unit = {},
     val onMiss: () -> Unit = {},
+    val onPerfect: () -> Unit = {},
+    val onGreat: () -> Unit = {},
     val onCombo: () -> Unit = {},
+    val onComboBig: () -> Unit = {},
+    val onNewRecord: () -> Unit = {},
+    val onUnlock: () -> Unit = {},
+    val onReward: () -> Unit = {},
     val onCountdown: () -> Unit = {},
     val onGameOver: () -> Unit = {}
 )
@@ -450,7 +536,13 @@ internal fun rememberGameSoundHooks(
         GameSoundHooks(
             onHit = { soundController.play(GameSoundEffect.Hit) },
             onMiss = { soundController.play(GameSoundEffect.Miss) },
+            onPerfect = { soundController.play(GameSoundEffect.Perfect) },
+            onGreat = { soundController.play(GameSoundEffect.Great) },
             onCombo = { soundController.play(GameSoundEffect.Combo) },
+            onComboBig = { soundController.play(GameSoundEffect.ComboBig) },
+            onNewRecord = { soundController.play(GameSoundEffect.NewRecord) },
+            onUnlock = { soundController.play(GameSoundEffect.Unlock) },
+            onReward = { soundController.play(GameSoundEffect.Reward) },
             onCountdown = { soundController.play(GameSoundEffect.Countdown) },
             onGameOver = { soundController.play(GameSoundEffect.GameOver) }
         )

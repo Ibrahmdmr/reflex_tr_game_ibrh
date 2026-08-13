@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,7 @@ private enum class HomePopup {
     DailyReward,
     PlayerName,
     LevelUp,
+    ModeMasteryLevelUp,
     ThemeUnlock,
     HomeExit
 }
@@ -65,6 +67,7 @@ fun HomeContent(
     isStorePreviewMode: Boolean,
     selectedLanguage: AppLanguage,
     onStartClick: () -> Unit,
+    onQuickGameClick: () -> Unit,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
     onLanguageSelected: (AppLanguage) -> Unit,
@@ -79,25 +82,34 @@ fun HomeContent(
     onDailyRewardClaim: () -> Unit,
     onDailyRewardDialogShown: () -> Unit,
     onDailyChallengeClaim: () -> Unit,
+    onComboChallengeClaim: () -> Unit,
+    onWeeklyChallengeClaim: () -> Unit,
     onSeasonRewardClaim: (Int) -> Unit,
     onSeasonXpBoostClick: () -> Unit,
     onSeasonMissionClaim: (String) -> Unit,
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit,
     onShopCoinRewardClick: () -> Unit,
+    onInviteShareClick: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
     onThemeTrial: (PlayerTheme) -> Unit,
+    onTargetSkinSelect: (TargetSkin) -> Unit,
+    onTargetSkinBuy: (TargetSkin) -> Unit,
     onPlayerNameChange: (String) -> Boolean,
     onPlayerTitleSelect: (PlayerTitle) -> Unit,
+    onProfileBadgeSelect: (ProfileBadge) -> Unit,
     onLeaderboardModeSelected: (GameMode) -> Unit,
     onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
     onLeaderboardRefresh: () -> Unit,
+    onDailyLeaderboardGoalClaim: () -> Unit,
+    onPersonalGoalClaim: () -> Unit,
     onLeaderboardOpenedForMission: () -> Unit,
     onShopOpenedForMission: () -> Unit,
     onStorePreviewModeChange: (Boolean) -> Unit,
+    onResetModeTips: () -> Unit,
     onRateAppClick: () -> Unit,
     onExitAppRequested: () -> Unit,
     modifier: Modifier = Modifier
@@ -126,11 +138,18 @@ fun HomeContent(
         var unlockedThemePopup by rememberSaveable { mutableStateOf<PlayerTheme?>(null) }
         var showHomeExitDialog by rememberSaveable { mutableStateOf(false) }
         var dismissedLevelUp by rememberSaveable { mutableStateOf<Int?>(null) }
+        var dismissedModeMasteryLevelUp by rememberSaveable { mutableStateOf<String?>(null) }
         val levelUp = progressionState.lastLevelUp
+        val modeMasteryLevelUp = progressionState.lastModeMasteryLevelUp
+        val modeMasteryLevelUpKey = modeMasteryLevelUp?.let {
+            "${it.mode.storageKey}_${it.level}_${it.coinBonus}"
+        }
         val activeHomePopup = when {
             showDailyRewardPopup -> HomePopup.DailyReward
             showPlayerNameDialog -> HomePopup.PlayerName
             levelUp != null && dismissedLevelUp != levelUp -> HomePopup.LevelUp
+            modeMasteryLevelUp != null && dismissedModeMasteryLevelUp != modeMasteryLevelUpKey ->
+                HomePopup.ModeMasteryLevelUp
             unlockedThemePopup != null -> HomePopup.ThemeUnlock
             showHomeExitDialog -> HomePopup.HomeExit
             else -> null
@@ -145,6 +164,7 @@ fun HomeContent(
                     }
                 }
                 HomePopup.LevelUp -> dismissedLevelUp = levelUp
+                HomePopup.ModeMasteryLevelUp -> dismissedModeMasteryLevelUp = modeMasteryLevelUpKey
                 HomePopup.ThemeUnlock -> unlockedThemePopup = null
                 HomePopup.HomeExit -> showHomeExitDialog = false
                 null -> {
@@ -165,6 +185,13 @@ fun HomeContent(
             if (levelUp != null && dismissedLevelUp != levelUp) {
                 delay(LEVEL_UP_POPUP_DURATION_MS)
                 dismissedLevelUp = levelUp
+            }
+        }
+
+        LaunchedEffect(modeMasteryLevelUpKey) {
+            if (modeMasteryLevelUpKey != null && dismissedModeMasteryLevelUp != modeMasteryLevelUpKey) {
+                delay(LEVEL_UP_POPUP_DURATION_MS)
+                dismissedModeMasteryLevelUp = modeMasteryLevelUpKey
             }
         }
 
@@ -207,6 +234,13 @@ fun HomeContent(
             )
         }
 
+        if (activeHomePopup == HomePopup.ModeMasteryLevelUp && modeMasteryLevelUp != null) {
+            ModeMasteryLevelUpPopup(
+                levelUp = modeMasteryLevelUp,
+                onDismiss = { dismissedModeMasteryLevelUp = modeMasteryLevelUpKey }
+            )
+        }
+
         if (activeHomePopup == HomePopup.HomeExit) {
             HomeExitDialog(
                 onStayClick = { showHomeExitDialog = false },
@@ -220,7 +254,8 @@ fun HomeContent(
         GamePanelCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxHeight),
+                .heightIn(max = maxHeight)
+                .navigationBarsPadding(),
             contentPadding = panelPadding,
             content = {
                 Column(
@@ -233,7 +268,7 @@ fun HomeContent(
                             .fillMaxWidth()
                             .weight(1f, fill = false)
                             .verticalScroll(contentScrollState)
-                            .padding(bottom = 14.dp),
+                            .padding(bottom = if (isCompactHeight) 20.dp else 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(contentSpacing)
                     ) {
@@ -263,6 +298,15 @@ fun HomeContent(
                                 onHowToPlayClick = onHowToPlayClick,
                                 onDailyStreakProtect = onDailyStreakProtect,
                                 onDailyRewardCardClick = { showDailyRewardPopup = true },
+                                onSuggestionTabClick = { tab ->
+                                    logHomeTabOpened(
+                                        tab = tab,
+                                        leaderboardSnapshot = leaderboardSnapshot
+                                    )
+                                    if (tab == HomeTab.Leaderboard) onLeaderboardOpenedForMission()
+                                    if (tab == HomeTab.Shop) onShopOpenedForMission()
+                                    selectedHomeTab = tab
+                                },
                                 onDailyChallengeClaim = onDailyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick
                             )
@@ -275,7 +319,10 @@ fun HomeContent(
                                 onDailyStreakProtect = onDailyStreakProtect,
                                 onDailyRewardCardClick = { showDailyRewardPopup = true },
                                 onCoinChestClick = onCoinChestClick,
+                                onInviteShareClick = onInviteShareClick,
                                 onDailyChallengeClaim = onDailyChallengeClaim,
+                                onComboChallengeClaim = onComboChallengeClaim,
+                                onWeeklyChallengeClaim = onWeeklyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                                 onAchievementClaim = onAchievementClaim
                             )
@@ -299,6 +346,8 @@ fun HomeContent(
                                 progressionState = progressionState,
                                 onEditNameClick = { showPlayerNameDialog = true },
                                 onTitleSelect = onPlayerTitleSelect,
+                                onPersonalGoalClaim = onPersonalGoalClaim,
+                                onProfileBadgeSelect = onProfileBadgeSelect,
                                 onQuickMenuSelected = { tab ->
                                     logHomeTabOpened(
                                         tab = tab,
@@ -318,8 +367,19 @@ fun HomeContent(
                                 onDailyStreakProtect = onDailyStreakProtect,
                                 onDailyRewardCardClick = { showDailyRewardPopup = true },
                                 onDailyChallengeClaim = onDailyChallengeClaim,
+                                onComboChallengeClaim = onComboChallengeClaim,
+                                onWeeklyChallengeClaim = onWeeklyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
                                 onAchievementClaim = onAchievementClaim
+                            )
+
+                            HomeTab.Statistics -> StatisticsTabContent(
+                                bestScoresByMode = bestScoresByMode,
+                                progressionState = progressionState
+                            )
+
+                            HomeTab.Collection -> CollectionTabContent(
+                                progressionState = progressionState
                             )
 
                             HomeTab.Shop -> ShopTabContent(
@@ -332,12 +392,16 @@ fun HomeContent(
                                 onThemeSelect = onThemeSelect,
                                 onThemeBuy = onThemeBuy,
                                 onThemeTrial = onThemeTrial,
+                                onTargetSkinSelect = onTargetSkinSelect,
+                                onTargetSkinBuy = onTargetSkinBuy,
                                 onCoinChestClick = onCoinChestClick,
                                 onShopCoinRewardClick = onShopCoinRewardClick
                             )
 
                             HomeTab.Leaderboard -> LeaderboardTabContent(
                                 leaderboardSnapshot = leaderboardSnapshot,
+                                dailyLeaderboardGoal = progressionState.dailyLeaderboardGoal,
+                                onDailyLeaderboardGoalClaim = onDailyLeaderboardGoalClaim,
                                 onModeSelected = onLeaderboardModeSelected,
                                 onPeriodSelected = onLeaderboardPeriodSelected,
                                 onRefreshClick = onLeaderboardRefresh
@@ -365,6 +429,7 @@ fun HomeContent(
                                 onNewMissionNotificationChange = onNewMissionNotificationChange,
                                 onOpenOnboarding = onOpenOnboarding,
                                 onStorePreviewModeChange = onStorePreviewModeChange,
+                                onResetModeTips = onResetModeTips,
                                 onRateAppClick = onRateAppClick,
                                 onEditNameClick = { showPlayerNameDialog = true }
                             )
@@ -395,6 +460,14 @@ fun HomeContent(
                                 }
                             },
                             height = if (isCompactHeight) 50.dp else 54.dp
+                        )
+                        SecondaryGameButton(
+                            text = stringResource(R.string.quick_game_button),
+                            onClick = {
+                                if (activeHomePopup == null) {
+                                    onQuickGameClick()
+                                }
+                            }
                         )
                     }
                 }
@@ -445,6 +518,8 @@ internal enum class HomeTab(
     Shop(R.string.nav_shop, "◉", true),
     Profile(R.string.nav_profile, "◆", true),
     Leaderboard(R.string.nav_leaderboard, "#"),
+    Statistics(R.string.statistics_title, "%"),
+    Collection(R.string.collection_title, "▣"),
     Achievements(R.string.nav_achievements, "◇"),
     Missions(R.string.nav_missions, "✓"),
     Season(R.string.season_title, "S"),
@@ -467,6 +542,8 @@ private fun logHomeTabOpened(
         HomeTab.Play,
         HomeTab.Rewards,
         HomeTab.Achievements,
+        HomeTab.Collection,
+        HomeTab.Statistics,
         HomeTab.Season,
         HomeTab.Missions,
         HomeTab.Settings -> Unit

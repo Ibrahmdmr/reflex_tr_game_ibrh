@@ -108,6 +108,9 @@ enum class FirebaseEvent(val eventName: String) {
     PlayerNameChanged("player_name_changed"),
     AchievementUnlocked("achievement_unlocked"),
     AchievementClaimed("achievement_claimed"),
+    ScoreShared("score_shared"),
+    InviteShareClicked("invite_share_clicked"),
+    InviteRewardClaimed("invite_reward_claimed"),
     LevelUp("level_up"),
     RankChanged("rank_changed"),
     NotificationPermissionShown("notification_permission_shown"),
@@ -122,6 +125,7 @@ enum class FirebaseEvent(val eventName: String) {
 
 enum class FirebaseParam(val key: String) {
     ModeName("mode_name"),
+    Mode("mode"),
     ThemeName("theme_name"),
     CoinAmount("coin_amount"),
     ChallengeName("challenge_name"),
@@ -129,6 +133,7 @@ enum class FirebaseParam(val key: String) {
     Score("score"),
     MaxCombo("max_combo"),
     NewBest("new_best"),
+    IsNewRecord("is_new_record"),
     NameLength("name_length"),
     Period("period"),
     Placement("placement"),

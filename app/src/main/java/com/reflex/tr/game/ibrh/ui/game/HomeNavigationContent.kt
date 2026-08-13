@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,9 +49,9 @@ internal fun HomeBottomNavigation(
     val selectedBottomTab = if (selectedTab.showInBottomNav) selectedTab else HomeTab.Profile
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.06f),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.18f))
+        color = Color.White.copy(alpha = 0.065f),
+        shape = RoundedCornerShape(PremiumCardRadius),
+        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.22f))
     ) {
         Row(
             modifier = Modifier.padding(4.dp),
@@ -63,9 +64,9 @@ internal fun HomeBottomNavigation(
                         .weight(1f)
                         .clickable { onTabSelected(tab) },
                     color = if (selected) ArcadeBlue.copy(alpha = 0.20f) else Color.Transparent,
-                    shape = RoundedCornerShape(13.dp),
+                    shape = RoundedCornerShape(PremiumCompactRadius),
                     border = if (selected) {
-                        BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.52f))
+                        BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.48f))
                     } else {
                         null
                     }
@@ -82,7 +83,9 @@ internal fun HomeBottomNavigation(
                         )
                         Text(
                             text = stringResource(tab.titleRes),
-                            modifier = Modifier.padding(start = 4.dp),
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .padding(start = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (selected) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary,
                             textAlign = TextAlign.Center,
@@ -198,6 +201,7 @@ internal fun HowToPlayEntryCard(
 @Composable
 internal fun GameModeSection(
     bestScoresByMode: Map<GameMode, Int>,
+    modeMasteryXpByMode: Map<GameMode, Int>,
     selectedMode: GameMode,
     onModeStartClick: (GameMode) -> Unit,
     modifier: Modifier = Modifier
@@ -215,6 +219,7 @@ internal fun GameModeSection(
             GameModeCard(
                 mode = mode,
                 bestScore = bestScoresByMode[mode] ?: 0,
+                masteryProgress = modeMasteryProgressFor(modeMasteryXpByMode, mode),
                 selected = mode == selectedMode,
                 onClick = { onModeStartClick(mode) }
             )
@@ -226,9 +231,10 @@ internal fun GameModeSection(
 internal fun GameModeCard(
     mode: GameMode,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     bestScore: Int? = null,
-    selected: Boolean = false,
-    modifier: Modifier = Modifier
+    masteryProgress: ModeMasteryProgress? = null,
+    selected: Boolean = false
 ) {
     val accentColor = modeAccentColor(mode)
     val interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }
@@ -297,15 +303,33 @@ internal fun GameModeCard(
                 }
             }
             if (bestScore != null) {
-                Text(
-                    text = stringResource(R.string.mode_best_score_value, bestScore),
+                Column(
                     modifier = Modifier.padding(start = 36.dp, end = 12.dp, bottom = 9.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ReflexGamePalette.textSecondary
-                )
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = if (masteryProgress != null) {
+                            stringResource(
+                                R.string.mode_card_best_mastery_value,
+                                bestScore,
+                                masteryProgress.level
+                            )
+                        } else {
+                            stringResource(R.string.mode_best_score_value, bestScore)
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ReflexGamePalette.textSecondary
+                    )
+                    if (masteryProgress != null) {
+                        LinearProgressIndicator(
+                            progress = { masteryProgress.progressFraction },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = accentColor,
+                            trackColor = ReflexGamePalette.textPrimary.copy(alpha = 0.08f)
+                        )
+                    }
+                }
             }
         }
     }
 }
-
-

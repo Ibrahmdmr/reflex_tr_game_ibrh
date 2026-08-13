@@ -7,18 +7,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
-
-private fun appVersionLabel(): String {
-    return if (BuildConfig.DEBUG) {
-        BuildConfig.VERSION_NAME
-    } else {
-        BuildConfig.VERSION_NAME.substringBefore("-debug")
-    }
-}
 
 @Composable
 internal fun SettingsTabContent(
@@ -43,6 +34,7 @@ internal fun SettingsTabContent(
     onNewMissionNotificationChange: (Boolean) -> Unit,
     onOpenOnboarding: () -> Unit,
     onStorePreviewModeChange: (Boolean) -> Unit,
+    onResetModeTips: () -> Unit,
     onRateAppClick: () -> Unit,
     onEditNameClick: () -> Unit
 ) {
@@ -133,7 +125,7 @@ internal fun SettingsTabContent(
     SettingsSectionCard(title = stringResource(R.string.settings_data_title)) {
         SettingsInfoRow(
             title = stringResource(R.string.settings_app_version),
-            value = appVersionLabel()
+            value = getDisplayVersionName()
         )
         SettingsInfoRow(
             title = stringResource(R.string.settings_total_games),
@@ -149,7 +141,7 @@ internal fun SettingsTabContent(
         )
     }
 
-    if (BuildConfig.DEBUG) {
+    if (shouldShowDeveloperTools()) {
         SettingsSectionCard(title = stringResource(R.string.store_preview_settings_title)) {
             SettingsActionButton(
                 text = stringResource(
@@ -168,6 +160,10 @@ internal fun SettingsTabContent(
         SettingsActionButton(
             text = stringResource(R.string.settings_open_onboarding),
             onClick = onOpenOnboarding
+        )
+        SettingsActionButton(
+            text = stringResource(R.string.settings_reset_mode_tips),
+            onClick = onResetModeTips
         )
         SettingsActionButton(
             text = stringResource(R.string.settings_contact_us),
