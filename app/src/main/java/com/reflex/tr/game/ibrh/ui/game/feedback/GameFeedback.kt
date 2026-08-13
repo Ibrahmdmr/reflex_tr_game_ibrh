@@ -56,11 +56,11 @@ import com.reflex.tr.game.ibrh.ui.game.themeVisualSpec
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoralSoft
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlinx.coroutines.launch
 
 @Composable
 fun TargetMarker(

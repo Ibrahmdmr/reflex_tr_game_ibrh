@@ -78,9 +78,9 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
+import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.random.Random
-import kotlinx.coroutines.delay
 
 private val ScreenHorizontalPadding = 20.dp
 private val ScreenVerticalPadding = 18.dp

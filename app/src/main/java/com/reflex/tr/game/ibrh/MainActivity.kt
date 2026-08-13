@@ -84,10 +84,10 @@ import com.reflex.tr.game.ibrh.ui.game.HowToPlayScreen
 import com.reflex.tr.game.ibrh.ui.game.PolishedGameDialog
 import com.reflex.tr.game.ibrh.ui.game.RewardedAction
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private const val SplashDurationMillis = 3_000L
 private const val MainActivityLogTag = "MainActivityAds"
