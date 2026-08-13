@@ -42,7 +42,7 @@ internal fun ThemeTargetCard(
         Surface(
             modifier = modifier.fillMaxWidth(),
             color = ReflexGamePalette.cardGlassStrong,
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(PremiumCardRadius),
             border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
         ) {
             Text(
@@ -65,7 +65,7 @@ internal fun ThemeTargetCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Column(
@@ -106,7 +106,7 @@ internal fun ThemeTargetCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(5.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )

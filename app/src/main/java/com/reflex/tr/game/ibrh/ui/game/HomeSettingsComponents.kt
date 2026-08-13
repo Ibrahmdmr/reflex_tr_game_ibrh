@@ -157,7 +157,7 @@ internal fun NotificationStateChip(
     val accent = if (checked) ArcadeTeal else Color.White.copy(alpha = 0.42f)
     Surface(
         color = accent.copy(alpha = if (checked) 0.18f else 0.08f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(PremiumPillRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Text(
@@ -297,7 +297,7 @@ internal fun LanguageChip(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         color = color.copy(alpha = if (selected) 0.22f else 0.1f),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, color.copy(alpha = if (selected) 0.56f else 0.24f))
     ) {
         Text(

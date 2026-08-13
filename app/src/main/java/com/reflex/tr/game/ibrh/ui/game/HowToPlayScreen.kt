@@ -126,7 +126,7 @@ private fun HowToPlayHeader(
     ) {
         OutlinedButton(
             onClick = onBackClick,
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(PremiumChipRadius)
         ) {
             Text(
                 text = if (isDetailVisible) {
@@ -181,7 +181,7 @@ private fun HowToPlayModeDetail(mode: GameMode) {
             ) {
                 Surface(
                     color = accentColor.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(PremiumCardRadius),
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.34f))
                 ) {
                     Text(
@@ -213,7 +213,7 @@ private fun HowToPlayModeDetail(mode: GameMode) {
 
             Surface(
                 color = Color.White.copy(alpha = 0.07f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(PremiumCardRadius),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
                 Column(
@@ -241,7 +241,7 @@ private fun DifficultyChip(mode: GameMode) {
     val accentColor = modeAccentColor(mode)
     Surface(
         color = accentColor.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(999.dp)
+        shape = RoundedCornerShape(PremiumPillRadius)
     ) {
         Text(
             text = stringResource(mode.difficultyRes),

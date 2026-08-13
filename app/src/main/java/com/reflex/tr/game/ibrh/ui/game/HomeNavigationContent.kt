@@ -163,7 +163,7 @@ internal fun HowToPlayEntryCard(
                 onClick = onClick
             ),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
     ) {
         Row(
@@ -258,7 +258,7 @@ internal fun GameModeCard(
                 onClick = onClick
             ),
         color = if (selected) accentColor.copy(alpha = 0.18f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(17.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, accentColor.copy(alpha = if (selected) 0.62f else 0.28f))
     ) {
         Column {
@@ -290,7 +290,7 @@ internal fun GameModeCard(
                 }
                 Surface(
                     color = accentColor.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(999.dp)
+                    shape = RoundedCornerShape(PremiumPillRadius)
                 ) {
                     Text(
                         text = stringResource(mode.difficultyRes),

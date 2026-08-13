@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +40,7 @@ internal fun CoinChestCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.38f))
     ) {
         Row(
@@ -91,7 +92,10 @@ internal fun CoinChestCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            // Bounded width: SecondaryGameButton fills its width, so an unconstrained one in a
+            // Row collapses the sibling text column to zero and hides the whole card body.
             SecondaryGameButton(
+                modifier = Modifier.widthIn(min = 96.dp, max = 112.dp),
                 text = when {
                     !state.canOpen -> stringResource(R.string.coin_chest_limit_reached)
                     rewardedAdUiState.isLoading || rewardedAdUiState.isShowing -> stringResource(R.string.rewarded_loading)

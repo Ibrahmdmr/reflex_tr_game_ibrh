@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -272,6 +273,54 @@ class GameViewModelTest {
             "A scoring run must pay out coins",
             state.progressionState.coins > coinsBefore
         )
+    }
+
+    // --- boosts ---
+
+    /** Seeds the wallet before the view model reads its initial state from storage. */
+    private fun giveCoins(amount: Int) {
+        val preferences = GamePreferences(context)
+        preferences.saveProgressionState(preferences.getProgressionState().copy(coins = amount))
+    }
+
+    @Test
+    fun `coin boost charges the wallet and grants its advantage`() {
+        val coinsBefore = 500
+        giveCoins(coinsBefore)
+        val viewModel = createViewModel()
+        viewModel.markModeTipShown(GameMode.Classic)
+
+        val started = viewModel.startGameWithCoinBoost(GameBoost.ExtraTime)
+
+        val state = viewModel.uiState.value
+        assertTrue("A affordable boost must start the run", started)
+        assertEquals(GameBoost.ExtraTime, state.activeBoost)
+        assertEquals("ExtraTime adds five seconds to the base 30", 35, state.timeLeftSeconds)
+        assertEquals(coinsBefore - GameBoost.ExtraTime.coinPrice, state.progressionState.coins)
+    }
+
+    @Test
+    fun `coin boost is refused when the player cannot afford it`() {
+        val viewModel = createViewModel()
+        viewModel.markModeTipShown(GameMode.Classic)
+
+        val started = viewModel.startGameWithCoinBoost(GameBoost.ComboStart)
+
+        val state = viewModel.uiState.value
+        assertFalse("A boost beyond the wallet must not start a run", started)
+        assertFalse(state.hasGameStarted)
+        assertNull(state.activeBoost)
+    }
+
+    @Test
+    fun `the extra life boost starts the run with a spare life`() {
+        giveCoins(999)
+        val viewModel = createViewModel()
+        viewModel.markModeTipShown(GameMode.Classic)
+
+        viewModel.startGameWithCoinBoost(GameBoost.ExtraLife)
+
+        assertEquals(4, viewModel.uiState.value.lives)
     }
 
     // --- pause ---

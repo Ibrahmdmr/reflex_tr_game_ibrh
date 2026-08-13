@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,7 +69,7 @@ internal fun ProfileSubPageBackButton(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         color = ArcadeBlue.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.26f))
     ) {
         Row(
@@ -170,7 +171,7 @@ private fun NextGoalSuggestionCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.32f))
     ) {
         Row(
@@ -210,7 +211,9 @@ private fun NextGoalSuggestionCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            // Bounded width so the suggestion title and description keep their column.
             SecondaryGameButton(
+                modifier = Modifier.widthIn(min = 96.dp, max = 124.dp),
                 text = stringResource(suggestion.buttonRes),
                 onClick = suggestion.onClick
             )
@@ -294,7 +297,7 @@ internal fun FirstTargetCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
     ) {
         Row(
@@ -350,7 +353,7 @@ internal fun DailyModeCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.55f))
     ) {
         Column(
@@ -422,7 +425,7 @@ internal fun DailyModeCard(
                 }
                 Surface(
                     color = accent.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(PremiumPillRadius),
                     border = BorderStroke(1.dp, accent.copy(alpha = 0.42f))
                 ) {
                     Text(
@@ -449,7 +452,7 @@ internal fun DailyModeCard(
                     .fillMaxWidth()
                     .clickable { onPlayClick(state.mode) },
                 color = accent.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(PremiumChipRadius),
                 border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
             ) {
                 Text(

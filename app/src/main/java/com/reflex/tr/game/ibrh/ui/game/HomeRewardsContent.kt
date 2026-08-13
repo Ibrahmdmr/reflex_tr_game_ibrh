@@ -124,7 +124,7 @@ private fun InviteFriendCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
     ) {
         Column(
@@ -161,7 +161,7 @@ private fun InviteFriendCard(
             OutlinedButton(
                 onClick = onShareClick,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(PremiumChipRadius)
             ) {
                 Text(
                     text = stringResource(R.string.invite_share_button),
@@ -181,7 +181,7 @@ private fun BonusHourCard(state: BonusHourState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
     ) {
         Column(

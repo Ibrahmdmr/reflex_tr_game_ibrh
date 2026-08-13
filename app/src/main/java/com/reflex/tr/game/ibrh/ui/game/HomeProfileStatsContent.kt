@@ -3,7 +3,9 @@ package com.reflex.tr.game.ibrh.ui.game
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -72,7 +74,7 @@ internal fun HomeLevelProgressCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ArcadeTeal.copy(alpha = 0.11f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
     ) {
         Column(
@@ -100,7 +102,7 @@ internal fun HomeLevelProgressCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = ArcadeTeal,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -122,7 +124,7 @@ internal fun AchievementCounterCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ArcadeGold.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.28f))
     ) {
         Text(
@@ -158,7 +160,7 @@ internal fun AchievementSummaryCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ArcadeTeal.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.3f))
     ) {
         Row(
@@ -285,8 +287,13 @@ private data class StatisticItem(
 
 @Composable
 private fun StatisticsRow(items: List<StatisticItem>) {
+    // IntrinsicSize.Min + fillMaxHeight keeps both cards the height of the taller one. Titles
+    // wrap to two lines at different points ("En çok coin kazanılan oyun" vs "En iyi Klasik
+    // skoru"), which otherwise leaves one card visibly shorter than its neighbour.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items.forEach { item ->
@@ -294,7 +301,9 @@ private fun StatisticsRow(items: List<StatisticItem>) {
                 title = stringResource(item.titleRes),
                 value = item.value,
                 accent = item.accent,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
         }
     }
@@ -308,7 +317,7 @@ private fun ModeStatisticsSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.26f))
     ) {
         Column(
@@ -339,7 +348,7 @@ private fun PersonalRecordsSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.28f))
     ) {
         Column(
@@ -417,7 +426,7 @@ private fun ModeStatisticRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = modeAccent(mode).copy(alpha = 0.10f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, modeAccent(mode).copy(alpha = 0.26f))
     ) {
         Row(

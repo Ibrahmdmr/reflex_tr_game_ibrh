@@ -89,7 +89,7 @@ private fun BadgePill(
             .graphicsLayer { alpha = if (unlocked) 1f else 0.42f }
             .clickable(enabled = unlocked, onClick = onClick),
         color = accent.copy(alpha = if (selected) 0.2f else 0.12f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.54f else 0.24f))
     ) {
         Column(
@@ -97,7 +97,7 @@ private fun BadgePill(
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                text = badgeIcon(badge),
+                text = badge.icon,
                 style = MaterialTheme.typography.titleMedium,
                 color = accent
             )
@@ -126,7 +126,7 @@ private fun BadgeListRow(
             .graphicsLayer { alpha = if (unlocked) 1f else 0.46f }
             .clickable(enabled = unlocked, onClick = onClick),
         color = if (selected) accent.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.045f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.42f else 0.18f))
     ) {
         Row(
@@ -134,7 +134,7 @@ private fun BadgeListRow(
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Text(
-                text = badgeIcon(badge),
+                text = badge.icon,
                 style = MaterialTheme.typography.titleSmall,
                 color = accent
             )
@@ -181,16 +181,3 @@ private fun badgeAccent(badge: ProfileBadge): Color {
     }
 }
 
-private fun badgeIcon(badge: ProfileBadge): String {
-    return when (badge) {
-        ProfileBadge.FirstGame -> "1"
-        ProfileBadge.ComboHunter -> "x"
-        ProfileBadge.RecordBreaker -> "#"
-        ProfileBadge.DailyPlayer -> "D"
-        ProfileBadge.LoyalPlayer -> "L"
-        ProfileBadge.CollectionMaster -> "C"
-        ProfileBadge.BossHunter -> "B"
-        ProfileBadge.UltraPlayer -> "U"
-        ProfileBadge.SeasonHunter -> "S"
-    }
-}

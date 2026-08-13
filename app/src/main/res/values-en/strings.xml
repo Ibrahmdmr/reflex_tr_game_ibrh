@@ -3,7 +3,6 @@
 
     <string name="game_title">Reflex Avı</string>
     <string name="game_tagline">Test your speed, keep your rhythm, and chase your best score.</string>
-    <string name="start_game">Start</string>
     <string name="start_classic_game">Start Classic Mode</string>
     <string name="start_moving_game">Start Moving Target</string>
     <string name="start_fake_game">Start Decoy Target</string>
@@ -14,10 +13,6 @@
     <string name="open_details">View</string>
     <string name="back_to_modes">Back to Modes</string>
     <string name="back_to_profile">Back to Profile</string>
-    <string name="how_to_play_target">Tap the red target that appears randomly for 30 seconds.</string>
-    <string name="how_to_play_score">Each correct tap increases your score and moves the target.</string>
-    <string name="how_to_play_lives">You have 3 lives. Tapping outside the target costs a life.</string>
-    <string name="how_to_play_end">The game ends when time runs out or you lose all lives.</string>
 
     <string name="score">Score</string>
     <string name="lives">Lives</string>
@@ -26,7 +21,6 @@
     <string name="seconds_short">%1$ds</string>
     <string name="best_score">Best Score</string>
     <string name="best_score_value">Best Score: %1$d</string>
-    <string name="play_area_title">Reflex Arena</string>
     <string name="arena_reflex">Reflex Arena</string>
     <string name="arena_challenge">Challenge Arena</string>
     <string name="arena_target">Target Arena</string>
@@ -55,17 +49,12 @@
     <string name="daily_mode_title">Mode of the Day</string>
     <string name="daily_mode_bonus">+%1$d%% Coin Bonus</string>
     <string name="daily_mode_play">Play</string>
-    <string name="boost_sheet_title">Choose Boost</string>
-    <string name="boost_sheet_description">Pick a one-run edge and jump in.</string>
     <string name="boost_extra_time_title">+5 seconds</string>
     <string name="boost_extra_time_description">Start the run with 5 extra seconds.</string>
     <string name="boost_extra_life_title">1 extra life</string>
     <string name="boost_extra_life_description">Start the run with 1 extra life.</string>
     <string name="boost_combo_start_title">First x5 combo bonus</string>
     <string name="boost_combo_start_description">Start the run with a x5 combo advantage.</string>
-    <string name="boost_buy_with_coins">%1$d coins</string>
-    <string name="boost_use_ad">Use This Run</string>
-    <string name="boost_start_without">Start Now</string>
     <string name="season_title">Season</string>
     <string name="season_card_title">Season %1$d • Level %2$d</string>
     <string name="season_days_left">%1$d days left</string>
@@ -121,9 +110,7 @@
     <string name="max_combo">Max Combo</string>
     <string name="accuracy">Accuracy</string>
     <string name="percent_value">%1$d%%</string>
-    <string name="change_mode">Change Mode</string>
     <string name="daily_challenge_title">Daily Challenge</string>
-    <string name="daily_challenge_done">Done</string>
     <string name="daily_challenge_completed_badge">Ready</string>
     <string name="daily_challenge_completed_title">Challenge Clear!</string>
     <string name="daily_challenge_completed_description">Reward ready. New challenge tomorrow.</string>
@@ -143,12 +130,8 @@
     <string name="daily_challenge_leaderboard_description">Check the leaderboard once today.</string>
     <string name="daily_challenge_shop_title">Visit the Shop</string>
     <string name="daily_challenge_shop_description">Open the theme shop and see your next goals.</string>
-    <string name="daily_challenge_score_20_title">Score 20</string>
-    <string name="daily_challenge_score_20_description">Hold the pace and hit 20.</string>
     <string name="daily_challenge_play_3_title">Finish 3 Runs</string>
     <string name="daily_challenge_play_3_description">Complete three runs and warm up your reflexes.</string>
-    <string name="daily_challenge_fake_10_title">Score 10 in Decoy Target</string>
-    <string name="daily_challenge_fake_10_description">Ignore the decoys and land 10 correct taps.</string>
     <string name="language_selection_title">Language</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
@@ -156,7 +139,6 @@
     <string name="sound_off">Sound Off</string>
     <string name="coin_wallet_title">Coin Wallet</string>
     <string name="coin_wallet_value">%1$d coins</string>
-    <string name="coins_earned_title">Coins Won</string>
     <string name="coins_earned_value">+%1$d coins</string>
     <string name="coin_bonus_included">Includes +%1$d bonus</string>
     <string name="coin_reward_value">+%1$d</string>
@@ -181,7 +163,6 @@
     <string name="daily_reward_day_super">Box</string>
     <string name="daily_reward_loyal_badge">Loyal Player</string>
     <string name="daily_reward_loyal_badge_description">Your 30-day streak badge is unlocked.</string>
-    <string name="daily_reward_exit_fomo">Come back tomorrow and grab %1$d coins.</string>
     <string name="claim_reward">Claim Reward</string>
     <string name="claimed">Claimed</string>
     <string name="ok">OK</string>
@@ -227,8 +208,6 @@
     <string name="selected_theme_value">Theme: %1$s</string>
     <string name="theme_selected">Selected</string>
     <string name="theme_unlocked">Unlocked</string>
-    <string name="theme_locked">Locked</string>
-    <string name="theme_price">%1$d coins</string>
     <string name="theme_price_affordable">Ready to buy • %1$d coins</string>
     <string name="theme_price_locked">Locked • %1$d coins</string>
     <string name="theme_prestige_label">Most Prestigious Theme</string>
@@ -244,7 +223,6 @@
     <string name="theme_try_ad">Try 1 Run</string>
     <string name="theme_trial_active">Trial active: 1 run</string>
     <string name="theme_unlocked_popup_title">Theme Unlocked!</string>
-    <string name="theme_unlocked_popup_message">%1$s is yours now. The arena lights just changed.</string>
     <string name="shop_coin_earn_title">Earn Coins</string>
     <string name="shop_coin_earn_target">%1$s needs %2$d more coins</string>
     <string name="shop_coin_earn_button">Watch Ad +%1$d Coins</string>
@@ -295,7 +273,6 @@
     <string name="profile_quick_season_description">Track your season path and rewards.</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_empty">New missions will appear here soon.</string>
-    <string name="achievement_progress_value">%1$d/%2$d • +%3$d coins</string>
     <string name="achievement_progress_percent_value">%1$d%% • %2$d/%3$d • +%4$d coins</string>
     <string name="achievement_category_score">SCORE</string>
     <string name="achievement_category_game">GAME</string>
@@ -304,34 +281,24 @@
     <string name="achievement_category_theme">THEME</string>
     <string name="achievement_first_record_title">First Record</string>
     <string name="achievement_first_record_description">Land your first record moment.</string>
-    <string name="achievement_first_game_title">First Game</string>
-    <string name="achievement_first_game_description">Finish your first reflex run.</string>
     <string name="achievement_score_25_title">25 Score</string>
     <string name="achievement_score_25_description">Reach 25 score in a single run.</string>
     <string name="achievement_score_50_title">50 Score</string>
     <string name="achievement_score_50_description">Reach 50 score in a single run.</string>
     <string name="achievement_score_100_title">100 Score</string>
     <string name="achievement_score_100_description">Reach 100 score in a single run.</string>
-    <string name="achievement_hit_100_title">Hit 100 Targets</string>
-    <string name="achievement_hit_100_description">Tap 100 correct targets in total.</string>
     <string name="achievement_combo_5_title">x5 Combo</string>
     <string name="achievement_combo_5_description">Reach combo x5 in a single run.</string>
     <string name="achievement_combo_master_title">x10 Combo</string>
     <string name="achievement_combo_master_description">Reach combo x10 in a single run.</string>
     <string name="achievement_combo_20_title">x20 Combo</string>
     <string name="achievement_combo_20_description">Reach combo x20 in a single run.</string>
-    <string name="achievement_fake_master_title">Decoy Target Master</string>
-    <string name="achievement_fake_master_description">Score 20 in Decoy Target mode.</string>
-    <string name="achievement_color_champion_title">Color Reflex Champion</string>
-    <string name="achievement_color_champion_description">Score 20 in Color Reflex mode.</string>
     <string name="achievement_play_10_title">Play 10 Games</string>
     <string name="achievement_play_10_description">Complete 10 games in total.</string>
     <string name="achievement_play_50_title">Play 50 Games</string>
     <string name="achievement_play_50_description">Complete 50 games in total.</string>
     <string name="achievement_play_100_title">Play 100 Games</string>
     <string name="achievement_play_100_description">Complete 100 games in total.</string>
-    <string name="achievement_record_breaker_title">Record Breaker</string>
-    <string name="achievement_record_breaker_description">Break your best score in any mode.</string>
     <string name="achievement_rewarded_ad_1_title">First Rewarded Ad</string>
     <string name="achievement_rewarded_ad_1_description">Watch your first rewarded ad.</string>
     <string name="achievement_rewarded_ad_10_title">10 Rewarded Ads</string>
@@ -410,7 +377,6 @@
     <string name="settings_notifications_title">Notifications</string>
     <string name="settings_notifications_description">Only selected reminders are sent. You will receive at most 1–2 notifications per day.</string>
     <string name="settings_notifications_all_disabled">Notifications are off. Enable only the reminders you want from here.</string>
-    <string name="settings_notifications_permission_disabled">Android notification permission is off. Enable Reflex Hunt notifications in system settings to receive reminders.</string>
     <string name="settings_notifications_permission_closed_short">Notification permission is off</string>
     <string name="settings_toggle_on">On</string>
     <string name="settings_toggle_off">Off</string>
@@ -437,7 +403,6 @@
     <string name="onboarding_rewards_body">Play, earn rewards, and unlock new neon themes.</string>
     <string name="onboarding_step_value">%1$d / %2$d</string>
     <string name="onboarding_next">Next</string>
-    <string name="onboarding_back">Back</string>
     <string name="onboarding_start">Start</string>
     <string name="onboarding_skip">Skip</string>
     <string name="first_target_title">Set Your First Score</string>
@@ -461,8 +426,6 @@
     <string name="store_preview_enable">Enable</string>
     <string name="store_preview_disable">Disable</string>
     <string name="weekly_challenge_title">Weekly Challenge</string>
-    <string name="weekly_challenge_title_value">Weekly 100 score</string>
-    <string name="weekly_challenge_description">Collect 100 total score from games this week.</string>
     <string name="weekly_challenge_progress">%1$d/%2$d • Reward +%3$d coins</string>
     <string name="weekly_challenge_classic_50_title">Score 50 in Classic Mode</string>
     <string name="weekly_challenge_classic_50_description">Reach 50 score in one Classic run this week.</string>
@@ -521,6 +484,12 @@
     <string name="target_skin_select">Select</string>
     <string name="target_skin_buy">Buy</string>
     <string name="target_skin_locked">Not Enough Coins</string>
+    <string name="boost_section_title">Quick Boosts</string>
+    <string name="boost_section_description">A cheap, one-run edge. Watch an ad to get it for free instead.</string>
+    <string name="boost_buy_with_coins">%1$d coins</string>
+    <string name="boost_missing_coins">%1$d coins short</string>
+    <string name="boost_watch_ad">Watch ad</string>
+    <string name="power_up_section_title">Power-ups</string>
     <string name="power_up_sheet_title">Choose Power-up</string>
     <string name="power_up_sheet_description">This advantage applies only to your next run. You can choose at most 1 power-up per run.</string>
     <string name="power_up_start_without">Start Without Power-up</string>
@@ -694,8 +663,6 @@
     <string name="continue_almost_record_title">So Close to a Record!</string>
     <string name="game_over_near_record_message">One more run could break it.</string>
     <string name="game_over_season_xp">Season XP</string>
-    <string name="one_more_game_bonus_offer">One more run for bonus coins</string>
-    <string name="one_more_game_bonus_claimed">You grabbed +%1$d bonus coins</string>
     <string name="continue_offer_title">Continue?</string>
     <string name="new_record">New Record!</string>
     <string name="continue_game">Continue</string>

@@ -33,7 +33,7 @@ internal fun CoinWalletCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ArcadeGold.copy(alpha = 0.13f),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
     ) {
         Row(

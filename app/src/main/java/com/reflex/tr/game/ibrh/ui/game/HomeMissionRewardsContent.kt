@@ -56,7 +56,7 @@ internal fun MissionRewardsCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.34f))
     ) {
         Column(

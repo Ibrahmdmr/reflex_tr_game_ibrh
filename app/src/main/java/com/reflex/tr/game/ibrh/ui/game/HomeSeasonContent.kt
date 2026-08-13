@@ -36,7 +36,7 @@ internal fun SeasonMiniCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
     ) {
         Column(
@@ -100,7 +100,7 @@ internal fun SeasonTabContent(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
     ) {
         Column(
@@ -168,7 +168,7 @@ internal fun SeasonXpBoostCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.38f))
     ) {
         Column(
@@ -249,7 +249,7 @@ internal fun SeasonMissionCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.07f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(
             1.dp,
             if (mission.completed && !mission.claimed) ArcadeGold.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.12f)
@@ -340,7 +340,7 @@ internal fun SeasonQuestSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = ArcadeGold.copy(alpha = 0.14f),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(PremiumChipRadius),
             border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
         ) {
             Text(
@@ -364,7 +364,7 @@ private fun SeasonQuestCard(quest: SeasonQuestState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.07f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (quest.completed) 0.38f else 0.18f))
     ) {
         Column(
@@ -427,7 +427,7 @@ internal fun SeasonRewardCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = if (reward.premium) ArcadeGold.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.07f),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(1.dp, if (reward.premium) ArcadeGold.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.12f))
     ) {
         Row(

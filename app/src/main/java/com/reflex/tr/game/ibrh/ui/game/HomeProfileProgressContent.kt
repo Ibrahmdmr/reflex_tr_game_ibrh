@@ -47,7 +47,7 @@ internal fun ProfileProgressCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.neonBlue.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, ReflexGamePalette.neonBlue.copy(alpha = 0.32f))
     ) {
         Column(
@@ -104,7 +104,7 @@ internal fun ProfileProgressCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = ArcadeTeal,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -189,7 +189,7 @@ internal fun ProfileProgressCard(
             if (progressionState.dailyReward.loyalBadgeUnlocked) {
                 Surface(
                     color = ArcadeGold.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(PremiumChipRadius),
                     border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.38f))
                 ) {
                     Column(
@@ -227,7 +227,7 @@ internal fun ProfileProgressCard(
                                     .weight(1f)
                                     .clickable { onTitleSelect(title) },
                                 color = if (selected) ArcadeTeal.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f),
-                                shape = RoundedCornerShape(999.dp),
+                                shape = RoundedCornerShape(PremiumPillRadius),
                                 border = BorderStroke(
                                     1.dp,
                                     (if (selected) ArcadeTeal else ArcadeBlue).copy(alpha = 0.34f)

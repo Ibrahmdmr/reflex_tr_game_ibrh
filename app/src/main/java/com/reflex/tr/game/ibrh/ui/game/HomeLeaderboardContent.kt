@@ -142,7 +142,7 @@ internal fun LeaderboardSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = ReflexGamePalette.cardGlassStrong,
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(PremiumChipRadius),
                 border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.32f))
             ) {
                 Text(
@@ -177,7 +177,7 @@ internal fun LeaderboardSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = if (entry.isPlayer) ArcadeGold.copy(alpha = 0.18f) else ReflexGamePalette.cardGlassStrong,
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(PremiumChipRadius),
                 border = BorderStroke(1.dp, accent.copy(alpha = if (entry.rank <= 3 || entry.isPlayer) 0.58f else 0.26f))
             ) {
                 Row(
@@ -240,7 +240,7 @@ private fun DailyLeaderboardGoalCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(PremiumChipRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
     ) {
         Column(
@@ -304,7 +304,7 @@ private fun DailyLeaderboardGoalCard(
                         .fillMaxWidth()
                         .clickable { onClaimClick() },
                     color = ArcadeGold.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(PremiumPillRadius),
                     border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
                 ) {
                     Text(
@@ -338,7 +338,7 @@ internal fun LeaderboardPeriodSelector(
                     .weight(1f)
                     .clickable { onPeriodSelected(period) },
                 color = if (selected) ArcadeGold.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f),
-                shape = RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(PremiumPillRadius),
                 border = BorderStroke(1.dp, (if (selected) ArcadeGold else ArcadeBlue).copy(alpha = 0.36f))
             ) {
                 Text(
@@ -377,7 +377,7 @@ internal fun LeaderboardModeSelector(
                         .weight(1f)
                         .clickable { onModeSelected(mode) },
                     color = if (selected) themeAccentColor(PlayerTheme.CyberBlue).copy(alpha = 0.18f) else Color.White.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(PremiumCompactRadius),
                     border = BorderStroke(1.dp, (if (selected) ArcadeTeal else ArcadeBlue).copy(alpha = 0.34f))
                 ) {
                     Text(

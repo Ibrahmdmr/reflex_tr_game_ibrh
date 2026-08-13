@@ -104,7 +104,7 @@ internal fun ThemeCard(
             canBuy && !unlocked -> ArcadeGold.copy(alpha = 0.08f)
             else -> ReflexGamePalette.cardGlassStrong
         },
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(PremiumOverlayRadius),
         border = BorderStroke(
             width = when {
                 selected || trialActive -> 2.dp
@@ -140,7 +140,7 @@ internal fun ThemeCard(
                         )
                         Surface(
                             color = accent.copy(alpha = 0.18f),
-                            shape = RoundedCornerShape(999.dp),
+                            shape = RoundedCornerShape(PremiumPillRadius),
                             border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
                         ) {
                             Text(
@@ -206,7 +206,7 @@ internal fun ThemeCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
-                                .clip(RoundedCornerShape(999.dp)),
+                                .clip(RoundedCornerShape(PremiumPillRadius)),
                             color = accent,
                             trackColor = Color.White.copy(alpha = 0.08f)
                         )
@@ -261,7 +261,7 @@ internal fun ThemeStatusBadge(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(PremiumPillRadius),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f))
     ) {
         Text(
@@ -285,7 +285,7 @@ internal fun ThemePreview(
         modifier = Modifier
             .fillMaxWidth()
             .height(78.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(PremiumCardRadius))
             .background(
                 Brush.linearGradient(
                     colors = listOf(

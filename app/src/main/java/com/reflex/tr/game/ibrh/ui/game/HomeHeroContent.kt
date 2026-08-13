@@ -87,7 +87,7 @@ internal fun BestScoreHero(
 
     Surface(
         color = ReflexGamePalette.neonBlue.copy(alpha = 0.18f),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(PremiumOverlayRadius),
         tonalElevation = 0.dp,
         border = BorderStroke(
             width = 1.dp,

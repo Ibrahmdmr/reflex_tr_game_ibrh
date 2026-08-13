@@ -10,121 +10,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private const val GAME_PREFERENCES_NAME = "game_preferences"
-private const val BEST_SCORE_KEY = "best_score"
-private const val LANGUAGE_KEY = "language"
-private const val SOUND_ENABLED_KEY = "sound_enabled"
-private const val EFFECT_SOUND_ENABLED_KEY = "effect_sound_enabled"
-private const val VIBRATION_ENABLED_KEY = "vibration_enabled"
-private const val NOTIFICATION_DAILY_REWARD_KEY = "notification_daily_reward"
-private const val NOTIFICATION_STREAK_KEY = "notification_streak"
-private const val NOTIFICATION_NEW_MISSION_KEY = "notification_new_mission"
-private const val ONBOARDING_COMPLETED_KEY = "onboarding_completed"
-private const val FIRST_TARGET_BONUS_CLAIMED_KEY = "first_target_bonus_claimed"
-private const val INVITE_REWARD_CLAIMED_KEY = "invite_reward_claimed"
-private const val STORE_PREVIEW_MODE_KEY = "store_preview_mode"
-private const val FIRST_OPEN_DATE_KEY = "first_open_date"
-private const val REVIEW_LAST_PROMPT_TIME_KEY = "review_last_prompt_time"
-private const val REVIEW_AUTO_COMPLETED_KEY = "review_auto_completed"
-private const val SHOWN_MODE_TIPS_KEY = "shown_mode_tips"
-private const val LANGUAGE_TURKISH = "tr"
-private const val LANGUAGE_ENGLISH = "en"
-private const val DAILY_CHALLENGE_ID_KEY = "daily_challenge_id"
-private const val DAILY_CHALLENGE_TYPE_KEY = "daily_challenge_type"
-private const val DAILY_CHALLENGE_TARGET_KEY = "daily_challenge_target"
-private const val DAILY_CHALLENGE_PROGRESS_KEY = "daily_challenge_progress"
-private const val DAILY_CHALLENGE_COMPLETED_KEY = "daily_challenge_completed"
-private const val DAILY_CHALLENGE_CREATED_DATE_KEY = "daily_challenge_created_date"
-private const val DAILY_CHALLENGE_REWARD_CLAIMED_KEY = "daily_challenge_reward_claimed"
-private const val DAILY_CHALLENGE_DOUBLE_REWARD_CLAIMED_KEY = "daily_challenge_double_reward_claimed"
-private const val DAILY_CHALLENGE_REWARD_COINS_KEY = "daily_challenge_reward_coins"
-private const val COINS_KEY = "coins"
-private const val TOTAL_COINS_EARNED_KEY = "total_coins_earned"
-private const val TOTAL_COINS_SPENT_KEY = "total_coins_spent"
-private const val XP_KEY = "xp"
-private const val TOTAL_GAMES_KEY = "total_games"
-private const val TOTAL_SCORE_KEY = "total_score"
-private const val TOTAL_HITS_KEY = "total_hits"
-private const val TOTAL_MISSES_KEY = "total_misses"
-private const val LIFETIME_MAX_COMBO_KEY = "lifetime_max_combo"
-private const val LIFETIME_MAX_FLAWLESS_STREAK_KEY = "lifetime_max_flawless_streak"
-private const val PERSONAL_RECORD_BEST_SCORE_KEY = "personal_record_best_score"
-private const val PERSONAL_RECORD_BEST_COMBO_KEY = "personal_record_best_combo"
-private const val PERSONAL_RECORD_BEST_ACCURACY_KEY = "personal_record_best_accuracy"
-private const val PERSONAL_RECORD_LONGEST_SURVIVAL_KEY = "personal_record_longest_survival"
-private const val PERSONAL_RECORD_MOST_COINS_KEY = "personal_record_most_coins"
-private const val SELECTED_PROFILE_BADGES_KEY = "selected_profile_badges"
-private const val TOTAL_BOSS_ROUND_HITS_KEY = "total_boss_round_hits"
-private const val TOTAL_ULTRA_MOMENT_HITS_KEY = "total_ultra_moment_hits"
-private const val SEASON_HUNTER_BADGE_UNLOCKED_KEY = "season_hunter_badge_unlocked"
-private const val REWARDED_AD_WATCH_COUNT_KEY = "rewarded_ad_watch_count"
-private const val SELECTED_THEME_KEY = "selected_theme"
-private const val UNLOCKED_THEMES_KEY = "unlocked_themes"
-private const val SELECTED_TARGET_SKIN_KEY = "selected_target_skin"
-private const val UNLOCKED_TARGET_SKINS_KEY = "unlocked_target_skins"
-private const val DAILY_REWARD_LAST_CLAIM_DATE_KEY = "daily_reward_last_claim_date"
-private const val DAILY_DIALOG_LAST_SHOWN_DATE_KEY = "daily_dialog_last_shown_date"
-private const val DAILY_REWARD_STREAK_KEY = "daily_reward_streak"
-private const val COIN_CHEST_OPEN_DATE_KEY = "coin_chest_open_date"
-private const val COIN_CHEST_OPEN_COUNT_KEY = "coin_chest_open_count"
-private const val COIN_CHEST_LAST_REWARD_KEY = "coin_chest_last_reward"
-private const val SHOP_COIN_REWARD_DATE_KEY = "shop_coin_reward_date"
-private const val SHOP_COIN_REWARD_COUNT_KEY = "shop_coin_reward_count"
-private const val ONE_MORE_GAME_BONUS_DATE_KEY = "one_more_game_bonus_date"
-private const val ONE_MORE_GAME_BONUS_PLAYED_COUNT_KEY = "one_more_game_bonus_played_count"
-private const val ONE_MORE_GAME_BONUS_CLAIMED_KEY = "one_more_game_bonus_claimed"
-private const val ACHIEVEMENT_CLAIMED_IDS_KEY = "achievement_claimed_ids"
-private const val WEEKLY_CHALLENGE_PROGRESS_KEY = "weekly_challenge_progress"
-private const val WEEKLY_CHALLENGE_CREATED_DATE_KEY = "weekly_challenge_created_date"
-private const val WEEKLY_CHALLENGE_TYPE_KEY = "weekly_challenge_type"
-private const val WEEKLY_CHALLENGE_CLAIMED_KEY = "weekly_challenge_claimed"
-private const val WEEKLY_GOAL_BOARD_WEEK_KEY = "weekly_goal_board_week"
-private const val WEEKLY_GOAL_BONUS_CLAIMED_KEY = "weekly_goal_bonus_claimed"
-private const val DAILY_LEADERBOARD_GOAL_DATE_KEY = "daily_leaderboard_goal_date"
-private const val DAILY_LEADERBOARD_GOAL_TYPE_KEY = "daily_leaderboard_goal_type"
-private const val DAILY_LEADERBOARD_GOAL_PROGRESS_KEY = "daily_leaderboard_goal_progress"
-private const val DAILY_LEADERBOARD_GOAL_CLAIMED_KEY = "daily_leaderboard_goal_claimed"
-private const val DAILY_LEADERBOARD_GOAL_INITIAL_SCORE_KEY = "daily_leaderboard_goal_initial_score"
-private const val DAILY_LEADERBOARD_GOAL_INITIAL_RANK_KEY = "daily_leaderboard_goal_initial_rank"
-private const val PERSONAL_GOAL_DATE_KEY = "personal_goal_date"
-private const val PERSONAL_GOAL_TARGET_SCORE_KEY = "personal_goal_target_score"
-private const val PERSONAL_GOAL_INITIAL_BEST_SCORE_KEY = "personal_goal_initial_best_score"
-private const val PERSONAL_GOAL_PROGRESS_SCORE_KEY = "personal_goal_progress_score"
-private const val PERSONAL_GOAL_CLAIMED_KEY = "personal_goal_claimed"
-private const val PERSONAL_GOAL_REWARD_COINS_KEY = "personal_goal_reward_coins"
-private const val COMBO_CHALLENGE_DATE_KEY = "combo_challenge_date"
-private const val COMBO_CHALLENGE_TYPE_KEY = "combo_challenge_type"
-private const val COMBO_CHALLENGE_PROGRESS_KEY = "combo_challenge_progress"
-private const val COMBO_CHALLENGE_GAMES_USED_KEY = "combo_challenge_games_used"
-private const val COMBO_CHALLENGE_CLAIMED_KEY = "combo_challenge_claimed"
-private const val DAILY_MINI_TOURNAMENT_DATE_KEY = "daily_mini_tournament_date"
-private const val DAILY_MINI_TOURNAMENT_MODE_KEY = "daily_mini_tournament_mode"
-private const val DAILY_MINI_TOURNAMENT_BEST_SCORE_KEY = "daily_mini_tournament_best_score"
-private const val DAILY_MINI_TOURNAMENT_CLAIMED_KEY = "daily_mini_tournament_claimed"
-private const val SEASON_NUMBER_KEY = "season_number"
-private const val SEASON_START_DATE_KEY = "season_start_date"
-private const val SEASON_XP_KEY = "season_xp"
-private const val SEASON_CLAIMED_LEVELS_KEY = "season_claimed_levels"
-private const val SEASON_BADGE_LEVELS_KEY = "season_badge_levels"
-private const val SEASON_XP_BOOST_END_TIME_KEY = "season_xp_boost_end_time"
-private const val SEASON_MISSION_DATE_KEY = "season_mission_date"
-private const val SEASON_MISSION_PLAY_COUNT_KEY = "season_mission_play_count"
-private const val SEASON_MISSION_REWARDED_COUNT_KEY = "season_mission_rewarded_count"
-private const val SEASON_MISSION_XP_EARNED_KEY = "season_mission_xp_earned"
-private const val SEASON_MISSION_CLAIMED_IDS_KEY = "season_mission_claimed_ids"
-private const val SEASON_QUEST_CLAIMED_IDS_KEY = "season_quest_claimed_ids"
-private const val SEASON_QUEST_USED_COSMETICS_KEY = "season_quest_used_cosmetics"
-private const val PLAYER_NAME_KEY = "player_name"
-private const val PLAYER_NAME_PROMPT_COMPLETED_KEY = "player_name_prompt_completed"
-private const val PLAYER_TITLE_KEY = "player_title"
-private const val PLAYER_WEEKLY_SCORE_KEY = "player_weekly_score"
-private const val PLAYER_WEEKLY_SCORE_DATE_KEY = "player_weekly_score_date"
-private const val DAY_IN_MILLIS = 24L * 60L * 60L * 1000L
-private const val REVIEW_COOLDOWN_MILLIS = 14L * DAY_IN_MILLIS
-private const val DATE_PATTERN = "yyyy-MM-dd"
-private const val PROGRESSION_XP_PER_LEVEL = 250
-private val BONUS_HOUR_CANDIDATES = listOf(12, 18, 20, 21)
-
 enum class AppLanguage(val code: String) {
     Turkish(LANGUAGE_TURKISH),
     English(LANGUAGE_ENGLISH)
@@ -1315,7 +1200,7 @@ class GamePreferences(private val context: Context) {
     }
 
     private fun calculateLevel(xp: Int): Int {
-        return (safeProgressionXp(xp) / PROGRESSION_XP_PER_LEVEL + 1).coerceAtLeast(1)
+        return (safeProgressionXp(xp) / XP_PER_LEVEL + 1).coerceAtLeast(1)
     }
 
     private fun yesterdayDateKey(): String {
@@ -1405,7 +1290,7 @@ private fun SharedPreferences.Editor.commitSafely() {
  * "Oyuncu" to English users too. The UI resolves the fallback per language via
  * `ifBlank { ... }`.
  */
-private fun safePlayerName(name: String): String {
+internal fun safePlayerName(name: String): String {
     return name.trim().take(12)
 }
 

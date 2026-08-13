@@ -2,10 +2,8 @@ package com.reflex.tr.game.ibrh
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -82,12 +80,13 @@ import com.reflex.tr.game.ibrh.ui.game.GamePreferences
 import com.reflex.tr.game.ibrh.ui.game.GameScreen
 import com.reflex.tr.game.ibrh.ui.game.HowToPlayScreen
 import com.reflex.tr.game.ibrh.ui.game.PolishedGameDialog
+import com.reflex.tr.game.ibrh.ui.game.PremiumPanelRadius
 import com.reflex.tr.game.ibrh.ui.game.RewardedAction
+import com.reflex.tr.game.ibrh.ui.game.localizedContext
 import com.reflex.tr.game.ibrh.ui.theme.Reflex_tr_game_ibrhTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 private const val SplashDurationMillis = 3_000L
 private const val MainActivityLogTag = "MainActivityAds"
@@ -318,8 +317,8 @@ fun AppRoot(
         initialValue = true
     )
     val coroutineScope = rememberCoroutineScope()
-    val localizedContext = remember(context, selectedLanguage) {
-        context.createLocalizedContext(selectedLanguage)
+    val languageContext = remember(context, selectedLanguage) {
+        context.localizedContext(selectedLanguage)
     }
     var pendingNotificationToggle by remember { mutableStateOf<NotificationToggle?>(null) }
     var permissionRequestToggle by remember { mutableStateOf<NotificationToggle?>(null) }
@@ -412,7 +411,7 @@ fun AppRoot(
         LocalNotificationScheduler.sync(context.applicationContext)
     }
 
-    CompositionLocalProvider(LocalContext provides localizedContext) {
+    CompositionLocalProvider(LocalContext provides languageContext) {
         if (activeAppPopup == AppPopup.Onboarding) {
             FirstLaunchOnboardingDialog(
                 onFinish = {
@@ -426,7 +425,7 @@ fun AppRoot(
         if (activeAppPopup == AppPopup.NotificationPermission) pendingNotificationToggle?.let { toggle ->
             PolishedGameDialog(
                 onDismissRequest = { pendingNotificationToggle = null },
-                title = localizedContext.getString(R.string.notification_permission_title),
+                title = languageContext.getString(R.string.notification_permission_title),
                 confirmButton = {
                     Button(
                         modifier = Modifier
@@ -449,7 +448,7 @@ fun AppRoot(
                         }
                     ) {
                         Text(
-                            text = localizedContext.getString(R.string.notification_permission_allow),
+                            text = languageContext.getString(R.string.notification_permission_allow),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -461,7 +460,7 @@ fun AppRoot(
                         onClick = { pendingNotificationToggle = null }
                     ) {
                         Text(
-                            text = localizedContext.getString(R.string.notification_permission_not_now),
+                            text = languageContext.getString(R.string.notification_permission_not_now),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -469,7 +468,7 @@ fun AppRoot(
                 }
             ) {
                 Text(
-                    text = localizedContext.getString(R.string.notification_permission_message),
+                    text = languageContext.getString(R.string.notification_permission_message),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -630,7 +629,7 @@ private fun FirstLaunchOnboardingDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 380.dp),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(PremiumPanelRadius),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     border = BorderStroke(
                         width = 1.dp,
@@ -740,13 +739,6 @@ private val RewardedAction.analyticsName: String
         RewardedAction.Boost -> "boost"
         RewardedAction.SeasonXpBoost -> "season_xp_boost"
     }
-
-private fun Context.createLocalizedContext(language: AppLanguage): Context {
-    val locale = Locale.forLanguageTag(language.code)
-    val configuration = Configuration(resources.configuration)
-    configuration.setLocale(locale)
-    return createConfigurationContext(configuration)
-}
 
 @Preview(showBackground = true)
 @Composable

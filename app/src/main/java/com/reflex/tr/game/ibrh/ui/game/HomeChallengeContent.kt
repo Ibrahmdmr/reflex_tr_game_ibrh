@@ -63,7 +63,7 @@ internal fun DailyChallengeCard(
         } else {
             ReflexGamePalette.cardGlassStrong
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
     ) {
         Column(
@@ -125,7 +125,7 @@ internal fun DailyChallengeCard(
                 }
                 Surface(
                     color = accent.copy(alpha = if (state.completed) 0.2f else 0.14f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(PremiumPillRadius),
                     border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.24f))
                 ) {
                     Text(
@@ -182,7 +182,7 @@ internal fun PersonalGoalCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = if (state.completed) ArcadeTeal.copy(alpha = 0.12f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
     ) {
         Column(
@@ -217,7 +217,7 @@ internal fun PersonalGoalCard(
                 }
                 Surface(
                     color = accent.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(PremiumPillRadius),
                     border = BorderStroke(1.dp, accent.copy(alpha = 0.26f))
                 ) {
                     Text(
@@ -238,7 +238,7 @@ internal fun PersonalGoalCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -281,7 +281,7 @@ internal fun WeeklyChallengeCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = if (state.completed) ArcadeTeal.copy(alpha = 0.12f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.3f))
     ) {
         Column(
@@ -311,7 +311,7 @@ internal fun WeeklyChallengeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = ArcadeTeal,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -357,7 +357,7 @@ internal fun DailyMiniTournamentCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = if (state.completed) ArcadeTeal.copy(alpha = 0.12f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
     ) {
         Column(
@@ -400,7 +400,7 @@ internal fun DailyMiniTournamentCard(
                 }
                 Surface(
                     color = accent.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(PremiumPillRadius),
                     border = BorderStroke(1.dp, accent.copy(alpha = 0.26f))
                 ) {
                     Text(
@@ -421,7 +421,7 @@ internal fun DailyMiniTournamentCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -468,7 +468,7 @@ internal fun WeeklyGoalBoardCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = if (state.allCompleted) ArcadeTeal.copy(alpha = 0.12f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.allCompleted) 0.42f else 0.28f))
     ) {
         Column(
@@ -535,7 +535,7 @@ private fun WeeklyGoalRow(goal: WeeklyGoalState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(5.dp)
-                .clip(RoundedCornerShape(999.dp)),
+                .clip(RoundedCornerShape(PremiumPillRadius)),
             color = accent,
             trackColor = Color.White.copy(alpha = 0.08f)
         )
@@ -552,7 +552,7 @@ internal fun ComboChallengeCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = if (state.completed) ArcadeTeal.copy(alpha = 0.12f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (state.completed) 0.42f else 0.3f))
     ) {
         Column(
@@ -585,7 +585,7 @@ internal fun ComboChallengeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )

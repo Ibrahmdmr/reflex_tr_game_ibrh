@@ -92,7 +92,7 @@ internal fun AchievementSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = ReflexGamePalette.cardGlassStrong,
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(PremiumChipRadius),
                 border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
             ) {
                 Text(
@@ -155,7 +155,7 @@ internal fun AchievementCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = if (highlighted || achievement.unlocked) accent.copy(alpha = 0.13f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (highlighted) 0.62f else 0.28f))
     ) {
         Column(
@@ -197,7 +197,7 @@ internal fun AchievementCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )

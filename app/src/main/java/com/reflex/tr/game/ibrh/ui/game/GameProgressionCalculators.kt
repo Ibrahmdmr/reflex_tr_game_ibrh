@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-private const val PROGRESSION_XP_PER_LEVEL = 250
-
 internal fun advanceDailyChallengeForHit(
     state: DailyChallengeState,
     mode: GameMode,
@@ -127,5 +125,5 @@ internal fun updateAchievementProgress(
 }
 
 internal fun calculateProgressionLevel(xp: Int): Int {
-    return (xp / PROGRESSION_XP_PER_LEVEL + 1).coerceAtLeast(1)
+    return (xp / XP_PER_LEVEL + 1).coerceAtLeast(1)
 }

@@ -186,7 +186,7 @@ internal fun PlayerNameDialog(
                                         hasError = false
                                     },
                                 color = if (name == suggestion) ArcadeTeal.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(999.dp),
+                                shape = RoundedCornerShape(PremiumPillRadius),
                                 border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = if (name == suggestion) 0.52f else 0.22f))
                             ) {
                                 Text(

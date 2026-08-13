@@ -49,7 +49,7 @@ internal fun DailyStreakMiniCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Column(
@@ -120,7 +120,7 @@ internal fun DailyRewardCard(
             .fillMaxWidth()
             .clickable(onClick = onCardClick),
         color = if (state.canClaim || state.isStreakAtRisk) ReflexGamePalette.cardGlassStrong else ArcadeTeal.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Column(
@@ -218,7 +218,7 @@ internal fun DailyRewardProgressLine(
             Surface(
                 modifier = Modifier.weight(1f),
                 color = color.copy(alpha = if (active) 0.22f else 0.08f),
-                shape = RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(PremiumPillRadius),
                 border = BorderStroke(1.dp, color.copy(alpha = 0.42f))
             ) {
                 Text(
@@ -248,29 +248,29 @@ internal fun DailyRewardPopup(
     onDismiss: () -> Unit
 ) {
     val title = when {
-        state.isStreakAtRisk -> localizedHomeStringResource(R.string.daily_reward_streak_at_risk_title, selectedLanguage)
-        state.isSuperReward -> localizedHomeStringResource(R.string.daily_reward_super_title, selectedLanguage)
-        else -> localizedHomeStringResource(R.string.daily_reward_title, selectedLanguage)
+        state.isStreakAtRisk -> localizedStringResource(R.string.daily_reward_streak_at_risk_title, selectedLanguage)
+        state.isSuperReward -> localizedStringResource(R.string.daily_reward_super_title, selectedLanguage)
+        else -> localizedStringResource(R.string.daily_reward_title, selectedLanguage)
     }
     val message = when {
-        state.isStreakAtRisk -> localizedHomeStringResource(R.string.daily_reward_protect_message, selectedLanguage)
-        state.isSuperReward -> localizedHomeStringResource(
+        state.isStreakAtRisk -> localizedStringResource(R.string.daily_reward_protect_message, selectedLanguage)
+        state.isSuperReward -> localizedStringResource(
             id = R.string.daily_reward_super_message,
             selectedLanguage = selectedLanguage,
             state.rewardCoins
         )
-        state.claimedToday -> localizedHomeStringResource(R.string.daily_reward_claimed_today, selectedLanguage)
-        else -> localizedHomeStringResource(
+        state.claimedToday -> localizedStringResource(R.string.daily_reward_claimed_today, selectedLanguage)
+        else -> localizedStringResource(
             id = R.string.daily_reward_popup_message,
             selectedLanguage = selectedLanguage,
             state.rewardCoins
         )
     }
     val claimText = when {
-        state.isStreakAtRisk -> localizedHomeStringResource(R.string.daily_reward_protect_button, selectedLanguage)
-        state.isSuperReward -> localizedHomeStringResource(R.string.daily_reward_super_claim, selectedLanguage)
-        state.claimedToday -> localizedHomeStringResource(R.string.daily_reward_continue, selectedLanguage)
-        else -> localizedHomeStringResource(R.string.daily_reward_continue, selectedLanguage)
+        state.isStreakAtRisk -> localizedStringResource(R.string.daily_reward_protect_button, selectedLanguage)
+        state.isSuperReward -> localizedStringResource(R.string.daily_reward_super_claim, selectedLanguage)
+        state.claimedToday -> localizedStringResource(R.string.daily_reward_continue, selectedLanguage)
+        else -> localizedStringResource(R.string.daily_reward_continue, selectedLanguage)
     }
 
     PolishedGameDialog(

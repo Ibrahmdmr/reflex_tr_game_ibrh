@@ -55,7 +55,7 @@ class GameViewModel internal constructor(
                     // The app overrides the system locale, so the fallback name must be resolved
                     // against the in-app language rather than through a plain getString().
                     defaultPlayerName = {
-                        application.createHomeLanguageContext(preferences.currentLanguage)
+                        application.localizedContext(preferences.currentLanguage)
                             .getString(R.string.profile_default_player_name)
                     }
                 )
@@ -69,18 +69,13 @@ class GameViewModel internal constructor(
         private const val PERFECT_TIMING_THRESHOLD_MS = 300L
         private const val GREAT_TIMING_THRESHOLD_MS = 700L
         private const val PERFECT_TIMING_BONUS_COINS = 1
-        private const val FLAWLESS_STREAK_5_BONUS_COINS = 10
-        private const val FLAWLESS_STREAK_10_BONUS_COINS = 25
-        private const val FLAWLESS_STREAK_20_BONUS_COINS = 75
         private const val BOSS_ROUND_DURATION_SECONDS = 5
         private const val BOSS_ROUND_HIT_SCORE_BONUS = 1
         private const val BOSS_ROUND_HIT_COIN_BONUS = 5
         private const val BOSS_ROUND_SPEED_PERCENT = 65
         private const val BOSS_ROUND_MIN_VISIBLE_DURATION_MILLIS = 850L
-        private val BOSS_ROUND_SCORE_THRESHOLDS = setOf(15, 30, 50)
         private const val ULTRA_MOMENT_DURATION_SECONDS = 7
         private const val ULTRA_MOMENT_HIT_COIN_BONUS = 1
-        private val ULTRA_MOMENT_COMBO_THRESHOLDS = setOf(10, 20)
         private const val LEVEL_UP_COIN_BONUS = 50
         private const val REWARDED_AD_XP_REWARD = 20
         private const val DAILY_CHALLENGE_XP_REWARD = 60
@@ -1075,22 +1070,6 @@ class GameViewModel internal constructor(
         logNewAchievementUnlocks(progression)
     }
 
-    private fun addCoins(progression: ProgressionState, coins: Int): ProgressionState {
-        val safeCoins = coins.coerceAtLeast(0)
-        val totalCoins = progression.coins.toLong() + safeCoins.toLong()
-        val totalEarned = progression.totalCoinsEarned.toLong() + safeCoins.toLong()
-        return progression.copy(
-            coins = totalCoins.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
-            totalCoinsEarned = totalEarned.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-        )
-    }
-
-    private fun addSpentCoins(currentSpent: Int, spentCoins: Int): Int {
-        return (currentSpent.coerceAtLeast(0).toLong() + spentCoins.coerceAtLeast(0).toLong())
-            .coerceAtMost(Int.MAX_VALUE.toLong())
-            .toInt()
-    }
-
     private fun updateDailyLeaderboardGoalAfterScore(
         progression: ProgressionState,
         score: Int,
@@ -1256,33 +1235,6 @@ class GameViewModel internal constructor(
         return (value.coerceAtLeast(0).toLong() + 1L)
             .coerceAtMost(Int.MAX_VALUE.toLong())
             .toInt()
-    }
-
-    private fun flawlessStreakBonusFor(streak: Int): Int {
-        return when (streak) {
-            5 -> FLAWLESS_STREAK_5_BONUS_COINS
-            10 -> FLAWLESS_STREAK_10_BONUS_COINS
-            20 -> FLAWLESS_STREAK_20_BONUS_COINS
-            else -> 0
-        }
-    }
-
-    private fun bossRoundThresholdForScore(
-        newScore: Int,
-        triggeredThresholds: Set<Int>
-    ): Int? {
-        return BOSS_ROUND_SCORE_THRESHOLDS
-            .filter { it !in triggeredThresholds && newScore >= it }
-            .minOrNull()
-    }
-
-    private fun ultraMomentThresholdForCombo(
-        combo: Int,
-        triggeredThresholds: Set<Int>
-    ): Int? {
-        return ULTRA_MOMENT_COMBO_THRESHOLDS
-            .filter { it !in triggeredThresholds && combo >= it }
-            .minOrNull()
     }
 
     private fun Long.withBossRoundSpeed(isBossRoundActive: Boolean): Long {
@@ -1887,25 +1839,6 @@ class GameViewModel internal constructor(
         )
     }
 
-    private fun calculateBonusHourCoins(
-        baseCoins: Int,
-        bonusHour: BonusHourState
-    ): Int {
-        if (!bonusHour.isActive || baseCoins <= 0) return 0
-
-        return (baseCoins * bonusHour.coinBonusPercent / 100).coerceAtLeast(1)
-    }
-
-    private fun consumeTrialThemeGame(progression: ProgressionState): ProgressionState {
-        if (progression.trialGamesRemaining <= 0) return progression
-
-        val remaining = progression.trialGamesRemaining - 1
-        return progression.copy(
-            trialGamesRemaining = remaining,
-            trialTheme = progression.trialTheme.takeIf { remaining > 0 }
-        )
-    }
-
     private fun updateProfileAfterGame(
         profile: PlayerProfile,
         mode: GameMode,
@@ -2378,121 +2311,6 @@ class GameViewModel internal constructor(
         }
     }
 
-    private fun personalRecordsBrokenByGame(
-        progression: ProgressionState,
-        bestScoresByMode: Map<GameMode, Int>,
-        mode: GameMode,
-        score: Int,
-        maxCombo: Int,
-        accuracyPercent: Int,
-        survivalSeconds: Int,
-        earnedCoins: Int
-    ): Set<PersonalRecordType> {
-        val records = mutableSetOf<PersonalRecordType>()
-        if (score > progression.personalRecords.bestScore.coerceAtLeast(0)) {
-            records += PersonalRecordType.HighestScore
-        }
-        if (maxCombo > progression.personalRecords.bestCombo.coerceAtLeast(0)) {
-            records += PersonalRecordType.HighestCombo
-        }
-        if (accuracyPercent.coerceIn(0, 100) > progression.personalRecords.bestAccuracyPercent.coerceIn(0, 100)) {
-            records += PersonalRecordType.BestAccuracy
-        }
-        if (survivalSeconds > progression.personalRecords.longestSurvivalSeconds.coerceAtLeast(0)) {
-            records += PersonalRecordType.LongestSurvival
-        }
-        if (earnedCoins > progression.personalRecords.mostCoinsInGame.coerceAtLeast(0)) {
-            records += PersonalRecordType.MostCoinsInGame
-        }
-        if (score > (bestScoresByMode[mode] ?: 0).coerceAtLeast(0)) {
-            records += when (mode) {
-                GameMode.Classic -> PersonalRecordType.ClassicBest
-                GameMode.MovingTarget -> PersonalRecordType.MovingTargetBest
-                GameMode.FakeTarget -> PersonalRecordType.FakeTargetBest
-                GameMode.ColorReflex -> PersonalRecordType.ColorReflexBest
-            }
-        }
-        return records
-    }
-
-    private fun accuracyPercent(hits: Int, attempts: Int): Int {
-        val safeAttempts = attempts.coerceAtLeast(0)
-        if (safeAttempts == 0) return 0
-        return ((hits.coerceAtLeast(0) * 100f) / safeAttempts).toInt().coerceIn(0, 100)
-    }
-
-    private fun advanceModeMastery(
-        progression: ProgressionState,
-        mode: GameMode,
-        score: Int,
-        maxCombo: Int
-    ): ModeMasteryAdvanceResult {
-        val currentXp = progression.modeMasteryXpByMode[mode]?.coerceAtLeast(0) ?: 0
-        val currentProgress = ModeMasteryProgress(currentXp)
-        val earnedXp = calculateModeMasteryXp(score = score, maxCombo = maxCombo)
-        val maxXp = (MODE_MASTERY_MAX_LEVEL - 1) * MODE_MASTERY_XP_PER_LEVEL
-        val nextXp = (currentXp.toLong() + earnedXp.toLong())
-            .coerceIn(0L, maxXp.toLong())
-            .toInt()
-        val nextProgress = ModeMasteryProgress(nextXp)
-        val crossedLevels = ((currentProgress.level + 1)..nextProgress.level).toList()
-        val coinBonus = crossedLevels.sumOf { level -> modeMasteryLevelReward(level) }
-        return ModeMasteryAdvanceResult(
-            xpByMode = progression.modeMasteryXpByMode + (mode to nextXp),
-            coinBonus = coinBonus,
-            levelUp = crossedLevels.lastOrNull()?.let { level ->
-                ModeMasteryLevelUp(
-                    mode = mode,
-                    level = level,
-                    coinBonus = coinBonus
-                )
-            }
-        )
-    }
-
-    private fun calculateModeMasteryXp(score: Int, maxCombo: Int): Int {
-        return 20 + score.coerceIn(0, 30) + maxCombo.coerceIn(0, 10)
-    }
-
-    private fun modeMasteryLevelReward(level: Int): Int {
-        return when (level) {
-            10 -> 750
-            5 -> 300
-            else -> 100
-        }
-    }
-
-    private data class ModeMasteryAdvanceResult(
-        val xpByMode: Map<GameMode, Int>,
-        val coinBonus: Int,
-        val levelUp: ModeMasteryLevelUp?
-    )
-
-    private fun advanceWeeklyChallenge(
-        challenge: ChallengeState,
-        mode: GameMode,
-        score: Int,
-        maxCombo: Int
-    ): ChallengeState {
-        if (challenge.claimed) return challenge
-        val nextProgress = when (challenge.type) {
-            WeeklyChallengeType.ClassicScore50 ->
-                if (mode == GameMode.Classic) maxOf(challenge.progress, score) else challenge.progress
-            WeeklyChallengeType.ColorReflexScore30 ->
-                if (mode == GameMode.ColorReflex) maxOf(challenge.progress, score) else challenge.progress
-            WeeklyChallengeType.FakeTargetScore20 ->
-                if (mode == GameMode.FakeTarget) maxOf(challenge.progress, score) else challenge.progress
-            WeeklyChallengeType.Play20Games ->
-                challenge.progress + 1
-            WeeklyChallengeType.Combo10 ->
-                maxOf(challenge.progress, maxCombo)
-        }.coerceIn(0, challenge.target)
-        return challenge.copy(
-            progress = nextProgress,
-            completed = nextProgress >= challenge.target
-        )
-    }
-
     private fun advanceWeeklyGoalBoardAfterGame(
         board: WeeklyGoalBoardState,
         score: Int,
@@ -2518,64 +2336,6 @@ class GameViewModel internal constructor(
             goals = updatedGoals,
             bonusClaimed = currentBoard.bonusClaimed || shouldClaimBonus,
             bonusUnlockedThisGame = shouldClaimBonus
-        )
-    }
-
-    private fun advanceSeasonQuestsAfterGame(
-        season: SeasonState,
-        score: Int,
-        maxCombo: Int,
-        theme: PlayerTheme,
-        targetSkin: TargetSkin
-    ): SeasonState {
-        val currentSeason = seasonForToday(season)
-        val usedCosmetics = currentSeason.usedCosmeticKeys +
-            "theme:${theme.storageKey}" +
-            "skin:${targetSkin.storageKey}"
-        val updatedQuests = currentSeason.quests.map { quest ->
-            val nextProgress = when (quest.type) {
-                SeasonQuestType.Play100Games -> quest.progress + 1
-                SeasonQuestType.Score3000 -> quest.progress + score.coerceAtLeast(0)
-                SeasonQuestType.Combo10TwentyFiveTimes -> quest.progress + if (maxCombo >= 10) 1 else 0
-                SeasonQuestType.Complete10DailyMissions -> quest.progress
-                SeasonQuestType.Use5Cosmetics -> usedCosmetics.size
-            }.coerceIn(0, quest.target)
-            val shouldClaimReward = nextProgress >= quest.target && !quest.claimed
-            quest.copy(
-                progress = nextProgress,
-                claimed = quest.claimed || shouldClaimReward,
-                rewardClaimedThisGame = shouldClaimReward
-            )
-        }
-        return currentSeason.copy(
-            quests = updatedQuests,
-            usedCosmeticKeys = usedCosmetics
-        )
-    }
-
-    private fun advanceSeasonQuestForDailyMissionClaim(progression: ProgressionState): ProgressionState {
-        val season = seasonForToday(progression.season)
-        val updatedQuests = season.quests.map { quest ->
-            if (quest.type != SeasonQuestType.Complete10DailyMissions) {
-                return@map quest.copy(rewardClaimedThisGame = false)
-            }
-            val nextProgress = (quest.progress + 1).coerceIn(0, quest.target)
-            val shouldClaimReward = nextProgress >= quest.target && !quest.claimed
-            quest.copy(
-                progress = nextProgress,
-                claimed = quest.claimed || shouldClaimReward,
-                rewardClaimedThisGame = shouldClaimReward
-            )
-        }
-        val updatedSeason = season.copy(quests = updatedQuests)
-        val seasonHunterUnlocked = progression.seasonHunterBadgeUnlocked ||
-            updatedSeason.seasonQuestsCompleted
-        return addCoins(
-            progression.copy(
-                season = updatedSeason,
-                seasonHunterBadgeUnlocked = seasonHunterUnlocked
-            ),
-            updatedSeason.seasonQuestRewardCoinsThisGame
         )
     }
 
@@ -2778,17 +2538,6 @@ class GameViewModel internal constructor(
                 )
             }
         }
-    }
-
-    private fun sanitizePlayerName(name: String): String? {
-        val cleanedName = name.trim().take(12)
-        if (cleanedName.isBlank()) return null
-
-        val loweredName = cleanedName.lowercase()
-        val blockedTerms = listOf("amk", "aq", "oros", "sik", "fuck", "shit")
-        if (blockedTerms.any { loweredName.contains(it) }) return null
-
-        return cleanedName
     }
 
     private fun shouldRequestInterstitialAfterGame(

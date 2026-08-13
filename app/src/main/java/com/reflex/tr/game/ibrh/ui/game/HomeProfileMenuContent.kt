@@ -32,7 +32,7 @@ internal fun ProfileQuickMenu(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.24f))
     ) {
         Column(
@@ -131,7 +131,7 @@ internal fun ProfileQuickMenuCard(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         color = accent.copy(alpha = 0.11f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.28f))
     ) {
         Row(

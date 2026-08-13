@@ -244,6 +244,16 @@ private fun FeaturedShopCard(
             modifier = Modifier.padding(PremiumCardPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // The badge spans the full card width instead of sharing the row with the action
+            // button; beside a 132dp button it only had ~130dp and truncated mid-word.
+            Text(
+                text = label,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelMedium,
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -259,13 +269,6 @@ private fun FeaturedShopCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = accent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                     Text(
                         text = name,
                         style = MaterialTheme.typography.titleSmall,
@@ -303,7 +306,7 @@ private fun FeaturedShopCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(5.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = accent,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -324,7 +327,7 @@ private fun FeaturedThemePreview(theme: PlayerTheme) {
     Box(
         modifier = Modifier
             .size(46.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(PremiumCompactRadius))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -394,7 +397,7 @@ private fun TargetSkinCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = if (selected) accent.copy(alpha = 0.16f) else ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.56f else 0.28f))
     ) {
         Row(
@@ -426,7 +429,9 @@ private fun TargetSkinCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            // Same bounded width as the featured cards above, so the name column keeps its room.
             SecondaryGameButton(
+                modifier = Modifier.widthIn(min = 108.dp, max = 132.dp),
                 text = when {
                     selected -> stringResource(R.string.target_skin_selected)
                     unlocked -> stringResource(R.string.target_skin_select)
@@ -519,7 +524,7 @@ internal fun ShopCoinEarnCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.38f))
     ) {
         Column(
@@ -581,13 +586,14 @@ internal fun ShopCoinEarnCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // The counter is a short fixed label, so it wraps its content and the button
+                // takes the remaining width. An even 50/50 split truncated the button's text.
                 Text(
                     text = stringResource(
                         R.string.shop_coin_earn_remaining_rights,
                         rewardState.remainingClaims,
                         rewardState.maxClaimsPerDay
                     ),
-                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (rewardState.canClaim) ReflexGamePalette.textSecondary else ArcadeCoral,
                     maxLines = 1,

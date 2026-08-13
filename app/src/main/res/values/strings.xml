@@ -3,7 +3,6 @@
 
     <string name="game_title">Reflex Avı</string>
     <string name="game_tagline">Hızını sına, ritmini koru ve en yüksek skora ulaş.</string>
-    <string name="start_game">Başla</string>
     <string name="start_classic_game">Klasik Mod Başlat</string>
     <string name="start_moving_game">Hareketli Hedef Başlat</string>
     <string name="start_fake_game">Sahte Hedef Başlat</string>
@@ -14,10 +13,6 @@
     <string name="open_details">İncele</string>
     <string name="back_to_modes">Modlara Dön</string>
     <string name="back_to_profile">Profil’e Dön</string>
-    <string name="how_to_play_target">30 saniye boyunca rastgele çıkan kırmızı hedefe dokun.</string>
-    <string name="how_to_play_score">Her doğru dokunuşta skor artar ve hedef yeni yere geçer.</string>
-    <string name="how_to_play_lives">3 canın var. Hedef dışına basarsan can kaybedersin.</string>
-    <string name="how_to_play_end">Süre dolduğunda veya canın bittiğinde oyun sona erer.</string>
 
     <string name="score">Skor</string>
     <string name="lives">Can</string>
@@ -26,7 +21,6 @@
     <string name="seconds_short">%1$ds</string>
     <string name="best_score">En İyi Skor</string>
     <string name="best_score_value">En İyi Skor: %1$d</string>
-    <string name="play_area_title">Refleks Arenası</string>
     <string name="arena_reflex">Refleks Arenası</string>
     <string name="arena_challenge">Meydan Okuma Alanı</string>
     <string name="arena_target">Hedef Arenası</string>
@@ -55,17 +49,12 @@
     <string name="daily_mode_title">Günün Modu</string>
     <string name="daily_mode_bonus">+%%%1$d Coin Bonusu</string>
     <string name="daily_mode_play">Oyna</string>
-    <string name="boost_sheet_title">Güçlendirme Seç</string>
-    <string name="boost_sheet_description">Tek oyunluk avantajını seç, ritme hızlı gir.</string>
     <string name="boost_extra_time_title">+5 saniye süre</string>
     <string name="boost_extra_time_description">Oyuna 5 saniye ekstra süreyle başla.</string>
     <string name="boost_extra_life_title">1 ekstra can</string>
     <string name="boost_extra_life_description">Oyuna 1 can avantajıyla başla.</string>
     <string name="boost_combo_start_title">İlk x5 kombo bonusu</string>
     <string name="boost_combo_start_description">Oyuna x5 kombo avantajıyla başla.</string>
-    <string name="boost_buy_with_coins">%1$d coin</string>
-    <string name="boost_use_ad">Bu Oyunda Kullan</string>
-    <string name="boost_start_without">Direkt Başla</string>
     <string name="season_title">Sezon</string>
     <string name="season_card_title">Sezon %1$d • Seviye %2$d</string>
     <string name="season_days_left">%1$d gün kaldı</string>
@@ -121,9 +110,7 @@
     <string name="max_combo">En Yüksek Kombo</string>
     <string name="accuracy">İsabet</string>
     <string name="percent_value">%%%1$d</string>
-    <string name="change_mode">Mod Değiştir</string>
     <string name="daily_challenge_title">Günün Görevi</string>
-    <string name="daily_challenge_done">Bitti</string>
     <string name="daily_challenge_completed_badge">Hazır</string>
     <string name="daily_challenge_completed_title">Görev Tamam!</string>
     <string name="daily_challenge_completed_description">Ödül hazır. Yeni görev yarın gelir.</string>
@@ -143,12 +130,8 @@
     <string name="daily_challenge_leaderboard_description">Bugün liderlik tablosuna bir kez göz at.</string>
     <string name="daily_challenge_shop_title">Mağazayı Ziyaret Et</string>
     <string name="daily_challenge_shop_description">Tema mağazasını aç ve yeni hedeflerini gör.</string>
-    <string name="daily_challenge_score_20_title">20 Skor Yap</string>
-    <string name="daily_challenge_score_20_description">Tempoyu koru, 20 skoru gör.</string>
     <string name="daily_challenge_play_3_title">3 Oyun Bitir</string>
     <string name="daily_challenge_play_3_description">Üç oyun tamamla, refleksini ısıt.</string>
-    <string name="daily_challenge_fake_10_title">Sahte Hedefte 10 skor</string>
-    <string name="daily_challenge_fake_10_description">Sahte hedeflere kanmadan 10 doğru dokunuş yap.</string>
     <string name="language_selection_title">Dil Seçimi</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
@@ -156,7 +139,6 @@
     <string name="sound_off">Ses Kapalı</string>
     <string name="coin_wallet_title">Coin Kasası</string>
     <string name="coin_wallet_value">%1$d coin</string>
-    <string name="coins_earned_title">Coin Kazandın</string>
     <string name="coins_earned_value">+%1$d coin</string>
     <string name="coin_bonus_included">+%1$d bonus dahil</string>
     <string name="coin_reward_value">+%1$d</string>
@@ -181,7 +163,6 @@
     <string name="daily_reward_day_super">Kasa</string>
     <string name="daily_reward_loyal_badge">Sadık Oyuncu</string>
     <string name="daily_reward_loyal_badge_description">30 günlük seri rozetin açıldı.</string>
-    <string name="daily_reward_exit_fomo">Yarın dön, %1$d coin kap.</string>
     <string name="claim_reward">Ödülü Al</string>
     <string name="claimed">Alındı</string>
     <string name="ok">Tamam</string>
@@ -227,8 +208,6 @@
     <string name="selected_theme_value">Tema: %1$s</string>
     <string name="theme_selected">Seçili</string>
     <string name="theme_unlocked">Açık</string>
-    <string name="theme_locked">Kilitli</string>
-    <string name="theme_price">%1$d coin</string>
     <string name="theme_price_affordable">Satın alınabilir • %1$d coin</string>
     <string name="theme_price_locked">Kilitli • %1$d coin</string>
     <string name="theme_prestige_label">En Prestijli Tema</string>
@@ -244,7 +223,6 @@
     <string name="theme_try_ad">1 Oyun Dene</string>
     <string name="theme_trial_active">Deneme aktif: 1 oyun</string>
     <string name="theme_unlocked_popup_title">Tema Açıldı!</string>
-    <string name="theme_unlocked_popup_message">%1$s artık senin. Arena ışıkları değişti.</string>
     <string name="shop_coin_earn_title">Coin Kazan</string>
     <string name="shop_coin_earn_target">%1$s için %2$d coin kaldı</string>
     <string name="shop_coin_earn_button">Reklam İzle +%1$d Coin Kazan</string>
@@ -287,7 +265,7 @@
     <string name="profile_default_player_name">Oyuncu</string>
     <string name="profile_rank_value">Rütbe: %1$s</string>
     <string name="profile_achievements_value">%1$d başarım</string>
-    <string name="profile_title_select">Ünvanını seç</string>
+    <string name="profile_title_select">Unvanını seç</string>
     <string name="profile_quick_leaderboard_description">Sıralamanı ve rakiplerini gör.</string>
     <string name="profile_quick_achievements_description">Uzun vadeli hedeflerini takip et.</string>
     <string name="profile_quick_missions_description">Günlük ve haftalık görevleri yönet.</string>
@@ -295,7 +273,6 @@
     <string name="profile_quick_season_description">Sezon yolunu ve ödüllerini takip et.</string>
     <string name="achievements_title">Başarımlar</string>
     <string name="achievements_empty">Yeni görevler yakında burada görünecek.</string>
-    <string name="achievement_progress_value">%1$d/%2$d • +%3$d coin</string>
     <string name="achievement_progress_percent_value">%%%1$d • %2$d/%3$d • +%4$d coin</string>
     <string name="achievement_category_score">SKOR</string>
     <string name="achievement_category_game">OYUN</string>
@@ -304,34 +281,24 @@
     <string name="achievement_category_theme">TEMA</string>
     <string name="achievement_first_record_title">İlk Rekor</string>
     <string name="achievement_first_record_description">İlk rekor anını yakala.</string>
-    <string name="achievement_first_game_title">İlk Oyun</string>
-    <string name="achievement_first_game_description">İlk refleks oyununu tamamla.</string>
     <string name="achievement_score_25_title">25 Skor</string>
     <string name="achievement_score_25_description">Tek oyunda 25 skora ulaş.</string>
     <string name="achievement_score_50_title">50 Skor</string>
     <string name="achievement_score_50_description">Tek oyunda 50 skora ulaş.</string>
     <string name="achievement_score_100_title">100 Skor</string>
     <string name="achievement_score_100_description">Tek oyunda 100 skora ulaş.</string>
-    <string name="achievement_hit_100_title">100 Hedef Vur</string>
-    <string name="achievement_hit_100_description">Toplam 100 doğru hedefe dokun.</string>
     <string name="achievement_combo_5_title">x5 Kombo</string>
     <string name="achievement_combo_5_description">Tek oyunda x5 kombo yakala.</string>
     <string name="achievement_combo_master_title">x10 Kombo</string>
     <string name="achievement_combo_master_description">Tek oyunda x10 kombo yakala.</string>
     <string name="achievement_combo_20_title">x20 Kombo</string>
     <string name="achievement_combo_20_description">Tek oyunda x20 kombo yakala.</string>
-    <string name="achievement_fake_master_title">Sahte Hedef Ustası</string>
-    <string name="achievement_fake_master_description">Sahte Hedef modunda 20 skor yap.</string>
-    <string name="achievement_color_champion_title">Renk Refleksi Şampiyonu</string>
-    <string name="achievement_color_champion_description">Renk Refleksi modunda 20 skor yap.</string>
     <string name="achievement_play_10_title">10 Oyun Oyna</string>
     <string name="achievement_play_10_description">Toplam 10 oyun tamamla.</string>
     <string name="achievement_play_50_title">50 Oyun Oyna</string>
     <string name="achievement_play_50_description">Toplam 50 oyun tamamla.</string>
     <string name="achievement_play_100_title">100 Oyun Oyna</string>
     <string name="achievement_play_100_description">Toplam 100 oyun tamamla.</string>
-    <string name="achievement_record_breaker_title">Rekor Kırıcı</string>
-    <string name="achievement_record_breaker_description">Herhangi bir modda yeni rekor kır.</string>
     <string name="achievement_rewarded_ad_1_title">İlk Ödüllü Reklam</string>
     <string name="achievement_rewarded_ad_1_description">İlk ödüllü reklamını izle.</string>
     <string name="achievement_rewarded_ad_10_title">10 Ödüllü Reklam</string>
@@ -410,7 +377,6 @@
     <string name="settings_notifications_title">Bildirimler</string>
     <string name="settings_notifications_description">Sadece seçtiğin hatırlatmalar gönderilir. Günde en fazla 1–2 bildirim alırsın.</string>
     <string name="settings_notifications_all_disabled">Bildirimler kapalı. Sadece istediğin hatırlatmaları buradan açabilirsin.</string>
-    <string name="settings_notifications_permission_disabled">Android bildirim izni kapalı. Hatırlatmaları almak için sistem ayarlarından Reflex Avı bildirimlerine izin ver.</string>
     <string name="settings_notifications_permission_closed_short">Bildirim izni kapalı</string>
     <string name="settings_toggle_on">Açık</string>
     <string name="settings_toggle_off">Kapalı</string>
@@ -437,7 +403,6 @@
     <string name="onboarding_rewards_body">Oyna, ödül kazan ve yeni neon temaların kilidini aç.</string>
     <string name="onboarding_step_value">%1$d / %2$d</string>
     <string name="onboarding_next">İleri</string>
-    <string name="onboarding_back">Geri</string>
     <string name="onboarding_start">Başla</string>
     <string name="onboarding_skip">Geç</string>
     <string name="first_target_title">İlk Skorunu Yap</string>
@@ -461,8 +426,6 @@
     <string name="store_preview_enable">Aç</string>
     <string name="store_preview_disable">Kapat</string>
     <string name="weekly_challenge_title">Haftalık Mücadele</string>
-    <string name="weekly_challenge_title_value">Haftalık 100 skor</string>
-    <string name="weekly_challenge_description">Bu hafta oyunlardan toplam 100 skor biriktir.</string>
     <string name="weekly_challenge_progress">%1$d/%2$d • Ödül +%3$d coin</string>
     <string name="weekly_challenge_classic_50_title">Klasik Modda 50 skor yap</string>
     <string name="weekly_challenge_classic_50_description">Bu hafta Klasik modda tek oyunda 50 skora ulaş.</string>
@@ -521,6 +484,12 @@
     <string name="target_skin_select">Seç</string>
     <string name="target_skin_buy">Satın Al</string>
     <string name="target_skin_locked">Yetersiz Coin</string>
+    <string name="boost_section_title">Hızlı Avantajlar</string>
+    <string name="boost_section_description">Ucuz, tek oyunluk avantaj. Reklam izleyerek bedava da alabilirsin.</string>
+    <string name="boost_buy_with_coins">%1$d coin</string>
+    <string name="boost_missing_coins">%1$d coin eksik</string>
+    <string name="boost_watch_ad">Reklam izle</string>
+    <string name="power_up_section_title">Güçlendirmeler</string>
     <string name="power_up_sheet_title">Güçlendirme Seç</string>
     <string name="power_up_sheet_description">Bu avantaj sadece sıradaki oyun için geçerlidir. Aynı oyunda en fazla 1 güçlendirme seçilebilir.</string>
     <string name="power_up_start_without">Güçlendirme Olmadan Başla</string>
@@ -694,8 +663,6 @@
     <string name="continue_almost_record_title">Rekora Çok Yakındın!</string>
     <string name="game_over_near_record_message">Bir oyun daha, rekor gelebilir.</string>
     <string name="game_over_season_xp">Sezon XP</string>
-    <string name="one_more_game_bonus_offer">Bir oyun daha oyna, bonus coin kap</string>
-    <string name="one_more_game_bonus_claimed">+%1$d bonus coin kaptın</string>
     <string name="continue_offer_title">Devam mı?</string>
     <string name="new_record">Yeni Rekor!</string>
     <string name="continue_game">Devam Et</string>

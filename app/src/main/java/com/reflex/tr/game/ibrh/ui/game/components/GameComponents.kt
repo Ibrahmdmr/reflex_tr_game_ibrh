@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.PremiumCardPadding
 import com.reflex.tr.game.ibrh.ui.game.PremiumCardRadius
+import com.reflex.tr.game.ibrh.ui.game.PremiumChipRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumCompactRadius
+import com.reflex.tr.game.ibrh.ui.game.PremiumOverlayRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumPanelRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumSectionSpacing
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberAnimatedPressScale
@@ -360,7 +362,7 @@ fun PrimaryGameButton(
                 shadowElevation = 10f + pulse * 12f
             },
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.Transparent,
@@ -378,12 +380,12 @@ fun PrimaryGameButton(
                             ArcadeGold.copy(alpha = 0.76f + pulse * 0.08f)
                         )
                     ),
-                    RoundedCornerShape(16.dp)
+                    RoundedCornerShape(PremiumChipRadius)
                 )
                 .border(
                     1.dp,
                     Color.White.copy(alpha = 0.24f + pulse * 0.12f),
-                    RoundedCornerShape(16.dp)
+                    RoundedCornerShape(PremiumChipRadius)
                 )
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center
@@ -399,6 +401,13 @@ fun PrimaryGameButton(
     }
 }
 
+/**
+ * Full-width secondary action, sized for stacking in a [Column].
+ *
+ * It applies `fillMaxWidth()` internally, so placing it in a [Row] without a width constraint
+ * makes it claim the whole row and collapse its siblings to zero width. Inside a row, always pass
+ * a bounded `modifier` — `Modifier.weight(...)` or `Modifier.widthIn(min, max)`.
+ */
 @Composable
 fun SecondaryGameButton(
     text: String,
@@ -418,7 +427,7 @@ fun SecondaryGameButton(
             .height(52.dp)
             .scale(scale),
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.White.copy(alpha = 0.095f),
             contentColor = ReflexGamePalette.textPrimary,
@@ -475,7 +484,7 @@ fun HowToPlayItem(text: String) {
 @Composable
 fun BestScoreBadge(bestScore: Int) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         color = ReflexGamePalette.neonBlue.copy(alpha = 0.18f),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
@@ -500,7 +509,7 @@ fun ScoreHighlightCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(PremiumOverlayRadius),
         color = accentColor.copy(alpha = 0.15f),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,

@@ -51,7 +51,7 @@ internal fun ThemeUnlockCelebration(
     modifier: Modifier = Modifier
 ) {
     val spec = themeVisualSpec(theme)
-    val title = localizedHomeStringResource(R.string.theme_unlocked_popup_title, selectedLanguage)
+    val title = localizedStringResource(R.string.theme_unlocked_popup_title, selectedLanguage)
     val pulse by rememberInfiniteTransition(label = "theme_unlock_glow").animateFloat(
         initialValue = 0.82f,
         targetValue = 1f,
@@ -79,7 +79,7 @@ internal fun ThemeUnlockCelebration(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(PremiumSurfaceRadius),
         border = BorderStroke(1.dp, spec.primary.copy(alpha = 0.72f))
     ) {
         Box(

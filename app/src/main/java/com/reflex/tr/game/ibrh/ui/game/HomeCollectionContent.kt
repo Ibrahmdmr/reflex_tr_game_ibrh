@@ -118,7 +118,7 @@ private fun CollectionProgressCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(PremiumCardRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.34f))
     ) {
         Column(
@@ -152,7 +152,7 @@ private fun CollectionProgressCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(999.dp)),
+                    .clip(RoundedCornerShape(PremiumPillRadius)),
                 color = ArcadeGold,
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
@@ -172,7 +172,7 @@ private fun CollectionProgressPill(
     Surface(
         modifier = modifier,
         color = ArcadeBlue.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PremiumCompactRadius),
         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.26f))
     ) {
         Column(
@@ -217,7 +217,7 @@ private fun <T> CollectionSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = ReflexGamePalette.cardGlassStrong,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(PremiumChipRadius),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
             ) {
                 Text(
@@ -339,7 +339,7 @@ internal fun CollectionMasterBadge(
     Surface(
         modifier = modifier,
         color = ArcadeGold.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(PremiumPillRadius),
         border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
     ) {
         Text(
@@ -363,7 +363,7 @@ private fun CollectionThemePreview(accent: Color) {
     Box(
         modifier = Modifier
             .size(42.dp)
-            .clip(RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(PremiumCompactRadius))
             .background(accent.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center
     ) {
