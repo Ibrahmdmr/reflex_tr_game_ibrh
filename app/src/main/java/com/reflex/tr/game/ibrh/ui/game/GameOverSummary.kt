@@ -46,9 +46,7 @@ internal fun PerformanceSummaryGrid(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // IntrinsicSize.Min + fillMaxHeight makes both cards in a row adopt the taller one's
-        // height. The prominent score card carries extra padding and a larger value style, so
-        // without this its neighbour would render visibly shorter.
+        // IntrinsicSize.Min + fillMaxHeight keeps both cards the height of the taller one.
         Row(
             modifier = Modifier
                 .fillMaxWidth()

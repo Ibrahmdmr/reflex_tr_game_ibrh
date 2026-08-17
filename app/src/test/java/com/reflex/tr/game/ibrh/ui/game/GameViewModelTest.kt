@@ -18,12 +18,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * End-to-end coverage of the gameplay loop through [GameViewModel].
- *
- * The view model is driven with an [UnconfinedTestDispatcher] whose scheduler is never advanced,
- * so the countdown and target-timeout coroutines stay parked and each test observes only the
- * effects of the input it sends. The leaderboard is backed by the offline implementation, so no
- * test touches the network.
+ * Gameplay loop through [GameViewModel]. The test scheduler is never advanced, so timer
+ * coroutines stay parked and each test sees only the effects of the input it sends.
  */
 @RunWith(RobolectricTestRunner::class)
 class GameViewModelTest {

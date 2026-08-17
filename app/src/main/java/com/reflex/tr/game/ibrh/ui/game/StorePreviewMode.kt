@@ -123,6 +123,7 @@ private fun storePreviewProgression(): ProgressionState {
             claimedRewardLevels = (1..11).toSet(),
             preservedBadgeLevels = setOf(5, 10),
             xpBoostEndTimeMillis = System.currentTimeMillis() + 24 * 60 * 1_000L,
+            xpBoostRemainingMinutes = 24,
             missionDateKey = "store-preview",
             gamesPlayedToday = 2,
             rewardedAdsWatchedToday = 1,

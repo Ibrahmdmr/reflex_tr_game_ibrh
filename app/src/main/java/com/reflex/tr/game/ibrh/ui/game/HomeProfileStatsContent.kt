@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -61,61 +59,6 @@ internal fun HomeQuickStats(
 }
 
 @Composable
-internal fun HomeLevelProgressCard(
-    progressionState: ProgressionState,
-    modifier: Modifier = Modifier
-) {
-    val currentLevelXp = (progressionState.level - 1) * XP_PER_LEVEL
-    val nextLevelXp = progressionState.level * XP_PER_LEVEL
-    val levelProgress = ((progressionState.xp - currentLevelXp).toFloat() / XP_PER_LEVEL)
-        .coerceIn(0f, 1f)
-    val remainingXp = (nextLevelXp - progressionState.xp).coerceAtLeast(0)
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = ArcadeTeal.copy(alpha = 0.11f),
-        shape = RoundedCornerShape(PremiumChipRadius),
-        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.28f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.home_level_progress_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ReflexGamePalette.textPrimary
-                )
-                Text(
-                    text = stringResource(R.string.level_value, progressionState.level),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ArcadeTeal
-                )
-            }
-            LinearProgressIndicator(
-                progress = { levelProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(PremiumPillRadius)),
-                color = ArcadeTeal,
-                trackColor = Color.White.copy(alpha = 0.08f)
-            )
-            Text(
-                text = stringResource(R.string.xp_to_next_level_value, remainingXp),
-                style = MaterialTheme.typography.labelSmall,
-                color = ReflexGamePalette.textSecondary
-            )
-        }
-    }
-}
-
-@Composable
 internal fun AchievementCounterCard(
     achievements: List<AchievementState>,
     modifier: Modifier = Modifier
@@ -150,43 +93,6 @@ internal fun QuickStatCard(
         accentColor = accent,
         modifier = modifier
     )
-}
-
-@Composable
-internal fun AchievementSummaryCard(
-    achievements: List<AchievementState>
-) {
-    val unlockedCount = achievements.count { it.unlocked }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = ArcadeTeal.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(PremiumCardRadius),
-        border = BorderStroke(1.dp, ArcadeTeal.copy(alpha = 0.3f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "★",
-                style = MaterialTheme.typography.titleMedium,
-                color = ArcadeGold
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.achievements_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary
-                )
-                Text(
-                    text = stringResource(R.string.achievement_summary_value, unlockedCount, achievements.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReflexGamePalette.textSecondary
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -287,9 +193,7 @@ private data class StatisticItem(
 
 @Composable
 private fun StatisticsRow(items: List<StatisticItem>) {
-    // IntrinsicSize.Min + fillMaxHeight keeps both cards the height of the taller one. Titles
-    // wrap to two lines at different points ("En çok coin kazanılan oyun" vs "En iyi Klasik
-    // skoru"), which otherwise leaves one card visibly shorter than its neighbour.
+    // IntrinsicSize.Min + fillMaxHeight keeps both cards the height of the taller one.
     Row(
         modifier = Modifier
             .fillMaxWidth()

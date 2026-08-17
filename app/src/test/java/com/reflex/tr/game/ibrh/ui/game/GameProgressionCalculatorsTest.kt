@@ -5,11 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Guards the game economy (coins / XP / level) and daily challenge progression.
- * Breaking these calculations hands out wrong rewards, so this is the most
- * critical pure logic in the app.
- */
+/** The game economy (coins / XP / level) and daily challenge progression. */
 class GameProgressionCalculatorsTest {
 
     // --- calculateEarnedCoins ---

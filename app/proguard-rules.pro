@@ -1,13 +1,7 @@
-# Reflex Avı — R8 / ProGuard rules
-#
-# Note: Firestore access in LeaderboardRepository reads fields manually
-# (document.getString / getLong). No reflection-based POJO mapping (toObject) is used,
-# so the model classes need no keep rules. If that changes — i.e. toObject/@PropertyName
-# start being used — the affected model classes must be kept explicitly.
+# Firestore models need no keep rules: LeaderboardRepository reads fields manually, never
+# via toObject/@PropertyName. Add keeps here if that changes.
 
 # --- Crashlytics: readable stack traces ---
-# Without the source file and line number attributes, Crashlytics reports come back
-# obfuscated and cannot be traced.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 

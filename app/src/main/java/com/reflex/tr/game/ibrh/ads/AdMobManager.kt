@@ -3,6 +3,7 @@ package com.reflex.tr.game.ibrh.ads
 import android.app.Activity
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -55,10 +56,23 @@ class AdMobManager(
         get() = rewardedAd != null
     var onRewardedUiStateChanged: ((RewardedAdUiState) -> Unit)? = null
 
-    private fun updateRewardedUiState(
-        transform: (RewardedAdUiState) -> RewardedAdUiState
+    /**
+     * Flags are derived from [status] so they cannot drift out of step with it. [isShowing] stays
+     * a parameter: a request rejected mid-ad must still report the ad that is on screen.
+     */
+    private fun publishRewardedUiState(
+        status: AdPresentationState,
+        rewardEarned: Boolean = false,
+        isShowing: Boolean = status is AdPresentationState.Showing
     ) {
-        rewardedUiState = transform(rewardedUiState)
+        rewardedUiState = RewardedAdUiState(
+            status = status,
+            isReady = rewardedAd != null,
+            isLoading = status is AdPresentationState.Loading,
+            isShowing = isShowing,
+            hasLoadFailed = status is AdPresentationState.Failed,
+            rewardEarned = rewardEarned
+        )
         if (activity.isFinishing || activity.isDestroyed) return
         activity.runOnUiThread {
             onRewardedUiStateChanged?.invoke(rewardedUiState)
@@ -76,30 +90,15 @@ class AdMobManager(
     ): Boolean {
         if (activity.isFinishing || activity.isDestroyed) {
             logWarn("Rewarded ad ignored because activity is not active")
-            updateRewardedUiState {
-                it.copy(
-                    status = AdPresentationState.Failed("activity_not_active"),
-                    isReady = rewardedAd != null,
-                    isLoading = false,
-                    isShowing = false,
-                    hasLoadFailed = true,
-                    rewardEarned = false
-                )
-            }
+            publishRewardedUiState(AdPresentationState.Failed("activity_not_active"))
             return false
         }
         if (isRewardedShowing || isInterstitialShowing) {
             logDebug("Another fullscreen ad is already showing")
-            updateRewardedUiState {
-                it.copy(
-                    status = AdPresentationState.Failed("ad_already_showing"),
-                    isReady = rewardedAd != null,
-                    isLoading = false,
-                    isShowing = isRewardedShowing,
-                    hasLoadFailed = true,
-                    rewardEarned = false
-                )
-            }
+            publishRewardedUiState(
+                status = AdPresentationState.Failed("ad_already_showing"),
+                isShowing = isRewardedShowing
+            )
             return false
         }
         val ad = rewardedAd
@@ -109,16 +108,7 @@ class AdMobManager(
                 eventName = "rewarded_failed",
                 params = adParams("placement" to placement, "reason" to "not_ready")
             )
-            updateRewardedUiState {
-                it.copy(
-                    status = AdPresentationState.Failed("not_ready"),
-                    isReady = false,
-                    isLoading = false,
-                    isShowing = false,
-                    hasLoadFailed = true,
-                    rewardEarned = false
-                )
-            }
+            publishRewardedUiState(AdPresentationState.Failed("not_ready"))
             loadRewardedAd()
             return false
         }
@@ -126,16 +116,7 @@ class AdMobManager(
         rewardedAd = null
         isRewardedShowing = true
         mainHandler.removeCallbacks(rewardedRetryRunnable)
-        updateRewardedUiState {
-            it.copy(
-                status = AdPresentationState.Showing,
-                isReady = false,
-                isLoading = false,
-                isShowing = true,
-                hasLoadFailed = false,
-                rewardEarned = false
-            )
-        }
+        publishRewardedUiState(AdPresentationState.Showing)
         AdAnalyticsTracker.track("rewarded_open", adParams("placement" to placement))
         logDebug("Rewarded ad is showing")
         var rewardEarned = false
@@ -144,22 +125,13 @@ class AdMobManager(
 
         fun finishRewardedAd(
             status: AdPresentationState,
-            hasLoadFailed: Boolean,
             shouldGrantReward: Boolean
         ) {
             if (fullscreenFinished) return
             fullscreenFinished = true
             isRewardedShowing = false
-            lastRewardedClosedElapsedMillis = android.os.SystemClock.elapsedRealtime()
-            updateRewardedUiState {
-                it.copy(
-                    status = status,
-                    isShowing = false,
-                    isLoading = false,
-                    hasLoadFailed = hasLoadFailed,
-                    rewardEarned = rewardEarned
-                )
-            }
+            lastRewardedClosedElapsedMillis = SystemClock.elapsedRealtime()
+            publishRewardedUiState(status = status, rewardEarned = rewardEarned)
             if (shouldGrantReward && rewardEarned && !rewardGranted) {
                 rewardGranted = true
                 logDebug("Rewarded ad dismissed after reward, granting reward")
@@ -172,7 +144,6 @@ class AdMobManager(
             override fun onAdDismissedFullScreenContent() {
                 finishRewardedAd(
                     status = if (rewardEarned) AdPresentationState.RewardEarned else AdPresentationState.Idle,
-                    hasLoadFailed = false,
                     shouldGrantReward = true
                 )
             }
@@ -186,7 +157,6 @@ class AdMobManager(
                 rewardEarned = false
                 finishRewardedAd(
                     status = AdPresentationState.Failed(adError.message),
-                    hasLoadFailed = true,
                     shouldGrantReward = false
                 )
             }
@@ -196,12 +166,12 @@ class AdMobManager(
             ad.show(activity) {
                 if (!rewardEarned) {
                     rewardEarned = true
-                    updateRewardedUiState {
-                        it.copy(
-                            status = AdPresentationState.RewardEarned,
-                            rewardEarned = true
-                        )
-                    }
+                    // Reward earned, but the ad has not been dismissed yet.
+                    publishRewardedUiState(
+                        status = AdPresentationState.RewardEarned,
+                        rewardEarned = true,
+                        isShowing = true
+                    )
                     AdAnalyticsTracker.track("rewarded_complete", adParams("placement" to placement))
                     FirebaseGameServices.logEvent(
                         event = FirebaseEvent.RewardedAdWatched,
@@ -220,7 +190,6 @@ class AdMobManager(
             rewardEarned = false
             finishRewardedAd(
                 status = AdPresentationState.Failed(throwable.message),
-                hasLoadFailed = true,
                 shouldGrantReward = false
             )
         }.getOrDefault(false)
@@ -229,7 +198,7 @@ class AdMobManager(
     fun showInterstitialAd(): Boolean {
         if (activity.isFinishing || activity.isDestroyed) return false
         if (isInterstitialShowing || isRewardedShowing) return false
-        val now = android.os.SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
         if (
             lastRewardedClosedElapsedMillis > 0L &&
             now - lastRewardedClosedElapsedMillis < REWARDED_TO_INTERSTITIAL_GRACE_MS
@@ -272,13 +241,7 @@ class AdMobManager(
     private fun loadRewardedAd() {
         if (activity.isFinishing || activity.isDestroyed) {
             isRewardedLoading = false
-            updateRewardedUiState {
-                it.copy(
-                    status = AdPresentationState.Idle,
-                    isLoading = false,
-                    isShowing = false
-                )
-            }
+            publishRewardedUiState(AdPresentationState.Idle)
             return
         }
         if (isRewardedLoading || rewardedAd != null || isRewardedShowing) return
@@ -286,15 +249,7 @@ class AdMobManager(
         mainHandler.removeCallbacks(rewardedRetryRunnable)
         logDebug("Rewarded ad is loading")
         isRewardedLoading = true
-        updateRewardedUiState {
-            it.copy(
-                status = AdPresentationState.Loading,
-                isReady = false,
-                isLoading = true,
-                isShowing = false,
-                rewardEarned = false
-            )
-        }
+        publishRewardedUiState(AdPresentationState.Loading)
         RewardedAd.load(
             activity,
             rewardedAdUnitId,
@@ -304,31 +259,14 @@ class AdMobManager(
                     logDebug("Rewarded ad loaded")
                     rewardedAd = ad
                     isRewardedLoading = false
-                    updateRewardedUiState {
-                        it.copy(
-                            status = AdPresentationState.Ready,
-                            isReady = true,
-                            isLoading = false,
-                            isShowing = false,
-                            hasLoadFailed = false,
-                            rewardEarned = false
-                        )
-                    }
+                    publishRewardedUiState(AdPresentationState.Ready)
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                     logWarn("Rewarded ad failed to load: ${loadAdError.message}")
                     rewardedAd = null
                     isRewardedLoading = false
-                    updateRewardedUiState {
-                        it.copy(
-                            status = AdPresentationState.Failed(loadAdError.message),
-                            isReady = false,
-                            isLoading = false,
-                            isShowing = false,
-                            hasLoadFailed = true
-                        )
-                    }
+                    publishRewardedUiState(AdPresentationState.Failed(loadAdError.message))
                     mainHandler.postDelayed(rewardedRetryRunnable, REWARDED_RETRY_DELAY_MS)
                 }
             }
@@ -365,11 +303,8 @@ class AdMobManager(
         )
     }
 
-    /**
-     * Drops every reference back to the host [Activity]. Must be called from `onDestroy()`:
-     * the retry runnables are posted with a delay of several seconds and would otherwise keep
-     * this manager — and through it the activity and the loaded ads — alive past its lifetime.
-     */
+    /** Drops every reference to the host [Activity]. Call from `onDestroy()`: the delayed retry
+     *  runnables would otherwise keep the activity alive past its lifetime. */
     fun release() {
         mainHandler.removeCallbacks(rewardedRetryRunnable)
         mainHandler.removeCallbacks(interstitialRetryRunnable)

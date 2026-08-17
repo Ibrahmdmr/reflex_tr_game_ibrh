@@ -34,10 +34,12 @@ internal fun advanceDailyChallengeForHit(
         DailyChallenge.OpenLeaderboard,
         DailyChallenge.VisitShop -> state.progress
     }
-    return state.copy(
+    val next = state.copy(
         progress = nextProgress,
         completed = nextProgress >= state.target
     )
+    // Same instance when nothing moved, so the caller can skip persisting with an identity check.
+    return if (next == state) state else next
 }
 
 internal fun advanceDailyChallengeForGameCompleted(

@@ -14,10 +14,8 @@ data class PersonalRecordsState(
 )
 
 /**
- * @property icon a language-neutral glyph. Each carries U+FE0E so the system renders it as
- * monochrome text and it picks up the badge tint instead of a fixed emoji palette. Deriving it from the title's first letter does not
- * work: English initials are meaningless next to Turkish names, and Turkish initials collide
- * ("Kombo Avcısı"/"Koleksiyon Ustası", "Sadık Oyuncu"/"Sezon Avcısı").
+ * @property icon a language-neutral glyph carrying U+FE0E, so it renders as monochrome text and
+ * takes the badge tint. Title initials do not work here: the Turkish ones collide.
  */
 enum class ProfileBadge(
     val storageKey: String,

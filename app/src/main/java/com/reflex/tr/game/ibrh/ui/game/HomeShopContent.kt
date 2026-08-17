@@ -289,18 +289,20 @@ private fun FeaturedShopCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                SecondaryGameButton(
-                    text = when {
-                        selected -> stringResource(R.string.theme_selected)
-                        unlocked -> stringResource(R.string.select_theme)
-                        canBuy -> stringResource(R.string.buy_theme)
-                        else -> stringResource(R.string.theme_insufficient_coins)
-                    },
-                    enabled = !selected && clickEnabled,
-                    onClick = onClick,
-                    modifier = Modifier.widthIn(min = 108.dp, max = 132.dp)
-                )
             }
+            // Own row, like the badge above: sharing the row left the name and the coin line
+            // about 128dp on a 360dp screen, which clipped "Matrix Yeşili" and "89950 Coin Kaldı".
+            SecondaryGameButton(
+                text = when {
+                    selected -> stringResource(R.string.theme_selected)
+                    unlocked -> stringResource(R.string.select_theme)
+                    canBuy -> stringResource(R.string.buy_theme)
+                    else -> stringResource(R.string.theme_insufficient_coins)
+                },
+                enabled = !selected && clickEnabled,
+                onClick = onClick,
+                modifier = Modifier.height(44.dp)
+            )
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier

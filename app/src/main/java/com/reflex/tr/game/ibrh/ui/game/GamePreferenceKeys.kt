@@ -1,12 +1,6 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/**
- * SharedPreferences storage keys and tuning constants for [GamePreferences].
- *
- * These live apart from the reader/writer logic so the persisted schema can be reviewed — and
- * grepped for collisions — in one place. They are `internal` rather than file-private purely so
- * [GamePreferences] can still reach them from its own file.
- */
+/** SharedPreferences keys and tuning constants for [GamePreferences], kept in one place. */
 
 internal const val GAME_PREFERENCES_NAME = "game_preferences"
 internal const val BEST_SCORE_KEY = "best_score"

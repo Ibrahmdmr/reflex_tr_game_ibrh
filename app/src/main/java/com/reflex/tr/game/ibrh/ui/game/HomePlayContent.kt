@@ -240,9 +240,7 @@ private fun nextGoalSuggestion(
         .filter { it.coinPrice > 0 && it !in progressionState.unlockedThemes }
         .minByOrNull { it.coinPrice }
     val canBuyTheme = nearestLockedTheme?.let { currentCoins >= it.coinPrice } == true
-    val canClaimSeasonReward = progressionState.season.rewards.any { reward ->
-        reward.level <= progressionState.season.level && !reward.claimed
-    }
+    val canClaimSeasonReward = progressionState.season.hasClaimableReward
 
     return when {
         progressionState.dailyReward.canClaim -> NextGoalSuggestion(

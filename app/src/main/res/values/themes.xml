@@ -7,7 +7,7 @@
 
     <style name="Theme.Reflex_tr_game_ibrh.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/refleks_avi_icon_full</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/app_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.Reflex_tr_game_ibrh</item>
     </style>
 </resources>

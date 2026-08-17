@@ -977,8 +977,6 @@ fun GameScreen(
                     isContinueEnabled = continueButtonEnabled,
                     isContinueLoading = continueButtonLoading,
                     onHomeClick = returnHomeFromGameOver,
-                    onChangeModeClick = returnHomeFromGameOver,
-                    onOpenThemeStoreClick = returnHomeFromGameOver,
                     isDoubleCoinsEnabled = !uiState.isCoinDoubleClaimed &&
                         uiState.baseCoinsThisGame > 0 &&
                         rewardedAdUiState.isReady &&

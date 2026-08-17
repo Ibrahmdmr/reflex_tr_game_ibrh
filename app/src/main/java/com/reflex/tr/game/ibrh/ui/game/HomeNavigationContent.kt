@@ -284,7 +284,7 @@ internal fun GameModeCard(
                         text = stringResource(mode.descriptionRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ReflexGamePalette.textSecondary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

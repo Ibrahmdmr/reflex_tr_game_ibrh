@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,28 +14,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -57,12 +49,10 @@ import com.reflex.tr.game.ibrh.ui.game.PremiumCardPadding
 import com.reflex.tr.game.ibrh.ui.game.PremiumCardRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumChipRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumCompactRadius
-import com.reflex.tr.game.ibrh.ui.game.PremiumOverlayRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumPanelRadius
 import com.reflex.tr.game.ibrh.ui.game.PremiumSectionSpacing
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberAnimatedPressScale
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
-import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
@@ -202,138 +192,6 @@ fun GamePanelCard(
 }
 
 @Composable
-fun GameStatCard(
-    label: String,
-    value: String,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    alertTrigger: Int = 0
-) {
-    val cardScale = remember { Animatable(1f) }
-    val glowAlpha = remember { Animatable(0f) }
-
-    LaunchedEffect(alertTrigger) {
-        if (alertTrigger == 0) return@LaunchedEffect
-
-        cardScale.snapTo(0.96f)
-        glowAlpha.snapTo(0.22f)
-        cardScale.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
-        glowAlpha.animateTo(0f, tween(240, easing = FastOutLinearInEasing))
-    }
-
-    Surface(
-        modifier = modifier
-            .scale(cardScale.value)
-            .shadow(8.dp, RoundedCornerShape(PremiumCardRadius), clip = false)
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(PremiumCardRadius)
-            ),
-        shape = RoundedCornerShape(PremiumCardRadius),
-        color = ReflexGamePalette.cardGlassStrong,
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .background(accentColor.copy(alpha = glowAlpha.value * 0.65f))
-                .padding(horizontal = 14.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCardAccent(accentColor)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                color = ReflexGamePalette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-fun LivesStatCard(
-    label: String,
-    lives: Int,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    alertTrigger: Int = 0
-) {
-    val cardScale = remember { Animatable(1f) }
-    val glowAlpha = remember { Animatable(0f) }
-
-    LaunchedEffect(alertTrigger) {
-        if (alertTrigger == 0) return@LaunchedEffect
-
-        cardScale.snapTo(0.96f)
-        glowAlpha.snapTo(0.22f)
-        cardScale.animateTo(1f, tween(180, easing = FastOutSlowInEasing))
-        glowAlpha.animateTo(0f, tween(240, easing = FastOutLinearInEasing))
-    }
-
-    Surface(
-        modifier = modifier
-            .scale(cardScale.value)
-            .shadow(8.dp, RoundedCornerShape(PremiumCardRadius), clip = false)
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(PremiumCardRadius)
-            ),
-        shape = RoundedCornerShape(PremiumCardRadius),
-        color = ReflexGamePalette.cardGlassStrong,
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .background(accentColor.copy(alpha = glowAlpha.value * 0.65f))
-                .padding(horizontal = 14.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCardAccent(accentColor)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(3) { index ->
-                    val isFilled = index < lives
-                    Icon(
-                        imageVector = if (isFilled) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isFilled) ArcadeCoral else ReflexGamePalette.textSecondary.copy(alpha = 0.42f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatCardAccent(accentColor: Color) {
-    Box(
-        modifier = Modifier
-            .size(width = 34.dp, height = 5.dp)
-            .background(accentColor.copy(alpha = 0.9f), RoundedCornerShape(50))
-    )
-}
-
-@Composable
 fun PrimaryGameButton(
     text: String,
     onClick: () -> Unit,
@@ -402,11 +260,8 @@ fun PrimaryGameButton(
 }
 
 /**
- * Full-width secondary action, sized for stacking in a [Column].
- *
- * It applies `fillMaxWidth()` internally, so placing it in a [Row] without a width constraint
- * makes it claim the whole row and collapse its siblings to zero width. Inside a row, always pass
- * a bounded `modifier` — `Modifier.weight(...)` or `Modifier.widthIn(min, max)`.
+ * Full-width secondary action, sized for stacking in a [Column]. It fills its width internally,
+ * so inside a [Row] always pass a bounded modifier — otherwise it collapses its siblings.
  */
 @Composable
 fun SecondaryGameButton(
@@ -428,6 +283,8 @@ fun SecondaryGameButton(
             .scale(scale),
         interactionSource = interactionSource,
         shape = RoundedCornerShape(PremiumCardRadius),
+        // Tighter than the Material3 default, which left no room for the label in a narrow row.
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.White.copy(alpha = 0.095f),
             contentColor = ReflexGamePalette.textPrimary,
@@ -460,28 +317,6 @@ fun SecondaryGameButton(
 }
 
 @Composable
-fun HowToPlayItem(text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(top = 6.dp)
-                .size(8.dp)
-                .background(ReflexGamePalette.targetRing, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = ReflexGamePalette.textSecondary
-        )
-    }
-}
-
-@Composable
 fun BestScoreBadge(bestScore: Int) {
     Surface(
         shape = RoundedCornerShape(PremiumCardRadius),
@@ -497,46 +332,5 @@ fun BestScoreBadge(bestScore: Int) {
             style = MaterialTheme.typography.labelLarge,
             color = ReflexGamePalette.textPrimary
         )
-    }
-}
-
-@Composable
-fun ScoreHighlightCard(
-    title: String,
-    value: String,
-    accentColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(PremiumOverlayRadius),
-        color = accentColor.copy(alpha = 0.15f),
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = accentColor.copy(alpha = 0.28f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = ReflexGamePalette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                color = ReflexGamePalette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-        }
     }
 }

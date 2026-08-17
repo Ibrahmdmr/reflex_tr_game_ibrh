@@ -42,7 +42,7 @@ internal fun ProfileProgressCard(
     val nextLevelXp = progressionState.level * 250
     val levelProgress = ((progressionState.xp - currentLevelXp).toFloat() / 250f).coerceIn(0f, 1f)
     val remainingXp = (nextLevelXp - progressionState.xp).coerceAtLeast(0)
-    val rank = rankFor(score = bestScore, level = progressionState.level)
+    val rank = rankFor(level = progressionState.level)
     val achievementCount = progressionState.achievements.count { it.unlocked }
     Surface(
         modifier = modifier.fillMaxWidth(),

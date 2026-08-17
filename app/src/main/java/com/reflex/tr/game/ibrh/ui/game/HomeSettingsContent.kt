@@ -15,7 +15,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 internal fun SettingsTabContent(
     playerProfile: PlayerProfile,
     progressionState: ProgressionState,
-    bestScoresByMode: Map<GameMode, Int>,
     selectedLanguage: AppLanguage,
     isSoundEnabled: Boolean,
     isEffectSoundEnabled: Boolean,
@@ -38,7 +37,7 @@ internal fun SettingsTabContent(
     onRateAppClick: () -> Unit,
     onEditNameClick: () -> Unit
 ) {
-    val rank = rankFor(score = bestScoresByMode.values.maxOrNull() ?: 0, level = progressionState.level)
+    val rank = rankFor(level = progressionState.level)
     val uriHandler = LocalUriHandler.current
     val unlockedAchievements = progressionState.achievements.count { it.unlocked }
     val totalScore = progressionState.totalHits

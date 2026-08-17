@@ -9,11 +9,8 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 /**
- * The app picks its language in-app rather than following the system locale, so strings must be
- * resolved against a context built for the selected [AppLanguage] instead of the ambient one.
- *
- * Both helpers here used to exist in three near-identical copies (home screen, game screen and
- * activity); keep them in one place so a fix reaches every caller.
+ * The app picks its language in-app rather than following the system locale, so strings resolve
+ * against a context built for the selected [AppLanguage] instead of the ambient one.
  */
 
 /** Returns a [Context] whose resources resolve against the in-app [language]. */

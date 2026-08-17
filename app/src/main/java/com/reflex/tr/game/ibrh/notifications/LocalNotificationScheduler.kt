@@ -64,7 +64,7 @@ object LocalNotificationScheduler {
             return
         }
 
-        val targetTime = nextReminderBaseTime()
+        val targetTime = nextReminderBaseTime(slotCount = enabledTypes.size)
         val targetDate = dateKey(targetTime)
         val mask = enabledTypes.fold(0) { acc, type -> acc or type.bit }
         if (!force &&
@@ -103,11 +103,13 @@ object LocalNotificationScheduler {
     }
 
     private fun schedule(context: Context, type: LocalNotificationType, triggerAtMillis: Long) {
+        // Skip a past slot rather than clamping it to now, which would re-fire a delivered reminder.
+        if (triggerAtMillis <= System.currentTimeMillis()) return
         runCatching {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
             alarmManager.setWindow(
                 AlarmManager.RTC_WAKEUP,
-                triggerAtMillis.coerceAtLeast(System.currentTimeMillis()),
+                triggerAtMillis,
                 NOTIFICATION_WINDOW_MILLIS,
                 pendingIntent(context, type)
             )
@@ -128,13 +130,20 @@ object LocalNotificationScheduler {
         )
     }
 
-    private fun nextReminderBaseTime(): Long {
+    /**
+     * Start of tonight's reminder batch, or tomorrow's once the whole batch is behind us. The roll
+     * over is decided by the *last* of the [slotCount] slots, so firing the first one does not
+     * cancel the siblings still pending today.
+     */
+    private fun nextReminderBaseTime(slotCount: Int): Long {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 20)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-            if (timeInMillis <= System.currentTimeMillis()) {
+            val lastSlotMillis = timeInMillis +
+                (slotCount - 1).coerceAtLeast(0) * NOTIFICATION_WINDOW_MILLIS
+            if (lastSlotMillis <= System.currentTimeMillis()) {
                 add(Calendar.DAY_OF_YEAR, 1)
             }
         }
@@ -187,7 +196,7 @@ class LocalNotificationReceiver : BroadcastReceiver() {
             LocalNotificationType.Mission -> context.getString(R.string.notification_mission_message)
         }
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.refleks_avi_icon)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))

@@ -18,8 +18,8 @@ android {
         applicationId = "com.reflex.tr.game.ibrh"
         minSdk = 25
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.2.1"
+        versionCode = 14
+        versionName = "1.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,6 +39,7 @@ android {
             buildConfigField("boolean", "AD_LOGGING_ENABLED", "true")
         }
         release {
+            isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
             manifestPlaceholders["admobAppId"] = "ca-app-pub-2483444595618509~3630426306"
@@ -50,6 +51,20 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        // R8 output signed with the debug key, for smoke-testing. No applicationIdSuffix:
+        // google-services.json registers only com.reflex.tr.game.ibrh.
+        create("releaseTest") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            versionNameSuffix = "-releasetest"
+            matchingFallbacks += listOf("release")
+            // Sample ad units; production ones do not serve to a debug-signed build.
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_APP_ID", "\"ca-app-pub-3940256099942544~3347511713\"")
+            buildConfigField("String", "REWARDED_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField("String", "INTERSTITIAL_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("boolean", "AD_LOGGING_ENABLED", "true")
         }
     }
     compileOptions {
@@ -68,10 +83,7 @@ android {
     }
     bundle {
         language {
-            // The app switches locale at runtime (see createLocalizedContext), so every
-            // language must ship in the base APK. With per-language splits enabled Play would
-            // deliver only the device language and the in-app TR/EN switch would silently
-            // fall back to the installed one.
+            // Every language must ship in the base APK for the in-app TR/EN switch to work.
             enableSplit = false
         }
     }
@@ -79,14 +91,14 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("com.google.android.gms:play-services-ads:23.6.0")
-    implementation("com.google.android.play:review-ktx:2.0.2")
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.play.services.ads)
+    implementation(libs.play.review.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

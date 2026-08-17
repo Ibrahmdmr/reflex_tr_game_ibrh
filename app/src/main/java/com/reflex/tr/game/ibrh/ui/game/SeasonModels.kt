@@ -99,6 +99,11 @@ data class SeasonState(
     val claimedRewardLevels: Set<Int> = emptySet(),
     val preservedBadgeLevels: Set<Int> = emptySet(),
     val xpBoostEndTimeMillis: Long = 0L,
+    /**
+     * Minutes left on [xpBoostEndTimeMillis], stored like [remainingDays] rather than read from
+     * the clock: a clock-reading getter would change value without Compose ever recomposing.
+     */
+    val xpBoostRemainingMinutes: Int = 0,
     val missionDateKey: String = "",
     val gamesPlayedToday: Int = 0,
     val rewardedAdsWatchedToday: Int = 0,
@@ -127,12 +132,12 @@ data class SeasonState(
             seasonRewardForLevel(level = level, claimedLevels = claimedRewardLevels)
         }
 
-    val isXpBoostActive: Boolean
-        get() = xpBoostEndTimeMillis > System.currentTimeMillis()
+    /** A reached reward still waiting to be collected, without building the whole [rewards] list. */
+    val hasClaimableReward: Boolean
+        get() = (1..level).any { it !in claimedRewardLevels }
 
-    val xpBoostRemainingMinutes: Int
-        get() = (((xpBoostEndTimeMillis - System.currentTimeMillis()).coerceAtLeast(0L) + 59_999L) / 60_000L)
-            .toInt()
+    val isXpBoostActive: Boolean
+        get() = xpBoostRemainingMinutes > 0
 
     val missions: List<SeasonMissionState>
         get() = listOf(
@@ -211,4 +216,21 @@ fun seasonRewardForLevel(
         premium = premiumKind != null,
         claimed = level in claimedLevels
     )
+}
+
+/**
+ * Reprojects [SeasonState.xpBoostRemainingMinutes] against [nowMillis], keeping the instance when
+ * the count has not moved. Call it wherever the season state is loaded or republished.
+ */
+internal fun SeasonState.withRefreshedXpBoost(
+    nowMillis: Long = System.currentTimeMillis()
+): SeasonState {
+    val remainingMillis = (xpBoostEndTimeMillis - nowMillis).coerceAtLeast(0L)
+    // Rounded up so a live boost never reads as "0 minutes".
+    val remainingMinutes = ((remainingMillis + 59_999L) / 60_000L).toInt()
+    return if (remainingMinutes == xpBoostRemainingMinutes) {
+        this
+    } else {
+        copy(xpBoostRemainingMinutes = remainingMinutes)
+    }
 }

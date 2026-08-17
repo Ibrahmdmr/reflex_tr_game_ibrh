@@ -41,7 +41,7 @@ class GamePreferences(private val context: Context) {
     val bestScoresFlow: Flow<Map<GameMode, Int>> = bestScoresState.asStateFlow()
     val languageFlow: Flow<AppLanguage> = languageState.asStateFlow()
 
-    /** Seçili dilin anlık değeri — Compose dışındaki katmanların string lokalize etmesi için. */
+    /** The selected language right now, for layers outside Compose that localise their own strings. */
     val currentLanguage: AppLanguage get() = languageState.value
     val soundEnabledFlow: Flow<Boolean> = soundEnabledState.asStateFlow()
     val effectSoundEnabledFlow: Flow<Boolean> = effectSoundEnabledState.asStateFlow()
@@ -761,7 +761,7 @@ class GamePreferences(private val context: Context) {
             },
             quests = loadSeasonQuests(claimedQuestIds, usedCosmetics),
             usedCosmeticKeys = usedCosmetics
-        )
+        ).withRefreshedXpBoost()
     }
 
     private fun loadSeasonQuests(
@@ -1274,21 +1274,14 @@ private fun String.toStringSet(): Set<String> {
         .toSet()
 }
 
-/**
- * Hands the write off to the background. [SharedPreferences.Editor.commit] writes to disk
- * synchronously and would block the main thread during the game loop, whereas
- * [SharedPreferences.Editor.apply] updates the in-memory value immediately and defers the
- * disk write. Android guarantees pending apply() writes are flushed before the process dies.
- */
+/** Defers the disk write; [SharedPreferences.Editor.commit] would block the main thread mid-game. */
 private fun SharedPreferences.Editor.commitSafely() {
     apply()
 }
 
 /**
- * Normalises the name, returning an empty string when none was entered. The displayed
- * default is deliberately not produced here: persisting a fixed Turkish value would show
- * "Oyuncu" to English users too. The UI resolves the fallback per language via
- * `ifBlank { ... }`.
+ * Blank when no name was entered. The fallback is left to the UI so it can follow the in-app
+ * language; a stored default would show one language's wording to everyone.
  */
 internal fun safePlayerName(name: String): String {
     return name.trim().take(12)

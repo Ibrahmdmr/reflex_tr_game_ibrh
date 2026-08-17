@@ -67,7 +67,6 @@
     <string name="season_xp_boost_watch_ad">Etkinleştir</string>
     <string name="season_xp_boost_refresh">Yenile</string>
     <string name="season_xp_boost_active">%1$d dk kaldı</string>
-    <string name="season_xp_boost_active_short">XP hızlandı</string>
     <string name="season_missions_title">Sezon Görevleri</string>
     <string name="season_mission_play_3_title">Bugün 3 oyun oyna</string>
     <string name="season_mission_play_3_description">Ritmini yakala, sezon yolunda hızlan.</string>
@@ -154,7 +153,6 @@
     <string name="daily_reward_super_title">Süper Seri Ödülü!</string>
     <string name="daily_reward_super_message">7 günlük seri tamam: %1$d coin ve özel kasa senin!</string>
     <string name="daily_reward_super_claim">Ödülü Al</string>
-    <string name="daily_reward_streak_value">Günlük Seri: %1$d gün</string>
     <string name="daily_reward_next_value">Yarınki ödül: %1$d coin</string>
     <string name="daily_reward_streak_at_risk_title">Seri Riskte!</string>
     <string name="daily_reward_protect_message">Bir gün kaçırdın. 1 reklam izle ve serini kaybetme.</string>
@@ -213,9 +211,7 @@
     <string name="theme_prestige_label">En Prestijli Tema</string>
     <string name="theme_legendary_label">Efsane Tema</string>
     <string name="theme_insufficient_coins">Coin yetersiz</string>
-    <string name="theme_target_title">Bir Sonraki Ödül</string>
     <string name="theme_target_progress">%1$d / %2$d Coin</string>
-    <string name="theme_target_completion">%%%1$d Tamamlandı</string>
     <string name="theme_target_remaining">%1$d Coin Kaldı</string>
     <string name="theme_target_all_unlocked_empty">Tüm temaların kilidini açtın!</string>
     <string name="select_theme">Seç</string>
@@ -256,7 +252,6 @@
     <string name="xp_value">%1$d / %2$d XP</string>
     <string name="level_up_value">Seviye Atladın! %1$d</string>
     <string name="level_up_bonus_message">Refleksin gelişti. +%1$d coin senin.</string>
-    <string name="home_level_progress_title">Seviye İlerlemesi</string>
     <string name="xp_to_next_level_value">Sonraki seviyeye %1$d XP</string>
     <string name="profile_games_value">%1$d oyun</string>
     <string name="profile_best_value">En iyi %1$d</string>

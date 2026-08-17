@@ -27,11 +27,7 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
-/**
- * Collaborators are injected rather than constructed inline so the game logic can be unit tested
- * against fakes. Production wiring lives in [GameViewModel.Factory]; obtain the view model with
- * `viewModel(factory = GameViewModel.Factory)`.
- */
+/** Collaborators are injected so the game logic is testable; production wiring is in [Factory]. */
 class GameViewModel internal constructor(
     private val gamePreferences: GamePreferences,
     private val leaderboardRepository: LeaderboardRepository,
@@ -272,10 +268,8 @@ class GameViewModel internal constructor(
             currentCombo = currentState.combo,
             timingGrade = timingGrade
         )
-        // Derive the next state from the state we already read instead of inside an update{}
-        // lambda: MutableStateFlow.update/updateAndGet may re-run the lambda on CAS contention,
-        // and targetEngine.generateTargets() is randomised, so a re-run would spawn
-        // different targets than the ones we act on below.
+        // Not inside update{}: that lambda can re-run on CAS contention, and generateTargets()
+        // is randomised, so a re-run would spawn different targets than the ones acted on below.
         val updatedState = currentState.let {
             val wasBossRoundActive = it.isBossRoundActive
             val scoreGain = 1 + if (wasBossRoundActive) BOSS_ROUND_HIT_SCORE_BONUS else 0
@@ -388,8 +382,14 @@ class GameViewModel internal constructor(
             )
         }
         _uiState.value = updatedState
-        gamePreferences.saveProgressionState(updatedState.progressionState)
-        gamePreferences.saveDailyChallengeState(updatedState.dailyChallengeState)
+        // Persist only what the hit moved: a progression write touches ~120 preference keys, and
+        // this runs on every tap. Both advance functions keep the instance when nothing changed.
+        if (updatedState.progressionState !== currentState.progressionState) {
+            gamePreferences.saveProgressionState(updatedState.progressionState)
+        }
+        if (updatedState.dailyChallengeState !== currentState.dailyChallengeState) {
+            gamePreferences.saveDailyChallengeState(updatedState.dailyChallengeState)
+        }
         logChallengeCompletedIfNeeded(
             previous = currentState.dailyChallengeState,
             updated = updatedState.dailyChallengeState
@@ -916,7 +916,7 @@ class GameViewModel internal constructor(
         val watchedProgression = recordRewardedAdWatched(_uiState.value.progressionState)
         val updatedSeason = seasonForToday(watchedProgression.season).copy(
             xpBoostEndTimeMillis = System.currentTimeMillis() + SeasonXpBoostDurationMillis
-        )
+        ).withRefreshedXpBoost()
         val updatedProgression = watchedProgression.copy(season = updatedSeason)
         saveRewardedProgressionAndLog(updatedProgression)
     }
@@ -1177,7 +1177,7 @@ class GameViewModel internal constructor(
         combo: Int
     ): ProgressionState {
         val challenge = comboChallengeForToday(progression.comboChallenge)
-        if (challenge.claimed || challenge.completed) return progression.copy(comboChallenge = challenge)
+        if (challenge.claimed || challenge.completed) return progression.withComboChallenge(challenge)
 
         val nextProgress = when (challenge.type) {
             ComboChallengeType.Combo5,
@@ -1189,7 +1189,12 @@ class GameViewModel internal constructor(
             progress = nextProgress,
             completed = nextProgress >= challenge.target
         )
-        return progression.copy(comboChallenge = nextChallenge)
+        return progression.withComboChallenge(nextChallenge)
+    }
+
+    /** Keeps the instance when unchanged; [onTargetTapped] decides whether to persist by identity. */
+    private fun ProgressionState.withComboChallenge(challenge: ComboChallengeState): ProgressionState {
+        return if (challenge == comboChallenge) this else copy(comboChallenge = challenge)
     }
 
     private fun updateComboChallengeAfterGame(
@@ -2371,12 +2376,12 @@ class GameViewModel internal constructor(
         xpAmount: Int
     ): ProgressionState {
         val previousLevel = progression.level
-        val previousRank = rankFor(score = 0, level = previousLevel)
+        val previousRank = rankFor(level = previousLevel)
         val nextXp = (progression.xp + xpAmount.coerceAtLeast(0)).coerceAtLeast(0)
         val nextLevel = calculateProgressionLevel(nextXp)
         val gainedLevels = (nextLevel - previousLevel).coerceAtLeast(0)
         val levelBonusCoins = gainedLevels * LEVEL_UP_COIN_BONUS
-        val nextRank = rankFor(score = 0, level = nextLevel)
+        val nextRank = rankFor(level = nextLevel)
 
         if (gainedLevels > 0) {
             FirebaseGameServices.logEvent(
@@ -2427,17 +2432,18 @@ class GameViewModel internal constructor(
         }
     }
 
+    /** Drives everything the home screen shows that moves with the clock rather than with play. */
     private fun startBonusHourTicker() {
         bonusHourJob?.cancel()
         bonusHourJob = viewModelScope.launch {
             while (true) {
-                refreshBonusHourState()
+                refreshClockDrivenState()
                 delay(60_000L)
             }
         }
     }
 
-    private fun refreshBonusHourState() {
+    private fun refreshClockDrivenState() {
         val bonusHour = gamePreferences.getBonusHourState()
         val freshDailyMiniTournament = gamePreferences.getDailyMiniTournamentState()
         _uiState.update { state ->
@@ -2446,16 +2452,20 @@ class GameViewModel internal constructor(
             } else {
                 freshDailyMiniTournament
             }
+            // Nothing else republishes the boost before it expires.
+            val season = state.progressionState.season.withRefreshedXpBoost()
             if (
                 state.progressionState.bonusHour == bonusHour &&
-                state.progressionState.dailyMiniTournament == dailyMiniTournament
+                state.progressionState.dailyMiniTournament == dailyMiniTournament &&
+                state.progressionState.season === season
             ) {
                 state
             } else {
                 state.copy(
                     progressionState = state.progressionState.copy(
                         bonusHour = bonusHour,
-                        dailyMiniTournament = dailyMiniTournament
+                        dailyMiniTournament = dailyMiniTournament,
+                        season = season
                     )
                 )
             }
@@ -2494,7 +2504,7 @@ class GameViewModel internal constructor(
             playerName = safePlayerName(profile),
             playerScore = leaderboardScore,
             playerTheme = safeTheme(progression),
-            playerRankTier = rankFor(score = leaderboardScore, level = progression.level),
+            playerRankTier = rankFor(level = progression.level),
             selectedMode = mode,
             selectedPeriod = selectedLeaderboardPeriod,
             refreshTick = leaderboardRefreshTick
@@ -2515,7 +2525,7 @@ class GameViewModel internal constructor(
                 playerName = safePlayerName(profile),
                 playerScore = leaderboardScore,
                 playerTheme = safeTheme(state.progressionState),
-                playerRankTier = rankFor(score = leaderboardScore, level = state.progressionState.level),
+                playerRankTier = rankFor(level = state.progressionState.level),
                 playerLevel = state.progressionState.level,
                 selectedMode = mode,
                 selectedPeriod = selectedLeaderboardPeriod,
@@ -2633,8 +2643,8 @@ class GameViewModel internal constructor(
                 targetLifetimeKey = it.targetLifetimeKey + 1
             )
         }
+        // No startModeJobs() here: it would cancel the colour-rule loop that is calling this.
         startTargetTimeout()
-        startModeJobs()
     }
 
     private fun randomInterstitialInterval(): Int {

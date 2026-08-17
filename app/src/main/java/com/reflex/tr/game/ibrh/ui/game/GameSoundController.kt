@@ -22,11 +22,24 @@ class GameSoundController(
         )
         .build()
 
+    /** Effects whose sample has finished decoding and can be handed to [SoundPool.play]. */
     private val soundIds = mutableMapOf<GameSoundEffect, Int>()
+
+    /** Samples handed to [SoundPool.load] that are still decoding, keyed by sample id. */
+    private val loadingEffects = mutableMapOf<Int, GameSoundEffect>()
+    private val lastPlayedAtByEffect = mutableMapOf<GameSoundEffect, Long>()
     private val generatedTonePlayer = GeneratedTonePlayer()
     var isEnabled: Boolean = true
 
     init {
+        // SoundPool decodes asynchronously and drops a play() issued before that finishes, so an
+        // effect is registered only on success — until then play() falls back to a generated tone.
+        soundPool.setOnLoadCompleteListener { _, sampleId, status ->
+            val effect = loadingEffects.remove(sampleId) ?: return@setOnLoadCompleteListener
+            if (status == 0) {
+                soundIds[effect] = sampleId
+            }
+        }
         preloadIfExists(GameSoundEffect.Hit, "sfx_hit")
         preloadIfExists(GameSoundEffect.Miss, "sfx_miss")
         preloadIfExists(GameSoundEffect.Perfect, "sfx_perfect")
@@ -56,16 +69,15 @@ class GameSoundController(
 
     fun release() {
         runCatching { soundPool.release() }
+        // Drop ids from the released pool, including any load still in flight.
+        loadingEffects.clear()
+        soundIds.clear()
         generatedTonePlayer.release()
     }
 
     /**
-     * Resolves sound effects by name so that files can be dropped into `res/raw` later without
-     * touching this class; when a file is absent the caller falls back to generated tones.
-     *
-     * Because there is no static `R.raw` reference, resource shrinking would strip these files
-     * from release builds — `res/raw/keep.xml` holds the matching keep rule. Remove that rule
-     * only if this lookup is replaced with direct `R.raw.*` references.
+     * Looks effects up by name so files can be dropped into `res/raw` later. There is no static
+     * `R.raw` reference, so `res/raw/keep.xml` stops resource shrinking from stripping them.
      */
     private fun preloadIfExists(
         effect: GameSoundEffect,
@@ -81,8 +93,8 @@ class GameSoundController(
 
         runCatching {
             soundPool.load(context, resourceId, 1)
-        }.getOrNull()?.let { soundId ->
-            soundIds[effect] = soundId
+        }.getOrNull()?.takeIf { it != 0 }?.let { sampleId ->
+            loadingEffects[sampleId] = effect
         }
     }
 
@@ -94,8 +106,6 @@ class GameSoundController(
         lastPlayedAtByEffect[effect] = now
         return true
     }
-
-    private val lastPlayedAtByEffect = mutableMapOf<GameSoundEffect, Long>()
 }
 
 enum class GameSoundEffect {
@@ -143,12 +153,9 @@ private val GameSoundEffect.cooldownMillis: Long
     }
 
 /**
- * Synthesises the fallback tones used when no `res/raw` sound file is bundled.
- *
- * Building the tracks means ~45k sine samples and eleven [AudioTrack] allocations, each of which
- * round-trips to the audio server. That is far too slow to run during composition, so the warm-up
- * happens on a background thread and playback stays silent until it finishes. [play] and [release]
- * are called from the main thread; the lock only guards publication of the warmed-up map.
+ * Synthesises the fallback tones used when no `res/raw` file is bundled. Building the eleven
+ * [AudioTrack]s is too slow for the main thread, so it warms up in the background and the lock
+ * only guards publication of the finished map.
  */
 private class GeneratedTonePlayer {
     private val lock = Any()

@@ -67,7 +67,6 @@
     <string name="season_xp_boost_watch_ad">Activate</string>
     <string name="season_xp_boost_refresh">Refresh</string>
     <string name="season_xp_boost_active">%1$d min left</string>
-    <string name="season_xp_boost_active_short">XP Boost on</string>
     <string name="season_missions_title">Season Missions</string>
     <string name="season_mission_play_3_title">Play 3 games today</string>
     <string name="season_mission_play_3_description">Find your rhythm and push the season track.</string>
@@ -154,7 +153,6 @@
     <string name="daily_reward_super_title">Super Streak Reward!</string>
     <string name="daily_reward_super_message">7-day streak complete: %1$d coins and a special box are yours!</string>
     <string name="daily_reward_super_claim">Claim Reward</string>
-    <string name="daily_reward_streak_value">Daily Streak: %1$d days</string>
     <string name="daily_reward_next_value">Tomorrow’s reward: %1$d coins</string>
     <string name="daily_reward_streak_at_risk_title">Streak at Risk!</string>
     <string name="daily_reward_protect_message">You missed a day. Watch 1 ad and keep your streak alive.</string>
@@ -213,9 +211,7 @@
     <string name="theme_prestige_label">Most Prestigious Theme</string>
     <string name="theme_legendary_label">Legendary Theme</string>
     <string name="theme_insufficient_coins">Not enough coins</string>
-    <string name="theme_target_title">Next Reward</string>
     <string name="theme_target_progress">%1$d / %2$d Coins</string>
-    <string name="theme_target_completion">%1$d%% Complete</string>
     <string name="theme_target_remaining">%1$d Coins Left</string>
     <string name="theme_target_all_unlocked_empty">You unlocked every theme!</string>
     <string name="select_theme">Select</string>
@@ -256,7 +252,6 @@
     <string name="xp_value">%1$d / %2$d XP</string>
     <string name="level_up_value">Level Up! %1$d</string>
     <string name="level_up_bonus_message">Your reflexes leveled up. +%1$d coins are yours.</string>
-    <string name="home_level_progress_title">Level Progress</string>
     <string name="xp_to_next_level_value">%1$d XP to next level</string>
     <string name="profile_games_value">%1$d games</string>
     <string name="profile_best_value">Best %1$d</string>

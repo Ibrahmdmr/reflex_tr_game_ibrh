@@ -28,13 +28,8 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-internal fun getDisplayVersionName(): String {
-    return if (BuildConfig.DEBUG) {
-        BuildConfig.VERSION_NAME
-    } else {
-        BuildConfig.VERSION_NAME.substringBefore("-debug")
-    }
-}
+/** The version without its build-type suffix, so Settings reads "1.2.2" in every variant. */
+internal fun getDisplayVersionName(): String = BuildConfig.VERSION_NAME.substringBefore('-')
 
 internal fun shouldShowDeveloperTools(): Boolean = BuildConfig.DEBUG
 
@@ -129,7 +124,7 @@ internal fun NotificationToggleRow(
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelLarge,
                         color = ReflexGamePalette.textPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     NotificationStateChip(checked = checked)

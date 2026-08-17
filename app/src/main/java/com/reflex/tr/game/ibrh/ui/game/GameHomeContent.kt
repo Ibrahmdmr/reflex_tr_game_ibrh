@@ -410,7 +410,6 @@ fun HomeContent(
                             HomeTab.Settings -> SettingsTabContent(
                                 playerProfile = playerProfile,
                                 progressionState = progressionState,
-                                bestScoresByMode = bestScoresByMode,
                                 selectedLanguage = selectedLanguage,
                                 isSoundEnabled = isSoundEnabled,
                                 isEffectSoundEnabled = isEffectSoundEnabled,

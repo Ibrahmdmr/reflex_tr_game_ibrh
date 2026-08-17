@@ -29,60 +29,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
 @Composable
-internal fun SeasonMiniCard(
-    season: SeasonState,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(PremiumCardRadius),
-        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.42f))
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.season_card_title, season.seasonNumber, season.level),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(R.string.season_days_left, season.remainingDays),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ArcadeGold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (season.isXpBoostActive) {
-                Text(
-                    text = stringResource(R.string.season_xp_boost_active_short),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ArcadeTeal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            LinearProgressIndicator(
-                progress = { season.progressPercent / 100f },
-                modifier = Modifier.fillMaxWidth(),
-                color = ArcadeGold,
-                trackColor = Color.White.copy(alpha = 0.12f)
-            )
-        }
-    }
-}
-
-@Composable
 internal fun SeasonTabContent(
     season: SeasonState,
     rewardedAdUiState: RewardedAdUiState,

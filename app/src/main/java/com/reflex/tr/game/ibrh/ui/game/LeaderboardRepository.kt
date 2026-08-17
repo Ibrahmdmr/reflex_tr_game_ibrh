@@ -97,7 +97,7 @@ class LocalLeaderboardRepository : LeaderboardRepository {
                 name = name,
                 score = score,
                 theme = PlayerTheme.entries[(seed + index) % PlayerTheme.entries.size],
-                rankTier = rankFor(score = score, level = 1 + score / 20)
+                rankTier = rankFor(level = 1 + score / 20)
             )
         }
         val playerEntry = LeaderboardEntry(
@@ -267,7 +267,7 @@ class FirestoreLeaderboardRepository(
                         name = name,
                         score = score,
                         theme = theme,
-                        rankTier = rankFor(score = score, level = level),
+                        rankTier = rankFor(level = level),
                         isPlayer = document.id == uid || document.getString("uid") == uid
                     )
                 }.toMutableList()
@@ -475,7 +475,8 @@ class FirestoreLeaderboardRepository(
     }
 }
 
-fun rankFor(score: Int, level: Int): RankTier {
+/** Rank is derived from the player level alone; score does not affect the tier. */
+fun rankFor(level: Int): RankTier {
     val normalizedLevel = level.coerceAtLeast(1)
     return when {
         normalizedLevel >= 40 -> RankTier.ReflexGod

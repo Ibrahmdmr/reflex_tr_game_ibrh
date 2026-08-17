@@ -67,8 +67,6 @@ fun GameOverOverlay(
     isContinueEnabled: Boolean,
     isContinueLoading: Boolean,
     onHomeClick: () -> Unit,
-    onChangeModeClick: () -> Unit,
-    onOpenThemeStoreClick: () -> Unit,
     isDoubleCoinsEnabled: Boolean,
     isDoubleCoinsLoading: Boolean,
     doubleCoinsText: String,
@@ -147,8 +145,6 @@ fun GameOverOverlay(
 
                 Text(
                     text = gameOverHeadline(
-                        score = score,
-                        bestScore = bestScore,
                         isNewBestScore = isNewBestScore,
                         showContinueButton = showContinueButton,
                         isNearRecord = isNearRecord
@@ -157,6 +153,27 @@ fun GameOverOverlay(
                     color = ReflexGamePalette.textPrimary,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = score.toString(),
+                    style = if (isCompactHeight) {
+                        MaterialTheme.typography.displaySmall
+                    } else {
+                        MaterialTheme.typography.displayMedium
+                    },
+                    color = if (isNewBestScore) ArcadeGold else ReflexGamePalette.textPrimary,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+                Text(
+                    text = stringResource(R.string.score),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ReflexGamePalette.textSecondary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
@@ -201,6 +218,37 @@ fun GameOverOverlay(
 
                 if (unlockedProfileBadges.isNotEmpty()) {
                     UnlockedProfileBadgesCard(badges = unlockedProfileBadges)
+                }
+
+                // Run-critical actions stay above the summary cards so they clear the fold.
+                PrimaryGameButton(
+                    text = stringResource(R.string.retry_game),
+                    onClick = onRetryClick
+                )
+
+                if (showContinueButton) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SecondaryGameButton(
+                            text = continueButtonText,
+                            onClick = onContinueClick,
+                            enabled = isContinueEnabled,
+                            isLoading = isContinueLoading
+                        )
+
+                        if (!continueHelperText.isNullOrBlank()) {
+                            Text(
+                                text = continueHelperText,
+                                modifier = Modifier.fillMaxWidth(0.86f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ReflexGamePalette.textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
 
                 if (!reason.isNullOrBlank()) {
@@ -255,40 +303,10 @@ fun GameOverOverlay(
                     DailyMiniTournamentGameOverCard(state = dailyMiniTournament)
                 }
 
-                PrimaryGameButton(
-                    text = stringResource(R.string.retry_game),
-                    onClick = onRetryClick
-                )
-
                 SecondaryGameButton(
                     text = stringResource(R.string.share_score),
                     onClick = onShareScoreClick
                 )
-
-                if (showContinueButton) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        SecondaryGameButton(
-                            text = continueButtonText,
-                            onClick = onContinueClick,
-                            enabled = isContinueEnabled,
-                            isLoading = isContinueLoading
-                        )
-
-                        if (!continueHelperText.isNullOrBlank()) {
-                            Text(
-                                text = continueHelperText,
-                                modifier = Modifier.fillMaxWidth(0.86f),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ReflexGamePalette.textSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
 
                 if (isDoubleCoinsEnabled || isDoubleCoinsLoading) {
                     SecondaryGameButton(
@@ -310,8 +328,6 @@ fun GameOverOverlay(
 
 @Composable
 private fun gameOverHeadline(
-    score: Int,
-    bestScore: Int,
     isNewBestScore: Boolean,
     showContinueButton: Boolean,
     isNearRecord: Boolean

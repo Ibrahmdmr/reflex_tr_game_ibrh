@@ -43,11 +43,8 @@ fun PolishedGameDialog(
     dismissButton: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // A Dialog hosts its content in a separate window whose own context overrides the localized
-    // one the app installs for the in-app language. Value parameters such as `title` are resolved
-    // in the caller's scope and stay correct, but the button and content lambdas run inside the
-    // dialog and would fall back to the system locale. Carrying the host context in keeps every
-    // dialog on the language the player chose.
+    // A Dialog's own window context overrides the in-app locale, so lambdas running inside it
+    // would fall back to the system language. Carry the host context in.
     val hostContext = LocalContext.current
 
     Dialog(

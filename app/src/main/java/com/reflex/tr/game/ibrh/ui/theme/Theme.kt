@@ -23,13 +23,10 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun Reflex_tr_game_ibrhTheme(
-    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = DarkColorScheme
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = DarkColorScheme,
         typography = Typography,
         content = content
     )

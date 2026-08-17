@@ -59,7 +59,7 @@ internal fun BoostSelectionBottomSheet(
                 .navigationBarsPadding()
                 .clickable(onClick = {}),
             color = ReflexGamePalette.cardGlassStrong,
-            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            shape = RoundedCornerShape(topStart = PremiumPanelRadius, topEnd = PremiumPanelRadius),
             border = BorderStroke(1.dp, ReflexGamePalette.neonPurple.copy(alpha = 0.42f))
         ) {
             Column(
@@ -234,10 +234,11 @@ private fun BoostOptionRow(
     }
 }
 
+/** U+FE0E forces text presentation, matching [ProfileBadge], so the glyphs take the row's tint. */
 private fun boostIcon(boost: GameBoost): String = when (boost) {
-    GameBoost.ExtraTime -> "⏱"
-    GameBoost.ExtraLife -> "♥"
-    GameBoost.ComboStart -> "⚡"
+    GameBoost.ExtraTime -> "⏱\uFE0E"
+    GameBoost.ExtraLife -> "♥\uFE0E"
+    GameBoost.ComboStart -> "⚡\uFE0E"
 }
 
 @Composable
