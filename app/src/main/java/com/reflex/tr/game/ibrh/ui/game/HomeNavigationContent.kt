@@ -55,7 +55,9 @@ internal fun HomeBottomNavigation(
     ) {
         Row(
             modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // Tight spacing: at four items on a 360dp screen the label had ~55dp and "Rewards"
+            // ellipsised.
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             bottomTabs.forEach { tab ->
                 val selected = tab == selectedBottomTab
@@ -72,7 +74,7 @@ internal fun HomeBottomNavigation(
                     }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
@@ -85,7 +87,7 @@ internal fun HomeBottomNavigation(
                             text = stringResource(tab.titleRes),
                             modifier = Modifier
                                 .weight(1f, fill = false)
-                                .padding(start = 4.dp),
+                                .padding(start = 3.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (selected) ReflexGamePalette.textPrimary else ReflexGamePalette.textSecondary,
                             textAlign = TextAlign.Center,

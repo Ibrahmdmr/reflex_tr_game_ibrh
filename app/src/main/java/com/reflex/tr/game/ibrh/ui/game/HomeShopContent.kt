@@ -273,7 +273,10 @@ private fun FeaturedShopCard(
                         text = name,
                         style = MaterialTheme.typography.titleSmall,
                         color = ReflexGamePalette.textPrimary,
-                        maxLines = 1,
+                        // Wraps rather than clips: beside the preview and the fixed-width action
+                        // button the name has about 130dp on a 360dp screen, which cut
+                        // "Classic Target" down to "Classic Tar…".
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
@@ -416,7 +419,10 @@ private fun TargetSkinCard(
                     text = stringResource(skin.titleRes),
                     style = MaterialTheme.typography.titleSmall,
                     color = ReflexGamePalette.textPrimary,
-                    maxLines = 1,
+                    // Wraps rather than clips: beside the preview and the fixed-width action
+                    // button the name has about 130dp on a 360dp screen, which cut
+                    // "Classic Target" down to "Classic Tar…".
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
@@ -494,16 +500,6 @@ private fun TargetSkinPreview(
             color = Color.White.copy(alpha = 0.9f),
             textAlign = TextAlign.Center
         )
-    }
-}
-
-private fun targetSkinAccent(skin: TargetSkin): Color {
-    return when (skin) {
-        TargetSkin.ClassicTarget -> ArcadeGold
-        TargetSkin.NeonRing -> Color(0xFF41F2FF)
-        TargetSkin.CyberDot -> Color(0xFF9F7BFF)
-        TargetSkin.FireCore -> Color(0xFFFF6B3D)
-        TargetSkin.MatrixOrb -> Color(0xFF49FF91)
     }
 }
 

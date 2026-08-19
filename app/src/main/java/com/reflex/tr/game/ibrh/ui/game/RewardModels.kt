@@ -9,8 +9,6 @@ enum class DailyRewardType {
 
 val DailyRewardCoinPlan = listOf(50, 75, 100, 150, 200, 300, 500)
 
-val CoinChestRewardPlan = listOf(50, 75, 100, 150, 250)
-
 const val OneMoreGameBonusCoins = 25
 
 const val FirstTargetBonusCoins = 50

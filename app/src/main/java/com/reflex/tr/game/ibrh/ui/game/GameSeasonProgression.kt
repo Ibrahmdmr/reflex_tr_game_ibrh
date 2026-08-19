@@ -1,8 +1,6 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 
 private const val DAILY_MODE_COIN_BONUS_PERCENT = 20
 private const val DAILY_MINI_TOURNAMENT_REWARD_COINS = 150
@@ -49,7 +47,13 @@ internal fun seasonForToday(season: SeasonState): SeasonState {
 }
 
 internal fun todayDateKey(): String {
-    return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
+    return dateFormatter().format(Calendar.getInstance().time)
+}
+
+/** ISO-style `yyyy-Www` key identifying the current week. */
+internal fun currentWeekKey(nowMillis: Long = System.currentTimeMillis()): String {
+    val calendar = Calendar.getInstance().apply { timeInMillis = nowMillis }
+    return "${calendar.get(Calendar.YEAR)}-W${calendar.get(Calendar.WEEK_OF_YEAR)}"
 }
 
 internal fun createDailyFeaturedMode(dateKey: String = todayDateKey()): DailyFeaturedModeState {

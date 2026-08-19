@@ -44,11 +44,14 @@ class GameViewModelTest {
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
 
-    private fun createViewModel() = GameViewModel(
-        gamePreferences = GamePreferences(context),
+    private fun createViewModel(
+        preferences: GamePreferences = GamePreferences(context)
+    ) = GameViewModel(
+        gamePreferences = preferences,
         leaderboardRepository = LocalLeaderboardRepository(),
         targetEngine = GameTargetEngine(),
         adConfig = AdConfig.Default,
+        premiumRepository = preferences,
         defaultPlayerName = { "Player" }
     )
 

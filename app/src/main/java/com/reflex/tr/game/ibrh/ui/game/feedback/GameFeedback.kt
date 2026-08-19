@@ -50,6 +50,8 @@ import com.reflex.tr.game.ibrh.ui.game.GameSoundEffect
 import com.reflex.tr.game.ibrh.ui.game.GameTargetRole
 import com.reflex.tr.game.ibrh.ui.game.PlayerTheme
 import com.reflex.tr.game.ibrh.ui.game.ReflexTargetColor
+import com.reflex.tr.game.ibrh.ui.game.targetSkinAccent
+import com.reflex.tr.game.ibrh.ui.game.toTaskColor
 import com.reflex.tr.game.ibrh.ui.game.TargetPosition
 import com.reflex.tr.game.ibrh.ui.game.TargetSkin
 import com.reflex.tr.game.ibrh.ui.game.themeVisualSpec
@@ -109,9 +111,9 @@ fun TargetMarker(
         spawnScale.animateTo(1.08f, tween(130, easing = FastOutSlowInEasing))
         spawnScale.animateTo(1f, tween(90, easing = FastOutSlowInEasing))
     }
-    val baseColor = remember(targetColor) { targetColor.toComposeColor() }
+    val baseColor = remember(targetColor) { targetColor.toTaskColor() }
     val themeGlowColor = remember(theme) { themeVisualSpec(theme).primary }
-    val skinAccent = remember(skin, baseColor) { targetSkinAccentColor(skin, baseColor) }
+    val skinAccent = remember(skin, baseColor) { targetSkinAccent(skin, baseColor) }
     val ringAlpha = if (role == GameTargetRole.Correct) 0.9f else 0.7f
     val coreAlpha = if (role == GameTargetRole.Correct) 1f else 0.84f
     val borderAlpha = if (role == GameTargetRole.Correct) 0.92f else 0.58f
@@ -255,28 +257,6 @@ fun TargetMarker(
                 .fillMaxSize(0.12f),
             alpha = 0.84f
         )
-    }
-}
-
-private fun ReflexTargetColor.toComposeColor(): Color {
-    return when (this) {
-        ReflexTargetColor.Red -> Color(0xFFFF335F)
-        ReflexTargetColor.Blue -> Color(0xFF39A8FF)
-        ReflexTargetColor.Gold -> Color(0xFFFFD84D)
-        ReflexTargetColor.Teal -> Color(0xFF22F2A6)
-    }
-}
-
-private fun targetSkinAccentColor(
-    skin: TargetSkin,
-    fallback: Color
-): Color {
-    return when (skin) {
-        TargetSkin.ClassicTarget -> fallback
-        TargetSkin.NeonRing -> Color(0xFF41F2FF)
-        TargetSkin.CyberDot -> Color(0xFF9F7BFF)
-        TargetSkin.FireCore -> Color(0xFFFF6B3D)
-        TargetSkin.MatrixOrb -> Color(0xFF49FF91)
     }
 }
 

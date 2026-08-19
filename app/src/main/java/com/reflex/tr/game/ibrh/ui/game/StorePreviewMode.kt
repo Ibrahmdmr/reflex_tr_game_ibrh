@@ -11,7 +11,15 @@ fun storePreviewUiState(base: GameUiState): GameUiState {
     )
     val profile = PlayerProfile(
         name = "ReflexX",
-        title = PlayerTitle.NeonLegend,
+        title = PlayerTitle.NeonWarrior,
+        unlockedTitles = setOf(
+            PlayerTitle.NewReflex,
+            PlayerTitle.ComboHunter,
+            PlayerTitle.SpeedMaster,
+            PlayerTitle.SharpTapper,
+            PlayerTitle.Collector,
+            PlayerTitle.NeonWarrior
+        ),
         weeklyBestScore = 88,
         weeklyBestScoresByMode = bestScores,
         hasCompletedNamePrompt = true
@@ -218,7 +226,15 @@ private fun storePreviewLeaderboard(
         selectedPeriod = LeaderboardPeriod.AllTime,
         entries = listOf(
             LeaderboardEntry(1, "NeonAce", 108, PlayerTheme.GoldFire, RankTier.ReflexGod),
-            LeaderboardEntry(2, profile.name, bestScores.getValue(GameMode.Classic), progression.activeTheme, RankTier.NeonMaster, isPlayer = true),
+            LeaderboardEntry(
+                2,
+                profile.name,
+                bestScores.getValue(GameMode.Classic),
+                progression.activeTheme,
+                RankTier.NeonMaster,
+                isPlayer = true,
+                title = profile.activeTitle
+            ),
             LeaderboardEntry(3, "Pulse", 89, PlayerTheme.CyberBlue, RankTier.Platinum),
             LeaderboardEntry(4, "Blitz", 77, PlayerTheme.PurpleStorm, RankTier.Gold),
             LeaderboardEntry(5, "Nova", 69, PlayerTheme.IceNeon, RankTier.Gold),

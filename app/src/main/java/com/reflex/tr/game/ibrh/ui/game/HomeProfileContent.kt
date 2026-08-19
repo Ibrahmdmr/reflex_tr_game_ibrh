@@ -9,6 +9,7 @@ internal fun ProfileTabContent(
     progressionState: ProgressionState,
     onEditNameClick: () -> Unit,
     onTitleSelect: (PlayerTitle) -> Unit,
+    onTitlesOpened: () -> Unit,
     onPersonalGoalClaim: () -> Unit,
     onProfileBadgeSelect: (ProfileBadge) -> Unit,
     onQuickMenuSelected: (HomeTab) -> Unit
@@ -17,8 +18,13 @@ internal fun ProfileTabContent(
         playerProfile = playerProfile,
         progressionState = progressionState,
         bestScore = bestScore,
-        onEditNameClick = onEditNameClick,
-        onTitleSelect = onTitleSelect
+        onEditNameClick = onEditNameClick
+    )
+    PlayerTitleCard(
+        profile = playerProfile,
+        progressionState = progressionState,
+        onTitleSelect = onTitleSelect,
+        onTitlesOpened = onTitlesOpened
     )
     PersonalGoalCard(
         state = progressionState.personalGoal,

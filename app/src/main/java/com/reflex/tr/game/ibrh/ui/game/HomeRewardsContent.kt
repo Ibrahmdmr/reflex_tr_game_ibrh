@@ -1,5 +1,6 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,57 +12,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ads.PremiumState
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
-
-@Composable
-internal fun MissionsTabContent(
-    dailyChallengeState: DailyChallengeState,
-    progressionState: ProgressionState,
-    rewardedAdUiState: RewardedAdUiState,
-    onDailyRewardClaim: () -> Unit,
-    onDailyStreakProtect: () -> Unit,
-    onDailyRewardCardClick: () -> Unit,
-    onDailyChallengeClaim: () -> Unit,
-    onComboChallengeClaim: () -> Unit,
-    onWeeklyChallengeClaim: () -> Unit,
-    onDailyChallengeDoubleRewardClick: () -> Unit,
-    onAchievementClaim: (String) -> Unit
-) {
-    DailyChallengeCard(
-        state = dailyChallengeState,
-        rewardedAdUiState = rewardedAdUiState,
-        onClaimClick = onDailyChallengeClaim,
-        onDoubleRewardClick = onDailyChallengeDoubleRewardClick
-    )
-    WeeklyChallengeCard(
-        state = progressionState.weeklyChallenge,
-        onClaimClick = onWeeklyChallengeClaim
-    )
-    WeeklyGoalBoardCard(state = progressionState.weeklyGoalBoard)
-    ComboChallengeCard(
-        state = progressionState.comboChallenge,
-        onClaimClick = onComboChallengeClaim
-    )
-    DailyRewardCard(
-        state = progressionState.dailyReward,
-        onClaimClick = onDailyRewardClaim,
-        onProtectClick = onDailyStreakProtect,
-        onCardClick = onDailyRewardCardClick
-    )
-    AchievementSection(
-        achievements = progressionState.achievements,
-        unlockedIds = progressionState.latestUnlockedAchievementIds,
-        onClaimClick = onAchievementClaim
-    )
-}
 
 @Composable
 internal fun RewardsTabContent(
@@ -71,13 +32,24 @@ internal fun RewardsTabContent(
     onDailyRewardClaim: () -> Unit,
     onDailyStreakProtect: () -> Unit,
     onDailyRewardCardClick: () -> Unit,
-    onCoinChestClick: () -> Unit,
     onInviteShareClick: () -> Unit,
     onDailyChallengeClaim: () -> Unit,
     onComboChallengeClaim: () -> Unit,
     onWeeklyChallengeClaim: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
-    onAchievementClaim: (String) -> Unit
+    onAchievementClaim: (String) -> Unit,
+    onDailyEventClaim: () -> Unit,
+    onDailyEventPlayClick: () -> Unit,
+    onWeeklyLeagueClaim: () -> Unit,
+    onRewardChestOpenClick: () -> Unit,
+    onStarterRewardClaim: () -> Unit,
+    onDailyEventViewed: () -> Unit,
+    premiumState: PremiumState,
+    onBonusOfferClick: (RewardedOfferType) -> Unit,
+    onBonusLimitReached: (RewardedOfferType) -> Unit,
+    onPremiumCardClick: () -> Unit,
+    onBonusesOpened: (List<RewardedOfferState>) -> Unit,
+    onSectionTabClick: (HomeTab) -> Unit
 ) {
     Text(
         text = stringResource(R.string.reward_center_title),
@@ -85,34 +57,106 @@ internal fun RewardsTabContent(
         color = ReflexGamePalette.textPrimary,
         textAlign = TextAlign.Center
     )
+    QuestHubSummarySection(
+        summary = questHubRewardSummary(progressionState, dailyChallengeState),
+        recommendation = questHubRecommendation(progressionState, dailyChallengeState),
+        onRecommendationClick = onSectionTabClick
+    )
+
+    if (progressionState.starterJourney.isActive) {
+        QuestSectionHeader(titleRes = R.string.starter_section_title)
+        StarterJourneyCard(
+            state = progressionState.starterJourney,
+            onClaimClick = onStarterRewardClaim
+        )
+    } else if (progressionState.starterJourney.showsCompletedNote) {
+        StarterJourneyCompletedNote()
+    }
+
+    QuestSectionHeader(titleRes = R.string.quest_hub_section_today)
     DailyRewardCard(
         state = progressionState.dailyReward,
         onClaimClick = onDailyRewardClaim,
         onProtectClick = onDailyStreakProtect,
         onCardClick = onDailyRewardCardClick
     )
+    DailyEventDetailSection(
+        state = progressionState.dailyEvent,
+        remainingMinutes = dailyEventRemainingMinutes(),
+        onPlayClick = onDailyEventPlayClick,
+        onClaimClick = onDailyEventClaim,
+        onViewed = onDailyEventViewed
+    )
     BonusHourCard(state = progressionState.bonusHour)
+
+    DailyChallengeCard(
+        state = dailyChallengeState,
+        rewardedAdUiState = rewardedAdUiState,
+        onClaimClick = onDailyChallengeClaim,
+        onDoubleRewardClick = onDailyChallengeDoubleRewardClick
+    )
+    ComboChallengeCard(
+        state = progressionState.comboChallenge,
+        onClaimClick = onComboChallengeClaim
+    )
+
+    QuestSectionHeader(titleRes = R.string.quest_hub_section_week)
+    WeeklyLeagueSection(
+        state = progressionState.weeklyLeague,
+        remainingMinutes = weeklyLeagueRemainingMinutes(),
+        onClaimClick = onWeeklyLeagueClaim
+    )
+    WeeklyChallengeCard(
+        state = progressionState.weeklyChallenge,
+        onClaimClick = onWeeklyChallengeClaim
+    )
     WeeklyGoalBoardCard(state = progressionState.weeklyGoalBoard)
-    MissionRewardsCard(
-        dailyChallengeState = dailyChallengeState,
-        weeklyChallengeState = progressionState.weeklyChallenge,
-        comboChallengeState = progressionState.comboChallenge,
+    // Ahead of the achievements: that list is sixteen cards long, and everything actionable was
+    // stranded below it.
+    QuestSectionHeader(titleRes = R.string.bonuses_title)
+    // Only when one is waiting: an empty stack is not worth a card on an already long tab.
+    if (progressionState.rewardChest.hasPendingChest) {
+        RewardChestCard(
+            state = progressionState.rewardChest,
+            onOpenClick = onRewardChestOpenClick
+        )
+    }
+    BonusesSection(
+        // Recomputed only when something it reads actually changes, so the section does not
+        // rebuild its offer list on every recomposition of the tab.
+        offers = remember(progressionState, rewardedAdUiState) {
+            bonusOffers(progressionState, rewardedAdUiState)
+        },
+        premiumState = premiumState,
+        onOfferClick = onBonusOfferClick,
+        onLimitReached = onBonusLimitReached,
+        onPremiumClick = onPremiumCardClick,
+        onOpened = onBonusesOpened
+    )
+
+    QuestSectionHeader(titleRes = R.string.quest_hub_section_achievements)
+    AchievementSection(
         achievements = progressionState.achievements,
-        rewardedAdUiState = rewardedAdUiState,
-        onDailyChallengeClaim = onDailyChallengeClaim,
-        onComboChallengeClaim = onComboChallengeClaim,
-        onWeeklyChallengeClaim = onWeeklyChallengeClaim,
-        onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
-        onAchievementClaim = onAchievementClaim
+        unlockedIds = progressionState.latestUnlockedAchievementIds,
+        onClaimClick = onAchievementClaim
     )
-    CoinChestCard(
-        state = progressionState.coinChest,
-        rewardedAdUiState = rewardedAdUiState,
-        onOpenClick = onCoinChestClick
-    )
+
     InviteFriendCard(
         rewardClaimed = progressionState.inviteRewardClaimed,
         onShareClick = onInviteShareClick
+    )
+}
+
+/** Divider between quest-hub sections, so the rewards tab reads as grouped rather than a stack. */
+@Composable
+private fun QuestSectionHeader(@StringRes titleRes: Int) {
+    Text(
+        text = stringResource(titleRes),
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.titleSmall,
+        color = ArcadeGold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 

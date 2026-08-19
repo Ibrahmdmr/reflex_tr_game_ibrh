@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ads.PremiumState
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
@@ -89,10 +90,20 @@ fun HomeContent(
     onSeasonMissionClaim: (String) -> Unit,
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit,
+    onRewardChestOpenClick: () -> Unit,
+    onStarterRewardClaim: () -> Unit,
+    onDailyEventViewed: () -> Unit,
+    premiumState: PremiumState,
+    onBonusOfferClick: (RewardedOfferType) -> Unit,
+    onBonusLimitReached: (RewardedOfferType) -> Unit,
+    onPremiumCardClick: () -> Unit,
+    onBonusesOpened: (List<RewardedOfferState>) -> Unit,
     onShopCoinRewardClick: () -> Unit,
     onInviteShareClick: () -> Unit,
     onDailyChallengeDoubleRewardClick: () -> Unit,
     onAchievementClaim: (String) -> Unit,
+    onDailyEventClaim: () -> Unit,
+    onWeeklyLeagueClaim: () -> Unit,
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
     onThemeTrial: (PlayerTheme) -> Unit,
@@ -100,6 +111,7 @@ fun HomeContent(
     onTargetSkinBuy: (TargetSkin) -> Unit,
     onPlayerNameChange: (String) -> Boolean,
     onPlayerTitleSelect: (PlayerTitle) -> Unit,
+    onPlayerTitlesOpened: () -> Unit,
     onProfileBadgeSelect: (ProfileBadge) -> Unit,
     onLeaderboardModeSelected: (GameMode) -> Unit,
     onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
@@ -291,13 +303,11 @@ fun HomeContent(
                                 selectedMode = selectedMode,
                                 dailyFeaturedMode = dailyFeaturedMode,
                                 dailyChallengeState = dailyChallengeState,
-                                rewardedAdUiState = rewardedAdUiState,
                                 progressionState = progressionState,
                                 isOnboardingCompleted = isOnboardingCompleted,
                                 onModeStartClick = onModeStartClick,
                                 onHowToPlayClick = onHowToPlayClick,
-                                onDailyStreakProtect = onDailyStreakProtect,
-                                onDailyRewardCardClick = { showDailyRewardPopup = true },
+                                onStarterRewardClaim = onStarterRewardClaim,
                                 onSuggestionTabClick = { tab ->
                                     logHomeTabOpened(
                                         tab = tab,
@@ -306,9 +316,7 @@ fun HomeContent(
                                     if (tab == HomeTab.Leaderboard) onLeaderboardOpenedForMission()
                                     if (tab == HomeTab.Shop) onShopOpenedForMission()
                                     selectedHomeTab = tab
-                                },
-                                onDailyChallengeClaim = onDailyChallengeClaim,
-                                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick
+                                }
                             )
 
                             HomeTab.Rewards -> RewardsTabContent(
@@ -318,13 +326,24 @@ fun HomeContent(
                                 onDailyRewardClaim = onDailyRewardClaim,
                                 onDailyStreakProtect = onDailyStreakProtect,
                                 onDailyRewardCardClick = { showDailyRewardPopup = true },
-                                onCoinChestClick = onCoinChestClick,
                                 onInviteShareClick = onInviteShareClick,
                                 onDailyChallengeClaim = onDailyChallengeClaim,
                                 onComboChallengeClaim = onComboChallengeClaim,
                                 onWeeklyChallengeClaim = onWeeklyChallengeClaim,
                                 onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
-                                onAchievementClaim = onAchievementClaim
+                                onAchievementClaim = onAchievementClaim,
+                                onDailyEventClaim = onDailyEventClaim,
+                                onDailyEventPlayClick = { selectedHomeTab = HomeTab.Play },
+                                onWeeklyLeagueClaim = onWeeklyLeagueClaim,
+                                onRewardChestOpenClick = onRewardChestOpenClick,
+                                onStarterRewardClaim = onStarterRewardClaim,
+                                onDailyEventViewed = onDailyEventViewed,
+                                premiumState = premiumState,
+                                onBonusOfferClick = onBonusOfferClick,
+                                onBonusLimitReached = onBonusLimitReached,
+                                onPremiumCardClick = onPremiumCardClick,
+                                onBonusesOpened = onBonusesOpened,
+                                onSectionTabClick = { selectedHomeTab = it }
                             )
 
                             HomeTab.Achievements -> AchievementsTabContent(
@@ -346,6 +365,7 @@ fun HomeContent(
                                 progressionState = progressionState,
                                 onEditNameClick = { showPlayerNameDialog = true },
                                 onTitleSelect = onPlayerTitleSelect,
+                                onTitlesOpened = onPlayerTitlesOpened,
                                 onPersonalGoalClaim = onPersonalGoalClaim,
                                 onProfileBadgeSelect = onProfileBadgeSelect,
                                 onQuickMenuSelected = { tab ->
@@ -357,20 +377,6 @@ fun HomeContent(
                                     if (tab == HomeTab.Shop) onShopOpenedForMission()
                                     selectedHomeTab = tab
                                 }
-                            )
-
-                            HomeTab.Missions -> MissionsTabContent(
-                                dailyChallengeState = dailyChallengeState,
-                                progressionState = progressionState,
-                                rewardedAdUiState = rewardedAdUiState,
-                                onDailyRewardClaim = onDailyRewardClaim,
-                                onDailyStreakProtect = onDailyStreakProtect,
-                                onDailyRewardCardClick = { showDailyRewardPopup = true },
-                                onDailyChallengeClaim = onDailyChallengeClaim,
-                                onComboChallengeClaim = onComboChallengeClaim,
-                                onWeeklyChallengeClaim = onWeeklyChallengeClaim,
-                                onDailyChallengeDoubleRewardClick = onDailyChallengeDoubleRewardClick,
-                                onAchievementClaim = onAchievementClaim
                             )
 
                             HomeTab.Statistics -> StatisticsTabContent(
@@ -520,7 +526,6 @@ internal enum class HomeTab(
     Statistics(R.string.statistics_title, "%"),
     Collection(R.string.collection_title, "▣"),
     Achievements(R.string.nav_achievements, "◇"),
-    Missions(R.string.nav_missions, "✓"),
     Season(R.string.season_title, "S"),
     Settings(R.string.nav_settings, "⚙")
 }
@@ -544,7 +549,6 @@ private fun logHomeTabOpened(
         HomeTab.Collection,
         HomeTab.Statistics,
         HomeTab.Season,
-        HomeTab.Missions,
         HomeTab.Settings -> Unit
     }
 }

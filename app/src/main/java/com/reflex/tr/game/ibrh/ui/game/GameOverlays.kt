@@ -47,14 +47,17 @@ internal enum class RewardVaultType {
     Coin,
     SeasonXp,
     BonusCoin,
-    ThemeDiscount
+    ThemeDiscount,
+    RewardChest
 }
 
+/** [seasonXpAmount] is the second line a reward chest can add; every other type leaves it at 0. */
 internal data class RewardVaultFeedback(
     val type: RewardVaultType,
     val amount: Int,
     val strongGlow: Boolean,
-    val triggerKey: Int
+    val triggerKey: Int,
+    val seasonXpAmount: Int = 0
 )
 
 @Composable
@@ -88,97 +91,123 @@ internal fun RewardVaultOverlay(
         animationSpec = tween(durationMillis = 300),
         label = "reward_vault_glow"
     )
-    AnimatedVisibility(
-        visible = true,
-        enter = fadeIn(animationSpec = tween(120)) + scaleIn(initialScale = 0.84f),
-        exit = fadeOut(animationSpec = tween(160)) + scaleOut(targetScale = 0.92f),
-        modifier = modifier
+    // The panel is translucent by design, so it needs a scrim of its own: without one it renders
+    // straight over whatever card is behind it and the reward reads as broken layout.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(GameDialogScrimColor.copy(alpha = 0.62f)),
+        contentAlignment = Alignment.Center
     ) {
-        Surface(
-            color = Color.Black.copy(alpha = 0.18f),
-            shape = RoundedCornerShape(PremiumOverlayRadius),
-            border = BorderStroke(
-                1.dp,
-                if (feedback.strongGlow) {
-                    Color.White.copy(alpha = 0.5f)
-                } else {
-                    ReflexGamePalette.textPrimary.copy(alpha = 0.24f)
-                }
-            ),
-            modifier = Modifier.graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(120)) + scaleIn(initialScale = 0.84f),
+            exit = fadeOut(animationSpec = tween(160)) + scaleOut(targetScale = 0.92f),
+            modifier = modifier
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+            Surface(
+                color = Color.Black.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(PremiumOverlayRadius),
+                border = BorderStroke(
+                    1.dp,
+                    if (feedback.strongGlow) {
+                        Color.White.copy(alpha = 0.5f)
+                    } else {
+                        ReflexGamePalette.textPrimary.copy(alpha = 0.24f)
+                    }
+                ),
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
             ) {
-                Box(
-                    modifier = Modifier.size(92.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        ReflexGamePalette.textPrimary.copy(alpha = glowAlpha),
-                                        Color.Transparent
-                                    )
-                                ),
-                                shape = RoundedCornerShape(46.dp)
-                            )
-                    )
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                        modifier = Modifier.size(92.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Surface(
-                            color = ReflexGamePalette.textPrimary.copy(alpha = 0.92f),
-                            shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
+                        Box(
                             modifier = Modifier
-                                .size(width = 58.dp, height = 18.dp)
-                                .graphicsLayer {
-                                    rotationX = lidRotation
-                                    translationY = if (opened) -8f else 0f
-                                }
-                        ) {}
-                        Surface(
-                            color = ReflexGamePalette.cardGlassStrong,
-                            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
-                            border = BorderStroke(1.dp, ReflexGamePalette.textPrimary.copy(alpha = 0.35f)),
-                            modifier = Modifier.size(width = 68.dp, height = 46.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = stringResource(R.string.reward_vault_chest_label),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ReflexGamePalette.textPrimary,
-                                    textAlign = TextAlign.Center
+                                .matchParentSize()
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            ReflexGamePalette.textPrimary.copy(alpha = glowAlpha),
+                                            Color.Transparent
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(46.dp)
                                 )
+                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            Surface(
+                                color = ReflexGamePalette.textPrimary.copy(alpha = 0.92f),
+                                shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
+                                modifier = Modifier
+                                    .size(width = 58.dp, height = 18.dp)
+                                    .graphicsLayer {
+                                        rotationX = lidRotation
+                                        translationY = if (opened) -8f else 0f
+                                    }
+                            ) {}
+                            Surface(
+                                color = ReflexGamePalette.cardGlassStrong,
+                                shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
+                                border = BorderStroke(1.dp, ReflexGamePalette.textPrimary.copy(alpha = 0.35f)),
+                                modifier = Modifier.size(width = 68.dp, height = 46.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = stringResource(R.string.reward_vault_chest_label),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ReflexGamePalette.textPrimary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     }
+                    Text(
+                        text = if (feedback.type == RewardVaultType.RewardChest) {
+                            stringResource(R.string.reward_chest_opened)
+                        } else {
+                            stringResource(R.string.reward_vault_title)
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ReflexGamePalette.textPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = rewardVaultText(feedback),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ReflexGamePalette.textPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (feedback.seasonXpAmount > 0) {
+                        Text(
+                            text = stringResource(
+                                R.string.reward_chest_reward_season_xp,
+                                feedback.seasonXpAmount
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReflexGamePalette.textSecondary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-                Text(
-                    text = stringResource(R.string.reward_vault_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = rewardVaultText(feedback),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ReflexGamePalette.textPrimary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }
@@ -191,6 +220,7 @@ private fun rewardVaultText(feedback: RewardVaultFeedback): String {
         RewardVaultType.SeasonXp -> stringResource(R.string.reward_vault_season_xp, feedback.amount)
         RewardVaultType.BonusCoin -> stringResource(R.string.reward_vault_bonus_coin, feedback.amount)
         RewardVaultType.ThemeDiscount -> stringResource(R.string.reward_vault_theme_discount)
+        RewardVaultType.RewardChest -> stringResource(R.string.reward_chest_reward_coin, feedback.amount)
     }
 }
 

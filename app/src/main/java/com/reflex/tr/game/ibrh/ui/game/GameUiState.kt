@@ -2,6 +2,7 @@ package com.reflex.tr.game.ibrh.ui.game
 
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
+import com.reflex.tr.game.ibrh.ads.PremiumState
 
 internal fun showcasedProfileBadges(progressionState: ProgressionState): List<ProfileBadge> {
     val unlocked = unlockedProfileBadges(progressionState)
@@ -19,6 +20,7 @@ internal fun unlockedProfileBadges(progressionState: ProgressionState): Set<Prof
     return ProfileBadge.entries.filterTo(mutableSetOf()) { badge ->
         when (badge) {
             ProfileBadge.FirstGame -> progressionState.totalGames > 0
+            ProfileBadge.StarterComplete -> progressionState.starterJourney.isCompleted
             ProfileBadge.ComboHunter -> progressionState.lifetimeMaxCombo >= 10
             ProfileBadge.RecordBreaker -> progressionState.personalRecords.bestScore > 0
             ProfileBadge.DailyPlayer -> progressionState.dailyReward.claimedToday || progressionState.dailyReward.streakDay > 1
@@ -27,6 +29,7 @@ internal fun unlockedProfileBadges(progressionState: ProgressionState): Set<Prof
             ProfileBadge.BossHunter -> progressionState.totalBossRoundHits > 0
             ProfileBadge.UltraPlayer -> progressionState.totalUltraMomentHits > 0
             ProfileBadge.SeasonHunter -> progressionState.seasonHunterBadgeUnlocked
+            ProfileBadge.NeonLeaguePlayer -> progressionState.neonLeagueBadgeUnlocked
         }
     }
 }
@@ -190,6 +193,12 @@ data class GameUiState(
     val playerProfile: PlayerProfile = PlayerProfile(),
     val leaderboardSnapshot: LeaderboardSnapshot = LeaderboardSnapshot(),
     val earnedCoinsThisGame: Int = 0,
+    val leaguePointsEarnedThisGame: Int = 0,
+    val leagueUpgradedTo: LeagueTier? = null,
+    val rewardChestEarnedThisGame: RewardChestType? = null,
+    val newPlayerTitlesThisGame: List<PlayerTitle> = emptyList(),
+    val starterTaskCompletedThisGame: Boolean = false,
+    val premiumState: PremiumState = PremiumState(),
     val baseCoinsThisGame: Int = 0,
     val isCoinDoubleClaimed: Boolean = false,
     val pendingRewardedAction: RewardedAction? = null,

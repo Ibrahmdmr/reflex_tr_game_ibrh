@@ -289,7 +289,9 @@ fun SecondaryGameButton(
             containerColor = Color.White.copy(alpha = 0.095f),
             contentColor = ReflexGamePalette.textPrimary,
             disabledContainerColor = Color.White.copy(alpha = 0.075f),
-            disabledContentColor = ReflexGamePalette.textSecondary.copy(alpha = 0.7f)
+            // textSecondary is already muted; dimming it further left labels like "Ödülü Al"
+            // barely readable on the dark panel while still needing to read as unavailable.
+            disabledContentColor = ReflexGamePalette.textSecondary.copy(alpha = 0.92f)
         )
     ) {
         Row(

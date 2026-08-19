@@ -220,6 +220,10 @@ internal fun LeaderboardSection(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        // Only ever set on the player's own row; the board carries no titles.
+                        entry.title?.let { title ->
+                            PlayerTitleInlineLabel(title = title)
+                        }
                     }
                     Text(
                         text = entry.score.toString(),

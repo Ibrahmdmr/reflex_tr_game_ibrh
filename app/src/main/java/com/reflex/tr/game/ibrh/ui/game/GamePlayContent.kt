@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -253,14 +252,5 @@ fun GamePlayContent(
                 }
             }
         }
-    }
-}
-
-internal fun ReflexTargetColor.toTaskColor(): Color {
-    return when (this) {
-        ReflexTargetColor.Red -> Color(0xFFFF335F)
-        ReflexTargetColor.Blue -> Color(0xFF39A8FF)
-        ReflexTargetColor.Gold -> Color(0xFFFFD84D)
-        ReflexTargetColor.Teal -> Color(0xFF22F2A6)
     }
 }

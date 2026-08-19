@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,10 +36,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
+import com.reflex.tr.game.ibrh.share.ScoreShareData
+import com.reflex.tr.game.ibrh.share.ScoreShareLabels
+import com.reflex.tr.game.ibrh.share.ScoreShareManager
+import com.reflex.tr.game.ibrh.share.ScoreShareResult
 import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberGameSoundHooks
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val ScreenHorizontalPadding = 20.dp
 
@@ -177,10 +184,22 @@ fun GameScreen(
         onCoinChestClick = {
             onRewardedAdRequested(RewardedAction.CoinChest, viewModel::onCoinChestRewardEarned)
         },
+        onRewardChestOpen = viewModel::openRewardChest,
+        onStarterRewardClaim = viewModel::claimStarterJourneyReward,
+        onDailyEventViewed = viewModel::onDailyEventViewed,
+        onBonusOfferClick = { offer ->
+            // The offer decides which existing rewarded action runs; nothing new is granted here.
+            viewModel.onRewardedOfferClicked(offer)
+            onRewardedAdRequested(offer.action) { viewModel.onRewardedOfferEarned(offer) }
+        },
+        onBonusLimitReached = viewModel::onBonusOfferBlocked,
+        onPremiumCardClick = viewModel::onPremiumCardClicked,
+        onBonusesOpened = viewModel::onBonusesOpened,
         onShopCoinRewardClick = {
             onRewardedAdRequested(RewardedAction.ShopCoinReward, viewModel::onShopCoinRewardEarned)
         },
         onInviteShareClick = viewModel::onInviteShareCompleted,
+        onScoreShareCompleted = viewModel::onScoreShareCompleted,
         onDailyChallengeDoubleRewardClick = {
             onRewardVaultOpened ->
             onRewardedAdRequested(
@@ -191,6 +210,8 @@ fun GameScreen(
             }
         },
         onAchievementClaim = viewModel::claimAchievementReward,
+        onDailyEventClaim = viewModel::claimDailyEventReward,
+        onWeeklyLeagueClaim = viewModel::claimWeeklyLeagueReward,
         onThemeSelect = viewModel::selectTheme,
         onThemeBuy = viewModel::buyTheme,
         onThemeTrial = { theme ->
@@ -202,6 +223,7 @@ fun GameScreen(
         onTargetSkinBuy = viewModel::buyTargetSkin,
         onPlayerNameChange = viewModel::updatePlayerName,
         onPlayerTitleSelect = viewModel::selectPlayerTitle,
+        onPlayerTitlesOpened = viewModel::onPlayerTitlesOpened,
         onProfileBadgeSelect = viewModel::selectProfileBadge,
         onLeaderboardModeSelected = viewModel::selectLeaderboardMode,
         onLeaderboardPeriodSelected = viewModel::selectLeaderboardPeriod,
@@ -268,13 +290,23 @@ fun GameScreen(
     onSeasonMissionClaim: (String) -> Unit = {},
     onDailyStreakProtect: () -> Unit,
     onCoinChestClick: () -> Unit = {},
+    onRewardChestOpen: ((RewardChestReward) -> Unit) -> Unit = {},
+    onStarterRewardClaim: () -> Unit = {},
+    onDailyEventViewed: () -> Unit = {},
+    onBonusOfferClick: (RewardedOfferType) -> Unit = {},
+    onBonusLimitReached: (RewardedOfferType) -> Unit = {},
+    onPremiumCardClick: () -> Unit = {},
+    onBonusesOpened: (List<RewardedOfferState>) -> Unit = {},
     onShopCoinRewardClick: () -> Unit = {},
     onInviteShareClick: () -> Unit = {},
+    onScoreShareCompleted: () -> Int = { 0 },
     onPowerUpClick: (GamePowerUp) -> Boolean,
     onBoostCoinClick: (GameBoost) -> Boolean = { false },
     onBoostAdClick: (GameBoost) -> Unit = {},
     onDailyChallengeDoubleRewardClick: (() -> Unit) -> Unit = { onRewardVaultOpened -> onRewardVaultOpened() },
     onAchievementClaim: (String) -> Unit,
+    onDailyEventClaim: () -> Unit = {},
+    onWeeklyLeagueClaim: () -> Unit = {},
     onThemeSelect: (PlayerTheme) -> Unit,
     onThemeBuy: (PlayerTheme) -> Unit,
     onThemeTrial: (PlayerTheme) -> Unit,
@@ -282,6 +314,7 @@ fun GameScreen(
     onTargetSkinBuy: (TargetSkin) -> Unit = {},
     onPlayerNameChange: (String) -> Boolean,
     onPlayerTitleSelect: (PlayerTitle) -> Unit,
+    onPlayerTitlesOpened: () -> Unit = {},
     onProfileBadgeSelect: (ProfileBadge) -> Unit,
     onLeaderboardModeSelected: (GameMode) -> Unit,
     onLeaderboardPeriodSelected: (LeaderboardPeriod) -> Unit,
@@ -327,6 +360,8 @@ fun GameScreen(
     var showExitGameDialog by rememberSaveable { mutableStateOf(false) }
     var showBoostSheet by rememberSaveable { mutableStateOf(false) }
     var quickGameModeToStart by rememberSaveable { mutableStateOf<GameMode?>(null) }
+    var isPreparingShareCard by remember { mutableStateOf(false) }
+    val shareScope = rememberCoroutineScope()
     var rewardVaultTrigger by remember { mutableIntStateOf(0) }
     var rewardVaultFeedback by remember { mutableStateOf<RewardVaultFeedback?>(null) }
     val modeTipVisible = uiState.hasGameStarted &&
@@ -585,9 +620,17 @@ fun GameScreen(
         }
     }
 
-    val shouldShowContinueSlot =
-        uiState.canContinueWithReward ||
-            uiState.isRewardContinueReady
+    // One decision for what the Game Over panel may offer, capped at two and already filtered to
+    // what is genuinely actionable; the panel no longer works that out from loose booleans.
+    val gameOverOffers = gameOverRewardedOffers(
+        canContinue = uiState.canContinueWithReward,
+        isContinueReady = uiState.isRewardContinueReady,
+        baseCoinsThisGame = uiState.baseCoinsThisGame,
+        isCoinDoubleClaimed = uiState.isCoinDoubleClaimed,
+        rewardedAdUiState = rewardedAdUiState
+    )
+    val shouldShowContinueSlot = gameOverOffers.any { it.type == RewardedOfferType.ContinueGame }
+    val shouldShowDoubleCoins = gameOverOffers.any { it.type == RewardedOfferType.DoubleGameCoins }
     val continueButtonText = when {
         uiState.isRewardContinueReady ->
             stringResource(R.string.continue_game)
@@ -642,17 +685,14 @@ fun GameScreen(
         stringResource(R.string.play_store_link)
     )
     val inviteShareChooserTitle = stringResource(R.string.invite_share_chooser_title)
-    val shareScoreSafely = {
-        shareScore(
-            context = context,
-            text = shareText,
-            chooserTitle = shareChooserTitle,
-            score = safeShareScore,
-            mode = uiState.selectedMode,
-            isNewRecord = uiState.isNewBestScore
-        )
-    }
-    val showRewardVault: (RewardVaultType, Int, Boolean) -> Unit = { type, amount, strongGlow ->
+    // A function rather than a lambda so the season-XP line can default away: only reward chests
+    // pay two currencies at once, and every other caller stays a three-argument call.
+    fun showRewardVault(
+        type: RewardVaultType,
+        amount: Int,
+        strongGlow: Boolean,
+        seasonXpAmount: Int = 0
+    ) {
         soundHooks.onReward()
         haptic.performSafeGameHaptic(
             enabled = isVibrationEnabled,
@@ -663,8 +703,89 @@ fun GameScreen(
             type = type,
             amount = amount.coerceAtLeast(0),
             strongGlow = strongGlow,
-            triggerKey = rewardVaultTrigger
+            triggerKey = rewardVaultTrigger,
+            seasonXpAmount = seasonXpAmount.coerceAtLeast(0)
         )
+    }
+    val shareCardLabels = ScoreShareLabels(
+        title = stringResource(R.string.app_name),
+        slogan = stringResource(R.string.share_card_slogan),
+        score = stringResource(R.string.score),
+        bestScore = stringResource(R.string.best_score),
+        accuracy = stringResource(R.string.accuracy),
+        combo = stringResource(R.string.combo),
+        coins = stringResource(R.string.share_card_coin_label),
+        theme = stringResource(
+            R.string.share_card_theme_value,
+            stringResource(uiState.progressionState.activeTheme.titleRes)
+        ),
+        newRecord = stringResource(R.string.share_card_new_record),
+        challenge = stringResource(R.string.share_card_challenge),
+        storeHint = stringResource(R.string.share_card_store_hint)
+    )
+    val shareCardModeName = stringResource(uiState.selectedMode.titleRes)
+    val shareMessage = stringResource(
+        R.string.share_score_mode_text,
+        shareCardModeName,
+        safeShareScore,
+        stringResource(R.string.play_store_link)
+    )
+    val shareAccuracyText = stringResource(R.string.percent_value, calculateAccuracyPercent(uiState))
+    val preparingMessage = stringResource(R.string.share_score_preparing)
+    val shareFailedMessage = stringResource(R.string.share_score_failed)
+    val shareRewardMessage = stringResource(R.string.share_score_reward, ScoreShareRewardCoins)
+
+    val shareScoreSafely = {
+        if (!isPreparingShareCard) {
+            isPreparingShareCard = true
+            context.showShortToast(preparingMessage)
+            logScoreShareEvent(FirebaseEvent.ScoreShareClicked, uiState, safeShareScore)
+            shareScope.launch {
+                val data = ScoreShareData.of(
+                    score = safeShareScore,
+                    modeName = shareCardModeName,
+                    bestScore = uiState.bestScore,
+                    accuracyText = shareAccuracyText,
+                    maxCombo = uiState.maxCombo,
+                    earnedCoins = uiState.earnedCoinsThisGame,
+                    isNewBestScore = uiState.isNewBestScore,
+                    labels = shareCardLabels
+                )
+                val cardUri = ScoreShareManager.prepareCard(context, data)
+                logScoreShareEvent(
+                    event = if (cardUri != null) {
+                        FirebaseEvent.ScoreShareGenerated
+                    } else {
+                        FirebaseEvent.ScoreShareFailed
+                    },
+                    uiState = uiState,
+                    score = safeShareScore
+                )
+                val result = ScoreShareManager.launchShareSheet(
+                    context = context,
+                    imageUri = cardUri,
+                    message = shareMessage,
+                    chooserTitle = shareChooserTitle,
+                    onTargetChosen = {
+                        // Fires when the player picks an app, not when the sheet merely opens, so
+                        // a dismissed sheet pays nothing. The view model caps it to once a day.
+                        val rewardCoins = onScoreShareCompleted()
+                        if (rewardCoins > 0) {
+                            context.showShortToast(shareRewardMessage)
+                            showRewardVault(RewardVaultType.Coin, rewardCoins, false)
+                        }
+                    }
+                )
+                isPreparingShareCard = false
+                if (result == ScoreShareResult.Failed) {
+                    context.showShortToast(shareFailedMessage)
+                    logScoreShareEvent(FirebaseEvent.ScoreShareFailed, uiState, safeShareScore)
+                } else {
+                    logScoreShareEvent(FirebaseEvent.ScoreShareSheetOpened, uiState, safeShareScore)
+                }
+            }
+        }
+        Unit
     }
     val claimDailyRewardWithVault = {
         val reward = uiState.progressionState.dailyReward
@@ -680,6 +801,22 @@ fun GameScreen(
         onDailyChallengeClaim()
         if (canShowVault) {
             showRewardVault(RewardVaultType.BonusCoin, challenge.rewardCoins, false)
+        }
+    }
+    val claimDailyEventWithVault = {
+        val event = uiState.progressionState.dailyEvent
+        val canShowVault = event.canClaim
+        onDailyEventClaim()
+        if (canShowVault) {
+            showRewardVault(RewardVaultType.Coin, event.rewardCoins, false)
+        }
+    }
+    val claimWeeklyLeagueWithVault = {
+        val league = uiState.progressionState.weeklyLeague
+        val rewardCoins = league.pendingRewardTier.rewardCoins.takeIf { league.canClaimReward } ?: 0
+        onWeeklyLeagueClaim()
+        if (rewardCoins > 0) {
+            showRewardVault(RewardVaultType.Coin, rewardCoins, true)
         }
     }
     val claimWeeklyChallengeWithVault = {
@@ -786,6 +923,24 @@ fun GameScreen(
         }
         onPersonalGoalClaim()
     }
+    val openRewardChestWithVault = {
+        onRewardChestOpen { reward ->
+            showRewardVault(
+                type = RewardVaultType.RewardChest,
+                amount = reward.coins,
+                strongGlow = reward.type == RewardChestType.Legendary,
+                seasonXpAmount = reward.seasonXp
+            )
+        }
+    }
+    val claimStarterRewardWithVault = {
+        val journey = uiState.progressionState.starterJourney
+        val rewardCoins = journey.activeDay?.rewardCoins.takeIf { journey.hasClaimableReward } ?: 0
+        onStarterRewardClaim()
+        if (rewardCoins > 0) {
+            showRewardVault(RewardVaultType.Coin, rewardCoins, true)
+        }
+    }
     val openCoinChestWithSound = {
         if (uiState.progressionState.coinChest.canOpen) {
             soundHooks.onReward()
@@ -854,6 +1009,14 @@ fun GameScreen(
                 onSeasonMissionClaim = claimSeasonMissionWithVault,
                 onDailyStreakProtect = onDailyStreakProtect,
                 onCoinChestClick = openCoinChestWithSound,
+                onRewardChestOpenClick = openRewardChestWithVault,
+                onStarterRewardClaim = claimStarterRewardWithVault,
+                onDailyEventViewed = onDailyEventViewed,
+                premiumState = uiState.premiumState,
+                onBonusOfferClick = onBonusOfferClick,
+                onBonusLimitReached = onBonusLimitReached,
+                onPremiumCardClick = onPremiumCardClick,
+                onBonusesOpened = onBonusesOpened,
                 onShopCoinRewardClick = onShopCoinRewardClick,
                 onInviteShareClick = {
                     shareInvite(
@@ -865,6 +1028,8 @@ fun GameScreen(
                 },
                 onDailyChallengeDoubleRewardClick = claimDailyChallengeDoubleWithVault,
                 onAchievementClaim = claimAchievementWithHaptic,
+                onDailyEventClaim = claimDailyEventWithVault,
+                onWeeklyLeagueClaim = claimWeeklyLeagueWithVault,
                 onThemeSelect = onThemeSelect,
                 onThemeBuy = buyThemeWithHaptic,
                 onThemeTrial = onThemeTrial,
@@ -872,6 +1037,7 @@ fun GameScreen(
                 onTargetSkinBuy = buyTargetSkinWithHaptic,
                 onPlayerNameChange = onPlayerNameChange,
                 onPlayerTitleSelect = onPlayerTitleSelect,
+                onPlayerTitlesOpened = onPlayerTitlesOpened,
                 onProfileBadgeSelect = onProfileBadgeSelect,
                 onLeaderboardModeSelected = onLeaderboardModeSelected,
                 onLeaderboardPeriodSelected = onLeaderboardPeriodSelected,
@@ -969,7 +1135,14 @@ fun GameScreen(
                     totalCoins = uiState.progressionState.coins,
                     seasonXp = uiState.progressionState.season.xp,
                     comboChallenge = uiState.progressionState.comboChallenge,
+                    dailyEvent = uiState.progressionState.dailyEvent,
+                    leaguePointsEarned = uiState.leaguePointsEarnedThisGame,
+                    leagueUpgradedTo = uiState.leagueUpgradedTo,
                     dailyMiniTournament = uiState.progressionState.dailyMiniTournament,
+                    rewardChestEarned = uiState.rewardChestEarnedThisGame,
+                    newPlayerTitles = uiState.newPlayerTitlesThisGame,
+                    starterJourney = uiState.progressionState.starterJourney,
+                    starterTaskCompletedThisGame = uiState.starterTaskCompletedThisGame,
                     isCoinDoubleClaimed = uiState.isCoinDoubleClaimed,
                     showContinueButton = shouldShowContinueSlot,
                     continueButtonText = continueButtonText,
@@ -977,10 +1150,7 @@ fun GameScreen(
                     isContinueEnabled = continueButtonEnabled,
                     isContinueLoading = continueButtonLoading,
                     onHomeClick = returnHomeFromGameOver,
-                    isDoubleCoinsEnabled = !uiState.isCoinDoubleClaimed &&
-                        uiState.baseCoinsThisGame > 0 &&
-                        rewardedAdUiState.isReady &&
-                        !rewardedAdUiState.isShowing,
+                    isDoubleCoinsEnabled = shouldShowDoubleCoins,
                     isDoubleCoinsLoading = rewardedAdUiState.isShowing || rewardedAdUiState.isLoading,
                     doubleCoinsText = when {
                         uiState.isCoinDoubleClaimed -> stringResource(R.string.coin_bonus_claimed)
@@ -991,6 +1161,13 @@ fun GameScreen(
                     onContinueClick = continueSafely,
                     onDoubleCoinsClick = doubleCoinsSafely,
                     onShareScoreClick = shareScoreSafely,
+                    onRewardChestOpenClick = openRewardChestWithVault,
+                    shareScoreButtonText = if (isPreparingShareCard) {
+                        preparingMessage
+                    } else {
+                        stringResource(R.string.share_score)
+                    },
+                    isSharingScore = isPreparingShareCard,
                     onRetryClick = retrySafely
                 )
             }

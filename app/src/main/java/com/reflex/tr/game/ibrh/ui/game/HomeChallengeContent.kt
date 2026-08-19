@@ -143,7 +143,12 @@ internal fun DailyChallengeCard(
                 }
             }
             Text(
-                text = stringResource(R.string.mission_reward_ready_value, state.rewardCoins),
+                // "Reward ready" only once it actually is; before that this is just the prize.
+                text = if (state.completed && !state.rewardClaimed) {
+                    stringResource(R.string.mission_reward_ready_value, state.rewardCoins)
+                } else {
+                    stringResource(R.string.mission_reward_pending_value, state.rewardCoins)
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = accent,
                 maxLines = 1,
@@ -383,32 +388,41 @@ internal fun DailyMiniTournamentCard(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.daily_mini_tournament_title),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = accent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // The reward badge shares the title line so the mode name below keeps the
+                    // full width; beside the badge it clipped to "Today's mode: Deco…".
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.daily_mini_tournament_title),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Surface(
+                            color = accent.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(PremiumPillRadius),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.26f))
+                        ) {
+                            Text(
+                                text = stringResource(R.string.personal_goal_reward, state.rewardCoins),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ReflexGamePalette.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                     Text(
                         text = stringResource(R.string.daily_mini_tournament_mode, modeTitle),
                         style = MaterialTheme.typography.titleSmall,
                         color = ReflexGamePalette.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Surface(
-                    color = accent.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(PremiumPillRadius),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.26f))
-                ) {
-                    Text(
-                        text = stringResource(R.string.personal_goal_reward, state.rewardCoins),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = ReflexGamePalette.textPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

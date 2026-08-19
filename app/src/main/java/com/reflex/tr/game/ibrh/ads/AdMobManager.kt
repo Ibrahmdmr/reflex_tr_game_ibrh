@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -18,6 +19,7 @@ import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 
+@Immutable
 sealed class AdPresentationState {
     data object Idle : AdPresentationState()
     data object Loading : AdPresentationState()
@@ -27,6 +29,7 @@ sealed class AdPresentationState {
     data class Failed(val message: String? = null) : AdPresentationState()
 }
 
+@Immutable
 data class RewardedAdUiState(
     val status: AdPresentationState = AdPresentationState.Idle,
     val isReady: Boolean = false,
@@ -104,8 +107,8 @@ class AdMobManager(
         val ad = rewardedAd
         if (ad == null) {
             logDebug("Ad not ready")
-            AdAnalyticsTracker.track(
-                eventName = "rewarded_failed",
+            AdAnalyticsTracker.report(
+                event = FirebaseEvent.RewardedAdFailed,
                 params = adParams("placement" to placement, "reason" to "not_ready")
             )
             publishRewardedUiState(AdPresentationState.Failed("not_ready"))
@@ -117,7 +120,10 @@ class AdMobManager(
         isRewardedShowing = true
         mainHandler.removeCallbacks(rewardedRetryRunnable)
         publishRewardedUiState(AdPresentationState.Showing)
-        AdAnalyticsTracker.track("rewarded_open", adParams("placement" to placement))
+        AdAnalyticsTracker.report(
+            event = FirebaseEvent.RewardedAdOpened,
+            params = adParams("placement" to placement)
+        )
         logDebug("Rewarded ad is showing")
         var rewardEarned = false
         var rewardGranted = false
@@ -150,8 +156,8 @@ class AdMobManager(
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                 logWarn("Rewarded ad failed to show: ${adError.message}")
-                AdAnalyticsTracker.track(
-                    eventName = "rewarded_failed",
+                AdAnalyticsTracker.report(
+                    event = FirebaseEvent.RewardedAdFailed,
                     params = adParams("placement" to placement, "reason" to adError.message)
                 )
                 rewardEarned = false
@@ -172,6 +178,7 @@ class AdMobManager(
                         rewardEarned = true,
                         isShowing = true
                     )
+                    // Logcat only: the Firebase side of this is RewardedAdWatched, fired below.
                     AdAnalyticsTracker.track("rewarded_complete", adParams("placement" to placement))
                     FirebaseGameServices.logEvent(
                         event = FirebaseEvent.RewardedAdWatched,
@@ -183,8 +190,8 @@ class AdMobManager(
             true
         }.onFailure { throwable ->
             logWarn("Rewarded ad show threw: ${throwable.message}")
-            AdAnalyticsTracker.track(
-                eventName = "rewarded_failed",
+            AdAnalyticsTracker.report(
+                event = FirebaseEvent.RewardedAdFailed,
                 params = adParams("placement" to placement, "reason" to (throwable.message ?: "show_exception"))
             )
             rewardEarned = false
@@ -225,6 +232,8 @@ class AdMobManager(
         }
 
         logDebug("Interstitial ad is showing")
+        // Logcat only: the view model reports InterstitialShown with its pacing context, so
+        // reporting here as well would count every impression twice.
         AdAnalyticsTracker.track("interstitial_show")
         AdAnalyticsTracker.track("ad_revenue_estimate", adParams("format" to "interstitial"))
         return runCatching {

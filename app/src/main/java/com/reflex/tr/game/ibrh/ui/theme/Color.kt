@@ -2,18 +2,13 @@ package com.reflex.tr.game.ibrh.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val ArcadeNavy = Color(0xFF182033)
 val ArcadeBlue = Color(0xFF4A6CF7)
 val ArcadeBlueLight = Color(0xFF6F8CFF)
 val ArcadeTeal = Color(0xFF2CB7A5)
 val ArcadeGold = Color(0xFFFFC857)
 val ArcadeCoral = Color(0xFFFF2D35)
 val ArcadeCoralSoft = Color(0xFFFFD8D6)
-val ArcadeSurface = Color(0xFF101A35)
-val ArcadeSurfaceAlt = Color(0xFF1A2550)
 val ArcadeCard = Color(0xFFEFF3FF)
-val ArcadeBorder = Color(0xFF3A4775)
-val ArcadeTextMuted = Color(0xFFB7C2E8)
 val ArcadeDarkSurface = Color(0xFF070B1D)
 val ArcadeDarkCard = Color(0xCC121C3B)
 val ArcadeDarkBorder = Color(0xFF34406B)

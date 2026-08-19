@@ -129,7 +129,8 @@ internal fun LivePerformanceBar(
                     }
             )
             LivePerformanceMetric(
-                label = stringResource(R.string.accuracy),
+                // Its own short label: the full word does not fit a fifth of a 360dp screen.
+                label = stringResource(R.string.hud_accuracy),
                 value = stringResource(R.string.percent_value, accuracyPercent),
                 accentColor = ArcadeTeal,
                 modifier = Modifier.weight(1f)

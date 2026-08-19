@@ -14,7 +14,6 @@ import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
-import java.util.Calendar
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.absoluteValue
@@ -164,10 +163,6 @@ class LocalLeaderboardRepository : LeaderboardRepository {
         mode: GameMode
     ): Boolean = false
 
-    private fun currentWeekKey(): String {
-        val calendar = Calendar.getInstance()
-        return "${calendar.get(Calendar.YEAR)}-W${calendar.get(Calendar.WEEK_OF_YEAR)}"
-    }
 }
 
 class FirestoreLeaderboardRepository(
@@ -469,10 +464,6 @@ class FirestoreLeaderboardRepository(
         )
     }
 
-    private fun currentWeekKey(): String {
-        val calendar = Calendar.getInstance()
-        return "${calendar.get(Calendar.YEAR)}-W${calendar.get(Calendar.WEEK_OF_YEAR)}"
-    }
 }
 
 /** Rank is derived from the player level alone; score does not affect the tier. */

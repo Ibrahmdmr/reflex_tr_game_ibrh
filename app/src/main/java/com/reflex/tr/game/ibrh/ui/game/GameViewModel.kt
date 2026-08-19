@@ -11,6 +11,10 @@ import com.reflex.tr.game.ibrh.BuildConfig
 import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ads.AdAnalyticsTracker
 import com.reflex.tr.game.ibrh.ads.AdConfig
+import com.reflex.tr.game.ibrh.ads.AdPacingManager
+import com.reflex.tr.game.ibrh.ads.PremiumFeature
+import com.reflex.tr.game.ibrh.ads.PremiumRepository
+import com.reflex.tr.game.ibrh.ads.PremiumState
 import com.reflex.tr.game.ibrh.ads.adParams
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
@@ -33,6 +37,7 @@ class GameViewModel internal constructor(
     private val leaderboardRepository: LeaderboardRepository,
     private val targetEngine: GameTargetEngine,
     private val adConfig: AdConfig,
+    private val premiumRepository: PremiumRepository,
     private val defaultPlayerName: () -> String
 ) : ViewModel() {
 
@@ -48,6 +53,8 @@ class GameViewModel internal constructor(
                     leaderboardRepository = FirestoreLeaderboardRepository(),
                     targetEngine = GameTargetEngine(),
                     adConfig = AdConfig.Default,
+                    // A Play Billing client would replace this one object and nothing else.
+                    premiumRepository = preferences,
                     // The app overrides the system locale, so the fallback name must be resolved
                     // against the in-app language rather than through a plain getString().
                     defaultPlayerName = {
@@ -76,6 +83,7 @@ class GameViewModel internal constructor(
         private const val REWARDED_AD_XP_REWARD = 20
         private const val DAILY_CHALLENGE_XP_REWARD = 60
         private const val INVITE_SHARE_REWARD_COINS = 100
+        private const val SCORE_SHARE_REWARD_COINS = 50
         private const val SEASON_XP_GAME_PLAYED = 35
         private const val SEASON_XP_CHALLENGE_COMPLETED = 90
         private const val SEASON_XP_DAILY_STREAK = 70
@@ -120,12 +128,9 @@ class GameViewModel internal constructor(
     private var ultraMomentResultClearJob: Job? = null
     private var leaderboardRefreshJob: Job? = null
     private var bonusHourJob: Job? = null
-    private var completedGameCount = 0
-    private var nextInterstitialGameCount = randomInterstitialInterval()
+    private var adPacingState = gamePreferences.getAdPacingState()
     private var lastHitElapsedMillis = 0L
     private var gameStartedElapsedMillis = 0L
-    private var lastInterstitialShownElapsedMillis = 0L
-    private var lastRewardedAdElapsedMillis = 0L
     private var lastRewardedGrantAction: RewardedAction? = null
     private var lastRewardedGrantElapsedMillis = 0L
     private var targetSpawnElapsedMillis = 0L
@@ -601,65 +606,187 @@ class GameViewModel internal constructor(
         claimDailyChallengeBaseRewardIfReady()
     }
 
-    fun claimWeeklyChallengeReward() {
+    fun claimWeeklyChallengeReward() = claimOnce(
+        isClaimable = { it.weeklyChallenge.completed && !it.weeklyChallenge.claimed },
+        rewardCoins = { it.weeklyChallenge.rewardCoins },
+        markClaimed = { it.copy(weeklyChallenge = it.weeklyChallenge.copy(claimed = true)) }
+    )
+
+    fun claimDailyLeaderboardGoalReward() = claimOnce(
+        isClaimable = { it.dailyLeaderboardGoal.completed && !it.dailyLeaderboardGoal.claimed },
+        rewardCoins = { it.dailyLeaderboardGoal.rewardCoins },
+        markClaimed = { it.copy(dailyLeaderboardGoal = it.dailyLeaderboardGoal.copy(claimed = true)) }
+    )
+
+    fun claimPersonalGoalReward() = claimOnce(
+        isClaimable = { it.personalGoal.completed && !it.personalGoal.claimed },
+        rewardCoins = { it.personalGoal.rewardCoins },
+        markClaimed = { it.copy(personalGoal = it.personalGoal.copy(claimed = true)) }
+    )
+
+    fun claimWeeklyLeagueReward() {
         if (isStorePreviewModeActive()) return
-        val freshProgression = gamePreferences.getProgressionState()
-        val challenge = freshProgression.weeklyChallenge
-        if (!challenge.completed || challenge.claimed) return
+        val stored = progressionForClaim()
+        val league = weeklyLeagueForWeek(stored.weeklyLeague)
+        val (clearedLeague, rewardTier) = claimedWeeklyLeagueReward(league) ?: return
 
-        val updatedChallenge = challenge.copy(claimed = true)
         val updatedProgression = addCoins(
-            progression = freshProgression.copy(weeklyChallenge = updatedChallenge),
-            coins = challenge.rewardCoins
-        )
-        _uiState.update { it.copy(progressionState = updatedProgression) }
-        gamePreferences.saveProgressionState(updatedProgression)
-    }
-
-    fun claimDailyLeaderboardGoalReward() {
-        if (isStorePreviewModeActive()) return
-        val freshProgression = gamePreferences.getProgressionState()
-        val goal = freshProgression.dailyLeaderboardGoal
-        if (!goal.completed || goal.claimed) return
-
-        val updatedGoal = goal.copy(claimed = true)
-        val updatedProgression = addCoins(
-            progression = freshProgression.copy(dailyLeaderboardGoal = updatedGoal),
-            coins = goal.rewardCoins
-        )
-        saveProgressionAndUpdateState(updatedProgression)
-    }
-
-    fun claimPersonalGoalReward() {
-        if (isStorePreviewModeActive()) return
-        val freshProgression = gamePreferences.getProgressionState()
-        val goal = freshProgression.personalGoal
-        if (!goal.completed || goal.claimed) return
-
-        val updatedGoal = goal.copy(claimed = true)
-        val updatedProgression = addCoins(
-            progression = freshProgression.copy(personalGoal = updatedGoal),
-            coins = goal.rewardCoins
+            progression = stored,
+            coins = rewardTier.rewardCoins
+        ).copy(
+            weeklyLeague = clearedLeague,
+            neonLeagueBadgeUnlocked = stored.neonLeagueBadgeUnlocked || rewardTier == LeagueTier.Neon
         )
         saveProgressionAndUpdateState(updatedProgression)
+        logWeeklyLeagueEvent(
+            event = FirebaseEvent.WeeklyLeagueRewardClaimed,
+            tier = rewardTier,
+            totalPoints = league.pendingRewardPoints,
+            rewardCoins = rewardTier.rewardCoins
+        )
     }
 
-    fun claimComboChallengeReward() {
+    fun claimDailyEventReward() {
         if (isStorePreviewModeActive()) return
-        val freshProgression = gamePreferences.getProgressionState()
-        val challenge = freshProgression.comboChallenge
-        if (!challenge.completed || challenge.claimed) return
+        val stored = progressionForClaim()
+        val event = dailyEventForToday(stored.dailyEvent)
+        if (!event.canClaim) return
 
-        val updatedChallenge = challenge.copy(claimed = true)
+        val claimedEvent = event.copy(claimed = true)
         val updatedProgression = addCoins(
-            progression = freshProgression.copy(comboChallenge = updatedChallenge),
-            coins = challenge.rewardCoins
-        )
+            progression = stored,
+            coins = claimedEvent.rewardCoins
+        ).copy(dailyEvent = claimedEvent)
         saveProgressionAndUpdateState(updatedProgression)
+        logDailyEventEvent(FirebaseEvent.DailyEventRewardClaimed, claimedEvent)
+    }
+
+    /**
+     * Opens the best waiting chest and banks what it paid. The reward is drawn here rather than in
+     * the UI, so [onOpened] always reports the amount that actually reached the wallet. Does
+     * nothing when no chest is waiting.
+     */
+    fun openRewardChest(onOpened: (RewardChestReward) -> Unit = {}) {
+        if (isStorePreviewModeActive()) return
+        val progression = progressionForClaim()
+        val opened = openBestRewardChest(progression.rewardChest) ?: return
+
+        logRewardChestEvent(FirebaseEvent.RewardChestOpened, opened.reward.type)
+        // Season XP is skipped by addSeasonXp when the chest rolled none.
+        val paidProgression = addSeasonXp(
+            addCoins(progression, opened.reward.coins).copy(rewardChest = opened.state),
+            opened.reward.seasonXp
+        )
+        gamePreferences.saveProgressionState(paidProgression)
+        _uiState.update {
+            it.copy(progressionState = paidProgression, rewardChestEarnedThisGame = null)
+        }
+        logRewardChestEvent(
+            event = FirebaseEvent.RewardChestRewardGranted,
+            type = opened.reward.type,
+            rewardCoins = opened.reward.coins,
+            rewardSeasonXp = opened.reward.seasonXp
+        )
+        onOpened(opened.reward)
+    }
+
+    /**
+     * Collects the active starter day. [claimedStarterJourneyDay] is the only place a day is
+     * marked collected, so a double tap cannot pay twice.
+     */
+    fun claimStarterJourneyReward() {
+        if (isStorePreviewModeActive()) return
+        val progression = progressionForClaim()
+        val (claimedJourney, day) = claimedStarterJourneyDay(progression.starterJourney) ?: return
+
+        val rewarded = addCoins(progression, day.rewardCoins).copy(
+            starterJourney = claimedJourney,
+            // Skipped silently when the day carries no chest, or when the stack is already full.
+            rewardChest = day.rewardChest
+                ?.let { grantedRewardChest(progression.rewardChest, it) }
+                ?: progression.rewardChest
+        )
+        saveProgressionAndUpdateState(rewarded)
+        logStarterJourneyEvent(
+            event = FirebaseEvent.StarterRewardClaimed,
+            day = day,
+            rewardCoins = day.rewardCoins
+        )
+        if (rewarded.starterJourney.isCompleted) {
+            logStarterJourneyEvent(FirebaseEvent.StarterJourneyCompleted, day = day)
+        }
+    }
+
+    /** Reported from the rewards tab, so seeing today's event counts once per event. */
+    fun onDailyEventViewed() {
+        if (isStorePreviewModeActive()) return
+        advanceStarterJourney(StarterTask.SeeDailyEvent)
+    }
+
+    /**
+     * The one hook for starter tasks that a finished run cannot prove. Writes straight to storage
+     * rather than through [saveProgressionAndUpdateState], which is what keeps the reward-claim
+     * task from re-entering this function.
+     */
+    private fun advanceStarterJourney(task: StarterTask) {
+        val progression = _uiState.value.progressionState
+        val advance = advanceStarterJourneyForAction(progression.starterJourney, task)
+        if (advance.state == progression.starterJourney) return
+
+        val updated = progression.copy(starterJourney = advance.state)
+        gamePreferences.saveProgressionState(updated)
+        _uiState.update { it.copy(progressionState = updated) }
+        advance.completedTasks.forEach {
+            logStarterJourneyEvent(FirebaseEvent.StarterTaskCompleted, task = it)
+        }
+    }
+
+    fun claimComboChallengeReward() = claimOnce(
+        isClaimable = { it.comboChallenge.completed && !it.comboChallenge.claimed },
+        rewardCoins = { it.comboChallenge.rewardCoins },
+        markClaimed = { it.copy(comboChallenge = it.comboChallenge.copy(claimed = true)) }
+    )
+
+    /**
+     * The one claim path for a reward that is earned once and paid once.
+     *
+     * Reading through [progressionForClaim] rather than the UI state is what makes it idempotent:
+     * a second tap arriving right behind the first already sees `claimed = true` and pays nothing.
+     */
+    private fun claimOnce(
+        isClaimable: (ProgressionState) -> Boolean,
+        rewardCoins: (ProgressionState) -> Int,
+        markClaimed: (ProgressionState) -> ProgressionState
+    ) {
+        if (isStorePreviewModeActive()) return
+        val stored = progressionForClaim()
+        if (!isClaimable(stored)) return
+
+        saveProgressionAndUpdateState(addCoins(markClaimed(stored), rewardCoins(stored)))
+    }
+
+    /**
+     * The authoritative progression to claim against: stored values, plus the run flags the UI may
+     * still be showing.
+     *
+     * Storage is the authority because `SharedPreferences.apply()` publishes to the in-memory map
+     * at once, so a claim always sees one that landed a moment earlier. But storage deliberately
+     * holds none of the "this just happened" flags, so reading it plainly would clear a level-up
+     * popup or the new-badge card while they are on screen — those are carried across instead.
+     */
+    private fun progressionForClaim(): ProgressionState {
+        val onScreen = _uiState.value.progressionState
+        return gamePreferences.getProgressionState().copy(
+            lastModeMasteryLevelUp = onScreen.lastModeMasteryLevelUp,
+            latestUnlockedAchievementIds = onScreen.latestUnlockedAchievementIds,
+            latestUnlockedProfileBadges = onScreen.latestUnlockedProfileBadges,
+            lastLevelUp = onScreen.lastLevelUp
+        )
     }
 
     fun onLeaderboardOpenedForMission() {
         if (isStorePreviewModeActive()) return
+        advanceStarterJourney(StarterTask.OpenLeaderboard)
         advanceDailyChallengeForVisit(DailyChallenge.OpenLeaderboard)
         updateDailyLeaderboardGoalFromSnapshot(_uiState.value.leaderboardSnapshot)
     }
@@ -731,6 +858,24 @@ class GameViewModel internal constructor(
         logNewAchievementUnlocks(updatedProgression)
     }
 
+    /**
+     * Pays the once-a-day share reward after the share sheet actually opened. Returns the coins
+     * granted, or 0 when today's reward is already spent, so the caller can show the message only
+     * when something was paid.
+     */
+    fun onScoreShareCompleted(): Int {
+        if (isStorePreviewModeActive()) return 0
+        if (!gamePreferences.canClaimScoreShareReward()) return 0
+
+        gamePreferences.markScoreShareRewardClaimed()
+        val updatedProgression = addCoins(
+            progression = progressionForClaim(),
+            coins = SCORE_SHARE_REWARD_COINS
+        )
+        saveProgressionAndUpdateState(updatedProgression)
+        return SCORE_SHARE_REWARD_COINS
+    }
+
     fun onInviteShareCompleted() {
         if (isStorePreviewModeActive()) return
         val state = _uiState.value
@@ -741,8 +886,7 @@ class GameViewModel internal constructor(
             progression = state.progressionState,
             coins = INVITE_SHARE_REWARD_COINS
         ).copy(inviteRewardClaimed = true)
-        _uiState.update { it.copy(progressionState = updatedProgression) }
-        gamePreferences.saveProgressionState(updatedProgression)
+        saveProgressionAndUpdateState(updatedProgression)
         FirebaseGameServices.logEvent(
             event = FirebaseEvent.InviteRewardClaimed,
             params = Bundle().apply {
@@ -768,6 +912,7 @@ class GameViewModel internal constructor(
         }
         gamePreferences.saveProgressionState(rewardedProgression)
         gamePreferences.saveDailyRewardClaim(streakDay = rewardedProgression.dailyReward.streakDay)
+        refreshPlayerTitles(rewardedProgression)
         FirebaseGameServices.logEvent(
             event = FirebaseEvent.DailyRewardClaimed,
             params = Bundle().apply {
@@ -802,6 +947,7 @@ class GameViewModel internal constructor(
         }
         gamePreferences.saveProgressionState(updatedProgression)
         logNewAchievementUnlocks(updatedProgression)
+        refreshPlayerTitles(updatedProgression)
         FirebaseGameServices.logEvent(
             event = FirebaseEvent.StreakProtected,
             params = Bundle().apply {
@@ -826,8 +972,35 @@ class GameViewModel internal constructor(
 
     fun selectPlayerTitle(title: PlayerTitle) {
         if (isStorePreviewModeActive()) return
-        gamePreferences.savePlayerTitle(title)
+        val profile = _uiState.value.playerProfile
+        if (title !in profile.unlockedTitles || title == profile.title) return
+
+        gamePreferences.savePlayerTitleState(title, profile.unlockedTitles)
+        _uiState.update { it.copy(playerProfile = it.playerProfile.copy(title = title)) }
+        logPlayerTitleEvent(FirebaseEvent.PlayerTitleSelected, title)
         refreshProfileAndLeaderboard()
+    }
+
+    /** Reported from the profile so opening the list counts once, not once per recomposition. */
+    fun onPlayerTitlesOpened() {
+        if (isStorePreviewModeActive()) return
+        logPlayerTitleEvent(FirebaseEvent.PlayerTitlesOpened)
+    }
+
+    /**
+     * The one hook that awards titles. Called after every progression write and on profile
+     * refresh, so a game, a claim, a purchase and a streak all reach it without each knowing the
+     * rules. Persists and announces only when something actually moved.
+     */
+    private fun refreshPlayerTitles(progression: ProgressionState): List<PlayerTitle> {
+        val result = refreshedPlayerTitles(_uiState.value.playerProfile, progression)
+        if (result.newlyUnlocked.isEmpty() && result.profile == _uiState.value.playerProfile) {
+            return emptyList()
+        }
+        gamePreferences.savePlayerTitleState(result.profile.title, result.profile.unlockedTitles)
+        _uiState.update { it.copy(playerProfile = result.profile) }
+        result.newlyUnlocked.forEach { logPlayerTitleEvent(FirebaseEvent.PlayerTitleUnlocked, it) }
+        return result.newlyUnlocked
     }
 
     fun selectProfileBadge(badge: ProfileBadge) {
@@ -863,14 +1036,14 @@ class GameViewModel internal constructor(
 
     fun claimAchievementReward(achievementId: String) {
         if (isStorePreviewModeActive()) return
-        val state = _uiState.value
-        val achievement = state.progressionState.achievements.firstOrNull { it.id == achievementId }
+        val stored = progressionForClaim()
+        val achievement = stored.achievements.firstOrNull { it.id == achievementId }
         if (achievement == null || !achievement.unlocked || achievement.claimed) return
 
-        val updatedAchievements = state.progressionState.achievements.map {
+        val updatedAchievements = stored.achievements.map {
             if (it.id == achievementId) it.copy(claimed = true) else it
         }
-        val rewardProgression = addCoins(state.progressionState, achievement.rewardCoins).copy(
+        val rewardProgression = addCoins(stored, achievement.rewardCoins).copy(
             achievements = updatedAchievements,
             latestUnlockedAchievementIds = emptyList()
         )
@@ -878,8 +1051,7 @@ class GameViewModel internal constructor(
             addXpWithLevelRewards(rewardProgression, achievement.rewardXp),
             SEASON_XP_ACHIEVEMENT_CLAIM
         )
-        _uiState.update { it.copy(progressionState = updatedProgression) }
-        gamePreferences.saveProgressionState(updatedProgression)
+        saveProgressionAndUpdateState(updatedProgression)
         FirebaseGameServices.logEvent(
             event = FirebaseEvent.AchievementClaimed,
             params = Bundle().apply {
@@ -891,8 +1063,8 @@ class GameViewModel internal constructor(
 
     fun claimSeasonReward(level: Int) {
         if (isStorePreviewModeActive()) return
-        val state = _uiState.value
-        val season = state.progressionState.season
+        val stored = progressionForClaim()
+        val season = stored.season
         if (level !in 1..SeasonMaxLevel || level > season.level || level in season.claimedRewardLevels) return
 
         val reward = seasonRewardForLevel(level, season.claimedRewardLevels)
@@ -900,14 +1072,13 @@ class GameViewModel internal constructor(
             reward.kind == SeasonRewardKind.NeonAvatar ||
             reward.kind == SeasonRewardKind.GoldFrame ||
             reward.kind == SeasonRewardKind.LeaderboardBadge
-        val updatedProgression = addCoins(state.progressionState, reward.coinReward).copy(
+        val updatedProgression = addCoins(stored, reward.coinReward).copy(
             season = season.copy(
                 claimedRewardLevels = season.claimedRewardLevels + level,
                 preservedBadgeLevels = if (badgeReward) season.preservedBadgeLevels + level else season.preservedBadgeLevels
             )
         )
-        _uiState.update { it.copy(progressionState = updatedProgression) }
-        gamePreferences.saveProgressionState(updatedProgression)
+        saveProgressionAndUpdateState(updatedProgression)
     }
 
     fun activateSeasonXpBoost() {
@@ -923,17 +1094,16 @@ class GameViewModel internal constructor(
 
     fun claimSeasonMission(missionId: String) {
         if (isStorePreviewModeActive()) return
-        val state = _uiState.value
-        val season = seasonForToday(state.progressionState.season)
+        val stored = progressionForClaim()
+        val season = seasonForToday(stored.season)
         val mission = season.missions.firstOrNull { it.id == missionId } ?: return
         if (!mission.completed || mission.claimed) return
 
-        val claimedProgression = state.progressionState.copy(
+        val claimedProgression = stored.copy(
             season = season.copy(claimedMissionIds = season.claimedMissionIds + mission.id)
         )
         val updatedProgression = addSeasonXp(claimedProgression, mission.rewardSeasonXp)
-        _uiState.update { it.copy(progressionState = updatedProgression) }
-        gamePreferences.saveProgressionState(updatedProgression)
+        saveProgressionAndUpdateState(updatedProgression)
     }
 
     fun buyTheme(theme: PlayerTheme) {
@@ -969,6 +1139,7 @@ class GameViewModel internal constructor(
         )
         gamePreferences.saveProgressionState(updatedProgression)
         logNewAchievementUnlocks(updatedProgression)
+        refreshPlayerTitles(updatedProgression)
     }
 
     fun tryThemeForOneGame(theme: PlayerTheme) {
@@ -1038,9 +1209,132 @@ class GameViewModel internal constructor(
     fun onInterstitialAdRequestHandled(wasShown: Boolean) {
         if (isStorePreviewModeActive()) return
         if (wasShown) {
-            lastInterstitialShownElapsedMillis = SystemClock.elapsedRealtime()
+            adPacingState = adPacingState.copy(
+                lastInterstitialElapsedMillis = SystemClock.elapsedRealtime()
+            )
         }
+        logAdPacingEvent(
+            event = if (wasShown) {
+                FirebaseEvent.InterstitialShown
+            } else {
+                FirebaseEvent.InterstitialFailed
+            }
+        )
         _uiState.update { it.copy(shouldRequestInterstitialAd = false) }
+    }
+
+    /** Interstitial pacing telemetry. Never carries anything about the player. */
+    private fun logAdPacingEvent(event: FirebaseEvent, reason: String? = null) {
+        logRewardedOfferEvent(
+            event = event,
+            source = "game_over",
+            reason = reason,
+            isPremium = premiumState().grants(PremiumFeature.NoInterstitials)
+        )
+    }
+
+    /** Read through the repository each time, so a future billing client needs no cache here. */
+    private fun premiumState(): PremiumState = premiumRepository.premiumState()
+
+    /**
+     * Nothing writes an entitlement in this build; the card says "coming soon" and this only
+     * records that the player looked at it.
+     */
+    fun onPremiumCardClicked() {
+        if (isStorePreviewModeActive()) return
+        logRewardedOfferEvent(
+            event = FirebaseEvent.PremiumComingSoonClicked,
+            source = "bonuses",
+            isPremium = premiumState().isPremiumUser
+        )
+    }
+
+    /**
+     * Everything the Bonuses section makes observable, reported in one place: that it was opened,
+     * what the premium card said, and the state each offer was in when the player saw it.
+     */
+    fun onBonusesOpened(offers: List<RewardedOfferState>) {
+        if (isStorePreviewModeActive()) return
+        val isPremium = premiumState().grants(PremiumFeature.NoInterstitials)
+        listOf(
+            FirebaseEvent.BonusesOpened,
+            FirebaseEvent.PremiumCardViewed,
+            FirebaseEvent.NoAdsStateChecked
+        ).forEach { event ->
+            logRewardedOfferEvent(event = event, source = "rewards_tab", isPremium = isPremium)
+        }
+        offers.forEach { offer ->
+            logRewardedOfferEvent(
+                event = FirebaseEvent.RewardedOfferViewed,
+                type = offer.type,
+                reason = offer.availability.name,
+                isPremium = isPremium
+            )
+            when (offer.availability) {
+                RewardedOfferAvailability.Available ->
+                    logRewardedOfferEvent(FirebaseEvent.RewardedOfferAdLoaded, offer.type)
+                RewardedOfferAvailability.AdNotReady ->
+                    logRewardedOfferEvent(FirebaseEvent.RewardedOfferAdFailed, offer.type)
+                else -> Unit
+            }
+        }
+    }
+
+    /**
+     * Grants a Bonuses offer by handing off to the reward handler that already owned it. Nothing
+     * is paid here: each handler keeps its own duplicate-callback guard and its own daily limit,
+     * so this cannot pay twice or bypass a cap.
+     */
+    fun onRewardedOfferEarned(type: RewardedOfferType) {
+        if (isStorePreviewModeActive()) return
+        logRewardedOfferEvent(
+            event = FirebaseEvent.RewardedOfferCompleted,
+            type = type,
+            source = type.surface.name
+        )
+        val coinsBefore = _uiState.value.progressionState.coins
+        when (type.action) {
+            RewardedAction.CoinChest -> onCoinChestRewardEarned()
+            RewardedAction.ShopCoinReward -> onShopCoinRewardEarned()
+            RewardedAction.ProtectStreak -> protectDailyRewardStreak()
+            RewardedAction.Continue -> onRewardContinueEarned()
+            RewardedAction.DoubleCoins -> onDoubleCoinsRewardEarned()
+            else -> return
+        }
+        val granted = _uiState.value.progressionState.coins - coinsBefore
+        logRewardedOfferEvent(
+            event = FirebaseEvent.RewardedOfferRewardGranted,
+            type = type,
+            rewardCoins = granted.coerceAtLeast(0),
+            source = type.surface.name
+        )
+        if (granted > 0) {
+            logRewardedOfferEvent(
+                event = FirebaseEvent.DailyBonusClaimed,
+                type = type,
+                rewardCoins = granted
+            )
+        }
+    }
+
+    /** Reported when the player taps an offer whose daily chances are already spent. */
+    fun onBonusOfferBlocked(type: RewardedOfferType) {
+        if (isStorePreviewModeActive()) return
+        logRewardedOfferEvent(
+            event = FirebaseEvent.BonusLimitReached,
+            type = type,
+            source = "bonuses"
+        )
+    }
+
+    /** Reported when the player chooses to watch, before any ad is requested. */
+    fun onRewardedOfferClicked(type: RewardedOfferType) {
+        if (isStorePreviewModeActive()) return
+        logRewardedOfferEvent(
+            event = FirebaseEvent.RewardedOfferClicked,
+            type = type,
+            source = type.surface.name
+        )
     }
 
     private fun isStorePreviewModeActive(): Boolean {
@@ -1061,8 +1355,14 @@ class GameViewModel internal constructor(
     }
 
     private fun saveProgressionAndUpdateState(progression: ProgressionState) {
+        // Every reward collected outside a run passes through here and raises the lifetime total;
+        // a finished game persists on its own path, so this cannot fire for gameplay coins.
+        val collectedReward = progression.totalCoinsEarned >
+            _uiState.value.progressionState.totalCoinsEarned
         gamePreferences.saveProgressionState(progression)
         _uiState.update { it.copy(progressionState = progression) }
+        refreshPlayerTitles(progression)
+        if (collectedReward) advanceStarterJourney(StarterTask.ClaimAnyReward)
     }
 
     private fun saveRewardedProgressionAndLog(progression: ProgressionState) {
@@ -1439,6 +1739,9 @@ class GameViewModel internal constructor(
             maxCombo = if (boost == GameBoost.ComboStart) 5 else initialState.maxCombo,
             earnedCoinsThisGame = 0,
             baseCoinsThisGame = 0,
+            rewardChestEarnedThisGame = null,
+            newPlayerTitlesThisGame = emptyList(),
+            starterTaskCompletedThisGame = false,
             isCoinDoubleClaimed = false,
             oneMoreGameBonusEarnedThisGame = 0,
             hasGameStarted = true,
@@ -1598,18 +1901,14 @@ class GameViewModel internal constructor(
         reasonRes: Int? = _uiState.value.gameOverReasonRes
     ) {
         cancelGameplayJobs()
-        completedGameCount += 1
         val stateBeforeFinish = _uiState.value
         val gameDurationMillis = (SystemClock.elapsedRealtime() - gameStartedElapsedMillis).coerceAtLeast(0L)
-        val shouldRequestInterstitialAd = shouldRequestInterstitialAfterGame(
+        val shouldRequestInterstitialAd = decideInterstitialAfterGame(
             score = stateBeforeFinish.score,
             bestScore = stateBeforeFinish.bestScore,
             isNewBestScore = stateBeforeFinish.isNewBestScore,
             gameDurationMillis = gameDurationMillis
         )
-        if (shouldRequestInterstitialAd) {
-            nextInterstitialGameCount = completedGameCount + randomInterstitialInterval()
-        }
 
         val previousModeBestScore = stateBeforeFinish.bestScoresByMode[stateBeforeFinish.selectedMode] ?: 0
         val previousDailyChallenge = stateBeforeFinish.dailyChallengeState
@@ -1716,6 +2015,23 @@ class GameViewModel internal constructor(
                     rewards.firstTargetBonusCoins > 0
             )
             val trialAwareProgression = consumeTrialThemeGame(updatedProgression)
+            // Derived by comparing both sides of the run. The "before" side is rolled to the
+            // current week first, so a week that turned over mid-session reads as a clean 0.
+            val leagueBefore = weeklyLeagueForWeek(progressionBeforeGame.weeklyLeague)
+            val leagueAfter = trialAwareProgression.weeklyLeague
+            val leaguePointsGained = (leagueAfter.points - leagueBefore.points).coerceAtLeast(0)
+            val leagueTierUpgrade = leagueAfter.tier.takeIf { it.ordinal > leagueBefore.tier.ordinal }
+            // A run awards at most one chest, so a longer pending list means this run earned the
+            // last entry. Nothing is dropped at the cap, so the two can never disagree.
+            val chestBefore = progressionBeforeGame.rewardChest.pendingCount
+            val chestAfter = trialAwareProgression.rewardChest
+            val chestEarnedThisGame = chestAfter.pendingChests.lastOrNull()
+                ?.takeIf { chestAfter.pendingCount > chestBefore }
+            val starterBefore = progressionBeforeGame.starterJourney
+            val starterAfter = trialAwareProgression.starterJourney
+            val starterTaskCompleted = StarterTask.entries.any {
+                starterAfter.isTaskCompleted(it) && !starterBefore.isTaskCompleted(it)
+            }
             val newlyUnlockedBadges = unlockedProfileBadges(trialAwareProgression) - unlockedBadgesBeforeGame
             val updatedBestScores = if (isNewModeBest) {
                 state.bestScoresByMode + (state.selectedMode to finalScore)
@@ -1757,6 +2073,10 @@ class GameViewModel internal constructor(
                 isPowerUpConsumed = false,
                 baseCoinsThisGame = rewards.baseCoins,
                 earnedCoinsThisGame = rewards.totalCoins,
+                leaguePointsEarnedThisGame = leaguePointsGained,
+                leagueUpgradedTo = leagueTierUpgrade,
+                rewardChestEarnedThisGame = chestEarnedThisGame,
+                starterTaskCompletedThisGame = starterTaskCompleted,
                 isCoinDoubleClaimed = false,
                 oneMoreGameBonusEarnedThisGame = rewards.oneMoreBonusCoins,
                 canContinueWithReward = !state.hasUsedRewardContinue,
@@ -1785,6 +2105,7 @@ class GameViewModel internal constructor(
             dailyMiniTournament = progressionFromStorage.dailyMiniTournament,
             season = progressionFromStorage.season,
             oneMoreGameBonus = progressionFromStorage.oneMoreGameBonus,
+            starterJourney = progressionFromStorage.starterJourney,
             firstTargetBonusClaimed = progressionFromStorage.firstTargetBonusClaimed,
             inviteRewardClaimed = progressionFromStorage.inviteRewardClaimed
         )
@@ -1867,6 +2188,11 @@ class GameViewModel internal constructor(
         gamePreferences.saveDailyChallengeState(finalState.dailyChallengeState)
         gamePreferences.saveProgressionState(finalState.progressionState)
         logNewAchievementUnlocks(finalState.progressionState)
+        // After the save, so the titles are judged on exactly the progression that was stored.
+        val newTitles = refreshPlayerTitles(finalState.progressionState)
+        if (newTitles.isNotEmpty()) {
+            _uiState.update { it.copy(newPlayerTitlesThisGame = newTitles) }
+        }
         logChallengeCompletedIfNeeded(
             previous = previousDailyChallenge,
             updated = finalState.dailyChallengeState
@@ -1920,6 +2246,7 @@ class GameViewModel internal constructor(
     ): GameUiState {
         val progression = gamePreferences.getProgressionState()
         val playerProfile = gamePreferences.getPlayerProfile()
+        val premium = premiumRepository.premiumState()
         val activeColor = if (mode == GameMode.ColorReflex) {
             targetEngine.randomTargetColor()
         } else {
@@ -1951,6 +2278,7 @@ class GameViewModel internal constructor(
             dailyChallengeState = gamePreferences.getDailyChallengeState(),
             progressionState = progression,
             playerProfile = playerProfile,
+            premiumState = premium,
             leaderboardSnapshot = createLeaderboardSnapshot(
                 profile = playerProfile,
                 progression = progression,
@@ -2269,6 +2597,79 @@ class GameViewModel internal constructor(
                 tournament
             }
         }
+        val dailyEventAdvance = advanceDailyEventAfterGame(
+            state = progression.dailyEvent,
+            mode = mode,
+            score = score,
+            maxCombo = maxCombo,
+            accuracyPercent = accuracyPercent,
+            bossRoundHits = bossRoundHits,
+            ultraMomentHits = ultraMomentHits,
+            maxFlawlessStreak = maxFlawlessStreak,
+            usedNonDefaultCosmetic = progression.activeTheme != PlayerTheme.NeonRed ||
+                progression.selectedTargetSkin != TargetSkin.ClassicTarget
+        )
+        if (dailyEventAdvance.gainedProgress > 0) {
+            logDailyEventEvent(
+                event = if (dailyEventAdvance.justCompleted) {
+                    FirebaseEvent.DailyEventCompleted
+                } else {
+                    FirebaseEvent.DailyEventProgress
+                },
+                state = dailyEventAdvance.state
+            )
+        }
+        val leagueAdvance = advanceWeeklyLeagueAfterGame(
+            state = progression.weeklyLeague,
+            score = score,
+            maxCombo = maxCombo,
+            accuracyPercent = accuracyPercent,
+            isNewBestScore = isNewBestScore,
+            dailyEventCompleted = dailyEventAdvance.justCompleted
+        )
+        if (leagueAdvance.earnedPoints > 0) {
+            logWeeklyLeagueEvent(
+                event = FirebaseEvent.WeeklyLeaguePointsEarned,
+                tier = leagueAdvance.state.tier,
+                totalPoints = leagueAdvance.state.points,
+                earnedPoints = leagueAdvance.earnedPoints
+            )
+        }
+        leagueAdvance.upgradedTo?.let { tier ->
+            logWeeklyLeagueEvent(
+                event = FirebaseEvent.WeeklyLeagueUpgraded,
+                tier = tier,
+                totalPoints = leagueAdvance.state.points
+            )
+        }
+        val chestEarn = earnRewardChestAfterGame(
+            state = progression.rewardChest,
+            dailyEventJustCompleted = dailyEventAdvance.justCompleted,
+            weeklyGoalJustCompleted = weeklyGoalBoard.goals.any { it.rewardClaimedThisGame } ||
+                weeklyGoalBoard.bonusUnlockedThisGame,
+            isNewBestScore = isNewBestScore
+        )
+        chestEarn.earnedChest?.let { chest ->
+            logRewardChestEvent(
+                event = FirebaseEvent.RewardChestEarned,
+                type = chest,
+                source = chestEarn.source
+            )
+        }
+        val starterAdvance = advanceStarterJourneyAfterGame(
+            state = progression.starterJourney,
+            score = score,
+            maxCombo = maxCombo
+        )
+        if (starterAdvance.state != progression.starterJourney) {
+            logStarterJourneyEvent(
+                event = FirebaseEvent.StarterTaskProgressed,
+                day = starterAdvance.state.activeDay
+            )
+            starterAdvance.completedTasks.forEach { task ->
+                logStarterJourneyEvent(FirebaseEvent.StarterTaskCompleted, task = task)
+            }
+        }
         val seasonWithQuestProgress = advanceSeasonQuestsAfterGame(
             season = progression.season,
             score = score,
@@ -2284,6 +2685,12 @@ class GameViewModel internal constructor(
             progression,
             earnedCoins + masteryResult.coinBonus + weeklyGoalBoard.totalRewardCoins + seasonQuestRewardCoins
         ).copy(
+            dailyEvent = dailyEventAdvance.state,
+            weeklyLeague = leagueAdvance.state,
+            rewardChest = chestEarn.state,
+            starterJourney = starterAdvance.state,
+            neonLeagueBadgeUnlocked = progression.neonLeagueBadgeUnlocked ||
+                leagueAdvance.state.tier == LeagueTier.Neon,
             totalGames = nextTotalGames,
             totalScore = nextTotalScore,
             gamesPlayedByMode = nextGamesPlayedByMode,
@@ -2345,7 +2752,9 @@ class GameViewModel internal constructor(
     }
 
     private fun recordRewardedAdWatched(progression: ProgressionState): ProgressionState {
-        lastRewardedAdElapsedMillis = SystemClock.elapsedRealtime()
+        adPacingState = adPacingState.copy(
+            lastRewardedElapsedMillis = SystemClock.elapsedRealtime()
+        )
         return addSeasonXp(updateAchievementProgress(
             addXpWithLevelRewards(
                 progression.copy(
@@ -2473,7 +2882,13 @@ class GameViewModel internal constructor(
     }
 
     private fun refreshProfileAndLeaderboard(showLoading: Boolean = false) {
-        val profile = gamePreferences.getPlayerProfile()
+        val storedProfile = gamePreferences.getPlayerProfile()
+        val titles = refreshedPlayerTitles(storedProfile, _uiState.value.progressionState)
+        val profile = titles.profile
+        if (profile != storedProfile) {
+            gamePreferences.savePlayerTitleState(profile.title, profile.unlockedTitles)
+            titles.newlyUnlocked.forEach { logPlayerTitleEvent(FirebaseEvent.PlayerTitleUnlocked, it) }
+        }
         _uiState.update {
             it.copy(
                 playerProfile = profile,
@@ -2508,7 +2923,16 @@ class GameViewModel internal constructor(
             selectedMode = mode,
             selectedPeriod = selectedLeaderboardPeriod,
             refreshTick = leaderboardRefreshTick
-        )
+        ).withPlayerTitle(profile.activeTitle)
+    }
+
+    /**
+     * Stamps the active title onto the player's own row after the board is built. The repository
+     * and the uploaded score model never learn about titles, so the board itself is unchanged.
+     */
+    private fun LeaderboardSnapshot.withPlayerTitle(title: PlayerTitle?): LeaderboardSnapshot {
+        if (title == null || entries.none { it.isPlayer }) return this
+        return copy(entries = entries.map { if (it.isPlayer) it.copy(title = title) else it })
     }
 
     private fun loadRemoteLeaderboard(showLoading: Boolean) {
@@ -2530,7 +2954,7 @@ class GameViewModel internal constructor(
                 selectedMode = mode,
                 selectedPeriod = selectedLeaderboardPeriod,
                 refreshTick = leaderboardRefreshTick
-            ).copy(isLoading = false)
+            ).copy(isLoading = false).withPlayerTitle(profile.activeTitle)
 
             val currentState = _uiState.value
             val updatedProgression = updateDailyLeaderboardGoalFromSnapshot(
@@ -2550,28 +2974,45 @@ class GameViewModel internal constructor(
         }
     }
 
-    private fun shouldRequestInterstitialAfterGame(
+    /**
+     * Counts the run, asks [AdPacingManager] for a verdict and records what it decided. The rules
+     * themselves live in the manager; this only owns the state they read.
+     */
+    private fun decideInterstitialAfterGame(
         score: Int,
         bestScore: Int,
         isNewBestScore: Boolean,
         gameDurationMillis: Long
     ): Boolean {
-        val now = SystemClock.elapsedRealtime()
-        val cooldownPassed = lastInterstitialShownElapsedMillis == 0L ||
-            now - lastInterstitialShownElapsedMillis >= adConfig.interstitialCooldownMillis
-        val rewardedCooldownPassed = lastRewardedAdElapsedMillis == 0L ||
-            now - lastRewardedAdElapsedMillis >= adConfig.interstitialCooldownMillis
-        val isShortGame = gameDurationMillis < adConfig.shortGameThresholdMillis ||
-            score <= adConfig.shortGameScoreThreshold
-        val isHighValueRun = isNewBestScore ||
-            (bestScore > 0 && score >= (bestScore * adConfig.highScoreDelayRatio).toInt())
-
-        return completedGameCount > adConfig.firstInterstitialFreeGames &&
-            completedGameCount >= nextInterstitialGameCount &&
-            cooldownPassed &&
-            rewardedCooldownPassed &&
-            !isShortGame &&
-            !isHighValueRun
+        adPacingState = adPacingState.copy(completedGames = adPacingState.completedGames + 1)
+        val decision = AdPacingManager.interstitialDecision(
+            state = adPacingState,
+            config = adConfig,
+            score = score,
+            bestScore = bestScore,
+            isNewBestScore = isNewBestScore,
+            gameDurationMillis = gameDurationMillis,
+            hasNoAdsEntitlement = premiumState().grants(PremiumFeature.NoInterstitials),
+            nowElapsedMillis = SystemClock.elapsedRealtime()
+        )
+        if (decision.eligible) {
+            adPacingState = adPacingState.copy(
+                nextInterstitialGame = AdPacingManager.nextInterstitialGame(
+                    completedGames = adPacingState.completedGames,
+                    config = adConfig
+                )
+            )
+        }
+        gamePreferences.saveAdPacingState(adPacingState)
+        logAdPacingEvent(
+            event = if (decision.eligible) {
+                FirebaseEvent.InterstitialEligible
+            } else {
+                FirebaseEvent.InterstitialSkippedByPacing
+            },
+            reason = decision.skipReason?.storageKey
+        )
+        return decision.eligible
     }
 
     private fun applyDailyReward(
@@ -2645,13 +3086,6 @@ class GameViewModel internal constructor(
         }
         // No startModeJobs() here: it would cancel the colour-rule loop that is calling this.
         startTargetTimeout()
-    }
-
-    private fun randomInterstitialInterval(): Int {
-        return Random.nextInt(
-            from = adConfig.interstitialMinGameInterval,
-            until = adConfig.interstitialMaxGameInterval + 1
-        )
     }
 
     override fun onCleared() {

@@ -1,5 +1,7 @@
 package com.reflex.tr.game.ibrh.ui.game
 
+import androidx.compose.runtime.Immutable
+
 internal fun advanceDailyChallengeForHit(
     state: DailyChallengeState,
     mode: GameMode,
@@ -128,4 +130,31 @@ internal fun updateAchievementProgress(
 
 internal fun calculateProgressionLevel(xp: Int): Int {
     return (xp / XP_PER_LEVEL + 1).coerceAtLeast(1)
+}
+
+/**
+ * Where the player sits inside their current level.
+ *
+ * The profile bar used to work this out inline with the level size written out three times as a
+ * literal, which meant retuning [XP_PER_LEVEL] would silently leave the bar reading wrong.
+ */
+@Immutable
+internal data class LevelProgress(
+    val currentLevelXp: Int,
+    val nextLevelXp: Int,
+    val remainingXp: Int,
+    val fraction: Float
+)
+
+internal fun levelProgressFor(level: Int, xp: Int): LevelProgress {
+    val safeLevel = level.coerceAtLeast(1)
+    val safeXp = xp.coerceAtLeast(0)
+    val currentLevelXp = (safeLevel - 1) * XP_PER_LEVEL
+    val nextLevelXp = safeLevel * XP_PER_LEVEL
+    return LevelProgress(
+        currentLevelXp = currentLevelXp,
+        nextLevelXp = nextLevelXp,
+        remainingXp = (nextLevelXp - safeXp).coerceAtLeast(0),
+        fraction = ((safeXp - currentLevelXp).toFloat() / XP_PER_LEVEL).coerceIn(0f, 1f)
+    )
 }

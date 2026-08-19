@@ -258,7 +258,7 @@ private fun CollectionSkinRow(
     unlocked: Boolean,
     currentCoins: Int
 ) {
-    val accent = collectionSkinAccent(skin)
+    val accent = targetSkinAccent(skin)
     CollectionItemRow(
         name = stringResource(skin.titleRes),
         price = skin.coinPrice,
@@ -411,14 +411,4 @@ private fun CollectionSkinPreview(
 
 private fun collectionThemeAccent(theme: PlayerTheme): Color {
     return themeVisualSpec(theme).primary
-}
-
-private fun collectionSkinAccent(skin: TargetSkin): Color {
-    return when (skin) {
-        TargetSkin.ClassicTarget -> ArcadeGold
-        TargetSkin.NeonRing -> Color(0xFF41F2FF)
-        TargetSkin.CyberDot -> Color(0xFF9F7BFF)
-        TargetSkin.FireCore -> Color(0xFFFF6B3D)
-        TargetSkin.MatrixOrb -> Color(0xFF49FF91)
-    }
 }

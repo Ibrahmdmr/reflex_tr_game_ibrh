@@ -4,6 +4,10 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
+/**
+ * @property title filled in locally for the player's own row only. The board is never asked to
+ * carry a title, so nothing about the stored or uploaded score model changes.
+ */
 @Immutable
 data class LeaderboardEntry(
     val rank: Int,
@@ -11,15 +15,9 @@ data class LeaderboardEntry(
     val score: Int,
     val theme: PlayerTheme = PlayerTheme.NeonRed,
     val rankTier: RankTier = RankTier.Bronze,
-    val isPlayer: Boolean = false
+    val isPlayer: Boolean = false,
+    val title: PlayerTitle? = null
 )
-
-enum class PlayerTitle(@StringRes val titleRes: Int) {
-    ReflexHunter(R.string.player_title_reflex_hunter),
-    ComboMaster(R.string.player_title_combo_master),
-    NeonLegend(R.string.player_title_neon_legend),
-    TargetKing(R.string.player_title_target_king)
-}
 
 enum class RankTier(@StringRes val titleRes: Int) {
     Bronze(R.string.rank_bronze),
@@ -33,13 +31,24 @@ enum class RankTier(@StringRes val titleRes: Int) {
 @Immutable
 data class PlayerProfile(
     val name: String = "",
-    val title: PlayerTitle = PlayerTitle.ReflexHunter,
+    val title: PlayerTitle? = null,
+    val unlockedTitles: Set<PlayerTitle> = emptySet(),
     val weeklyBestScore: Int = 0,
     val weeklyBestScoresByMode: Map<GameMode, Int> = GameMode.entries.associateWith { 0 },
     val hasCompletedNamePrompt: Boolean = false
 ) {
     val hasName: Boolean
         get() = name.isNotBlank()
+
+    /**
+     * Null until a title is both earned and chosen. Reading through this rather than [title]
+     * keeps a stored title the player no longer owns off the screen.
+     */
+    val activeTitle: PlayerTitle?
+        get() = title?.takeIf { it in unlockedTitles }
+
+    val unlockedTitleCount: Int
+        get() = unlockedTitles.size
 }
 
 enum class LeaderboardPeriod {

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -28,8 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
-import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
-import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
@@ -100,16 +97,12 @@ internal fun PlayTabContent(
     selectedMode: GameMode,
     dailyFeaturedMode: DailyFeaturedModeState,
     dailyChallengeState: DailyChallengeState,
-    rewardedAdUiState: RewardedAdUiState,
     progressionState: ProgressionState,
     isOnboardingCompleted: Boolean,
     onModeStartClick: (GameMode) -> Unit,
     onHowToPlayClick: () -> Unit,
-    onDailyStreakProtect: () -> Unit,
-    onDailyRewardCardClick: () -> Unit,
-    onSuggestionTabClick: (HomeTab) -> Unit,
-    onDailyChallengeClaim: () -> Unit,
-    onDailyChallengeDoubleRewardClick: () -> Unit
+    onStarterRewardClaim: () -> Unit,
+    onSuggestionTabClick: (HomeTab) -> Unit
 ) {
     Text(
         text = stringResource(R.string.game_tagline),
@@ -129,12 +122,20 @@ internal fun PlayTabContent(
         selectedMode = selectedMode,
         onModeStartClick = onModeStartClick
     )
-    NextGoalSuggestionCard(
-        bestScore = bestScore,
-        progressionState = progressionState,
-        dailyChallengeState = dailyChallengeState,
-        onDailyRewardClick = onDailyRewardCardClick,
-        onTabClick = onSuggestionTabClick
+    // Above the quest hub for the opening days only: while it is showing it *is* the agenda.
+    if (progressionState.starterJourney.isActive) {
+        StarterJourneyCard(
+            state = progressionState.starterJourney,
+            onClaimClick = onStarterRewardClaim
+        )
+    }
+    val recommendation = questHubRecommendation(progressionState, dailyChallengeState)
+    QuestHubCard(
+        summary = questHubRewardSummary(progressionState, dailyChallengeState),
+        recommendation = recommendation,
+        dailyEvent = progressionState.dailyEvent,
+        weeklyLeague = progressionState.weeklyLeague,
+        onOpenClick = { onSuggestionTabClick(recommendation.targetTab) }
     )
     if (isOnboardingCompleted && !progressionState.firstTargetBonusClaimed) {
         FirstTargetCard()
@@ -151,194 +152,6 @@ internal fun PlayTabContent(
     HowToPlayEntryCard(onClick = onHowToPlayClick)
 }
 
-@Composable
-private fun NextGoalSuggestionCard(
-    bestScore: Int,
-    progressionState: ProgressionState,
-    dailyChallengeState: DailyChallengeState,
-    onDailyRewardClick: () -> Unit,
-    onTabClick: (HomeTab) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val suggestion = nextGoalSuggestion(
-        bestScore = bestScore,
-        progressionState = progressionState,
-        dailyChallengeState = dailyChallengeState,
-        onDailyRewardClick = onDailyRewardClick,
-        onTabClick = onTabClick
-    )
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(PremiumCardRadius),
-        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.32f))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(ArcadeBlue.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "→",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ArcadeGold
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = stringResource(suggestion.titleRes),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(suggestion.descriptionRes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReflexGamePalette.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            // Bounded width so the suggestion title and description keep their column.
-            SecondaryGameButton(
-                modifier = Modifier.widthIn(min = 96.dp, max = 124.dp),
-                text = stringResource(suggestion.buttonRes),
-                onClick = suggestion.onClick
-            )
-        }
-    }
-}
-
-private data class NextGoalSuggestion(
-    val titleRes: Int,
-    val descriptionRes: Int,
-    val buttonRes: Int,
-    val onClick: () -> Unit
-)
-
-private fun nextGoalSuggestion(
-    bestScore: Int,
-    progressionState: ProgressionState,
-    dailyChallengeState: DailyChallengeState,
-    onDailyRewardClick: () -> Unit,
-    onTabClick: (HomeTab) -> Unit
-): NextGoalSuggestion {
-    val currentCoins = progressionState.coins.coerceAtLeast(0)
-    val nearestLockedTheme = PlayerTheme.entries
-        .filter { it.coinPrice > 0 && it !in progressionState.unlockedThemes }
-        .minByOrNull { it.coinPrice }
-    val canBuyTheme = nearestLockedTheme?.let { currentCoins >= it.coinPrice } == true
-    val canClaimSeasonReward = progressionState.season.hasClaimableReward
-
-    return when {
-        progressionState.dailyReward.canClaim -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_daily_reward_title,
-            descriptionRes = R.string.next_goal_daily_reward_description,
-            buttonRes = R.string.next_goal_daily_reward_button,
-            onClick = onDailyRewardClick
-        )
-        canClaimSeasonReward -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_season_reward_title,
-            descriptionRes = R.string.next_goal_season_reward_description,
-            buttonRes = R.string.next_goal_season_reward_button,
-            onClick = { onTabClick(HomeTab.Season) }
-        )
-        !dailyChallengeState.completed -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_daily_mission_title,
-            descriptionRes = R.string.next_goal_daily_mission_description,
-            buttonRes = R.string.next_goal_daily_mission_button,
-            onClick = { onTabClick(HomeTab.Missions) }
-        )
-        canBuyTheme -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_unlock_theme_title,
-            descriptionRes = R.string.next_goal_unlock_theme_description,
-            buttonRes = R.string.next_goal_unlock_theme_button,
-            onClick = { onTabClick(HomeTab.Shop) }
-        )
-        bestScore < 20 || !progressionState.dailyLeaderboardGoal.claimed -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_leaderboard_title,
-            descriptionRes = R.string.next_goal_leaderboard_description,
-            buttonRes = R.string.next_goal_leaderboard_button,
-            onClick = { onTabClick(HomeTab.Leaderboard) }
-        )
-        nearestLockedTheme != null && currentCoins < nearestLockedTheme.coinPrice -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_coin_title,
-            descriptionRes = R.string.next_goal_coin_description,
-            buttonRes = R.string.next_goal_coin_button,
-            onClick = { onTabClick(HomeTab.Shop) }
-        )
-        else -> NextGoalSuggestion(
-            titleRes = R.string.next_goal_daily_mission_title,
-            descriptionRes = R.string.next_goal_daily_mission_description,
-            buttonRes = R.string.next_goal_daily_mission_button,
-            onClick = { onTabClick(HomeTab.Missions) }
-        )
-    }
-}
-
-@Composable
-internal fun FirstTargetCard(
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = ReflexGamePalette.cardGlassStrong,
-        shape = RoundedCornerShape(PremiumCardRadius),
-        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(ArcadeGold.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "★",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ArcadeGold,
-                    maxLines = 1
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.first_target_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = ReflexGamePalette.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(R.string.first_target_description, FirstTargetBonusCoins),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ReflexGamePalette.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
 
 @Composable
 internal fun DailyModeCard(
@@ -392,13 +205,36 @@ internal fun DailyModeCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.daily_mode_title),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = accent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // The bonus badge shares this line instead of the one below: beside a
+                    // ~150dp chip the mode title had too little room and clipped mid-word.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.daily_mode_title),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Surface(
+                            color = accent.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(PremiumPillRadius),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.42f))
+                        ) {
+                            Text(
+                                text = stringResource(R.string.daily_mode_bonus, state.coinBonusPercent),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ReflexGamePalette.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                     Text(
                         text = stringResource(state.mode.titleRes),
                         style = MaterialTheme.typography.titleMedium,
@@ -418,21 +254,6 @@ internal fun DailyModeCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = accent,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Surface(
-                    color = accent.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(PremiumPillRadius),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.42f))
-                ) {
-                    Text(
-                        text = stringResource(R.string.daily_mode_bonus, state.coinBonusPercent),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = ReflexGamePalette.textPrimary,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -460,6 +281,58 @@ internal fun DailyModeCard(
                     color = ReflexGamePalette.textPrimary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun FirstTargetCard(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = ReflexGamePalette.cardGlassStrong,
+        shape = RoundedCornerShape(PremiumCardRadius),
+        border = BorderStroke(1.dp, ArcadeGold.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(ArcadeGold.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "★",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ArcadeGold,
+                    maxLines = 1
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.first_target_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ReflexGamePalette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.first_target_description, FirstTargetBonusCoins),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }

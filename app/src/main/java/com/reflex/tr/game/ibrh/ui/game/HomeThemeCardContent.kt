@@ -134,7 +134,10 @@ internal fun ThemeCard(
                             text = stringResource(theme.titleRes),
                             style = MaterialTheme.typography.titleSmall,
                             color = ReflexGamePalette.textPrimary,
-                            maxLines = 1,
+                            // Wraps rather than clips: beside the rarity chip and the action
+                            // column the name has about 80dp on a 360dp screen, which cut
+                            // "Matrix Green" down to "Matrix Gr…".
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )

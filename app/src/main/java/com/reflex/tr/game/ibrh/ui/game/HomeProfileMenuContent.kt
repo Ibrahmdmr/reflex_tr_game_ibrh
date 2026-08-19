@@ -22,7 +22,6 @@ import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeCoral
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
-import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
 @Composable
@@ -86,19 +85,6 @@ internal fun ProfileQuickMenu(
                     icon = "▣",
                     accent = ArcadeGold,
                     onClick = { onTabSelected(HomeTab.Collection) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ProfileQuickMenuCard(
-                    title = stringResource(R.string.nav_missions),
-                    description = stringResource(R.string.profile_quick_missions_description),
-                    icon = "✓",
-                    accent = ArcadeTeal,
-                    onClick = { onTabSelected(HomeTab.Missions) },
                     modifier = Modifier.weight(1f)
                 )
             }

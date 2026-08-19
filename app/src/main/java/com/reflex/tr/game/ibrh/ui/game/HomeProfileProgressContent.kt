@@ -1,7 +1,6 @@
 package com.reflex.tr.game.ibrh.ui.game
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,11 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reflex.tr.game.ibrh.R
-import com.reflex.tr.game.ibrh.ui.theme.ArcadeBlue
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
@@ -35,13 +32,12 @@ internal fun ProfileProgressCard(
     progressionState: ProgressionState,
     bestScore: Int,
     onEditNameClick: () -> Unit,
-    onTitleSelect: (PlayerTitle) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentLevelXp = ((progressionState.level - 1) * 250)
-    val nextLevelXp = progressionState.level * 250
-    val levelProgress = ((progressionState.xp - currentLevelXp).toFloat() / 250f).coerceIn(0f, 1f)
-    val remainingXp = (nextLevelXp - progressionState.xp).coerceAtLeast(0)
+    val levelProgress = levelProgressFor(
+        level = progressionState.level,
+        xp = progressionState.xp
+    )
     val rank = rankFor(level = progressionState.level)
     val achievementCount = progressionState.achievements.count { it.unlocked }
     Surface(
@@ -72,11 +68,18 @@ internal fun ProfileProgressCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = stringResource(playerProfile.title.titleRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ReflexGamePalette.textSecondary
-                    )
+                    val activeTitle = playerProfile.activeTitle
+                    if (activeTitle != null) {
+                        PlayerTitleInlineLabel(title = activeTitle)
+                    } else {
+                        Text(
+                            text = stringResource(R.string.player_title_none_selected),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ReflexGamePalette.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     if (isCollectionComplete(progressionState)) {
                         CollectionMasterBadge(
                             modifier = Modifier.padding(top = 6.dp)
@@ -100,7 +103,7 @@ internal fun ProfileProgressCard(
                 }
             }
             LinearProgressIndicator(
-                progress = { levelProgress },
+                progress = { levelProgress.fraction },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
@@ -109,12 +112,12 @@ internal fun ProfileProgressCard(
                 trackColor = Color.White.copy(alpha = 0.08f)
             )
             Text(
-                text = stringResource(R.string.xp_value, progressionState.xp, nextLevelXp),
+                text = stringResource(R.string.xp_value, progressionState.xp, levelProgress.nextLevelXp),
                 style = MaterialTheme.typography.labelMedium,
                 color = ReflexGamePalette.textSecondary
             )
             Text(
-                text = stringResource(R.string.xp_to_next_level_value, remainingXp),
+                text = stringResource(R.string.xp_to_next_level_value, levelProgress.remainingXp),
                 style = MaterialTheme.typography.labelMedium,
                 color = ReflexGamePalette.textSecondary
             )
@@ -146,6 +149,21 @@ internal fun ProfileProgressCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.weekly_league_title),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ReflexGamePalette.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                LeagueTierChip(tier = progressionState.weeklyLeague.tier)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -206,42 +224,6 @@ internal fun ProfileProgressCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = ReflexGamePalette.textSecondary
                         )
-                    }
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = stringResource(R.string.profile_title_select),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ReflexGamePalette.textSecondary
-                )
-                PlayerTitle.entries.chunked(2).forEach { rowTitles ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowTitles.forEach { title ->
-                            val selected = title == playerProfile.title
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { onTitleSelect(title) },
-                                color = if (selected) ArcadeTeal.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f),
-                                shape = RoundedCornerShape(PremiumPillRadius),
-                                border = BorderStroke(
-                                    1.dp,
-                                    (if (selected) ArcadeTeal else ArcadeBlue).copy(alpha = 0.34f)
-                                )
-                            ) {
-                                Text(
-                                    text = stringResource(title.titleRes),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = ReflexGamePalette.textPrimary,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
                     }
                 }
             }

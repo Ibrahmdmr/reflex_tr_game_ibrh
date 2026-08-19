@@ -59,7 +59,14 @@ fun GameOverOverlay(
     totalCoins: Int,
     seasonXp: Int,
     comboChallenge: ComboChallengeState,
+    dailyEvent: DailyEventState,
+    leaguePointsEarned: Int,
+    leagueUpgradedTo: LeagueTier?,
     dailyMiniTournament: DailyMiniTournamentState,
+    rewardChestEarned: RewardChestType?,
+    newPlayerTitles: List<PlayerTitle>,
+    starterJourney: StarterJourneyState,
+    starterTaskCompletedThisGame: Boolean,
     isCoinDoubleClaimed: Boolean,
     showContinueButton: Boolean,
     continueButtonText: String,
@@ -73,6 +80,9 @@ fun GameOverOverlay(
     onContinueClick: () -> Unit,
     onDoubleCoinsClick: () -> Unit,
     onShareScoreClick: () -> Unit,
+    onRewardChestOpenClick: () -> Unit,
+    shareScoreButtonText: String,
+    isSharingScore: Boolean,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -220,10 +230,24 @@ fun GameOverOverlay(
                     UnlockedProfileBadgesCard(badges = unlockedProfileBadges)
                 }
 
+                NewPlayerTitlesCard(titles = newPlayerTitles)
+
+                StarterJourneyGameOverNote(
+                    state = starterJourney,
+                    taskCompletedThisGame = starterTaskCompletedThisGame
+                )
+
                 // Run-critical actions stay above the summary cards so they clear the fold.
                 PrimaryGameButton(
                     text = stringResource(R.string.retry_game),
                     onClick = onRetryClick
+                )
+
+                SecondaryGameButton(
+                    text = shareScoreButtonText,
+                    onClick = onShareScoreClick,
+                    enabled = !isSharingScore,
+                    isLoading = isSharingScore
                 )
 
                 if (showContinueButton) {
@@ -297,16 +321,61 @@ fun GameOverOverlay(
                     )
                 )
 
+                rewardChestEarned?.let { chest ->
+                    RewardChestGameOverCard(
+                        type = chest,
+                        onOpenClick = onRewardChestOpenClick
+                    )
+                }
+
                 ComboChallengeProgressCard(state = comboChallenge)
+
+                // At most two progress lines; the rest is a link so the panel does not grow a
+                // list of everything that moved this run.
+                val progressLines = buildList {
+                    leagueUpgradedTo?.let {
+                        add(stringResource(R.string.weekly_league_upgraded_value, stringResource(it.titleRes)))
+                    }
+                    if (dailyEvent.completed && dailyEvent.progress > 0) {
+                        add(stringResource(R.string.daily_event_game_over_completed))
+                    }
+                    if (leaguePointsEarned > 0) {
+                        add(stringResource(R.string.weekly_league_game_over_points, leaguePointsEarned))
+                    }
+                    if (dailyEvent.progress > 0 && !dailyEvent.completed) {
+                        add(
+                            stringResource(
+                                R.string.daily_event_game_over_progress,
+                                dailyEvent.progress,
+                                dailyEvent.target
+                            )
+                        )
+                    }
+                }
+                progressLines.take(2).forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ReflexGamePalette.textSecondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (progressLines.size > 2) {
+                    Text(
+                        text = stringResource(R.string.quest_hub_more_progress),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ArcadeGold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 if (mode == dailyMiniTournament.mode) {
                     DailyMiniTournamentGameOverCard(state = dailyMiniTournament)
                 }
-
-                SecondaryGameButton(
-                    text = stringResource(R.string.share_score),
-                    onClick = onShareScoreClick
-                )
 
                 if (isDoubleCoinsEnabled || isDoubleCoinsLoading) {
                     SecondaryGameButton(

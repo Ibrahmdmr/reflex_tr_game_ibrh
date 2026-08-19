@@ -3,9 +3,8 @@ package com.reflex.tr.game.ibrh.ui.game
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
+import android.widget.Toast
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
-import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import kotlin.random.Random
 
@@ -40,33 +39,34 @@ internal fun shareInvite(
     }
 }
 
-internal fun shareScore(
-    context: Context,
-    text: String,
-    chooserTitle: String,
-    score: Int,
-    mode: GameMode,
-    isNewRecord: Boolean
+/** Coins paid for the first score share of the day. Mirrors GameViewModel's own constant. */
+internal const val ScoreShareRewardCoins = 50
+
+internal fun Context.showShortToast(message: String) {
+    runCatching { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
+}
+
+/**
+ * Score-card analytics. Carries only gameplay figures — never the player name or uid — and never
+ * throws, so a reporting failure cannot break the share.
+ */
+internal fun logScoreShareEvent(
+    event: FirebaseEvent,
+    uiState: GameUiState,
+    score: Int
 ) {
-    val sendIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    val chooserIntent = Intent.createChooser(sendIntent, chooserTitle).apply {
-        if (context !is Activity) {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    }
-    val launched = runCatching {
-        context.startActivity(chooserIntent)
-    }.isSuccess
-    if (launched) {
-        FirebaseGameServices.logEvent(
-            event = FirebaseEvent.ScoreShared,
-            params = Bundle().apply {
-                putInt(FirebaseParam.Score.key, score.coerceAtLeast(0))
-                putString(FirebaseParam.Mode.key, mode.storageKey)
-                putBoolean(FirebaseParam.IsNewRecord.key, isNewRecord)
+    logGameEvent(event) {
+        putString(FirebaseParam.Mode.key, uiState.selectedMode.storageKey)
+        putInt(FirebaseParam.Score.key, score.coerceAtLeast(0))
+        putInt(FirebaseParam.BestScore.key, uiState.bestScore.coerceAtLeast(0))
+        putInt(FirebaseParam.MaxCombo.key, uiState.maxCombo.coerceAtLeast(0))
+        putInt(FirebaseParam.EarnedCoin.key, uiState.earnedCoinsThisGame.coerceAtLeast(0))
+        putInt(
+            FirebaseParam.Accuracy.key,
+            if (uiState.totalAttempts > 0) {
+                ((uiState.successfulHits * 100f) / uiState.totalAttempts).toInt().coerceIn(0, 100)
+            } else {
+                0
             }
         )
     }

@@ -1,16 +1,12 @@
 package com.reflex.tr.game.ibrh.ui.game
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,21 +41,10 @@ internal fun CoinChestCard(
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // No leading icon: it left the title about 118dp on a 360dp screen, which clipped it
+            // along with the description and the remaining-count line.
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(ArcadeGold.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "$",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ArcadeGold
-                )
-            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -88,7 +72,9 @@ internal fun CoinChestCard(
                     text = stringResource(R.string.coin_chest_remaining, state.remainingOpens, state.maxOpensPerDay) + lastRewardText,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (state.canOpen) ArcadeGold else ReflexGamePalette.textSecondary,
-                    maxLines = 1,
+                    // Two lines: this appends the last reward to the remaining count, which is
+                    // more than one line holds next to the button.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
