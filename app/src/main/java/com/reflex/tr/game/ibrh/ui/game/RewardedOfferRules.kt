@@ -4,23 +4,10 @@ import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 
-/**
- * Every rule the rewarded offers need. UI reads state; only these functions decide it.
- *
- * None of this grants anything. Each offer still runs through the [RewardedAction] that already
- * owned it, so the ad callback remains the only thing that can pay out.
- */
-
-/** At most this many rewarded actions on the Game Over panel, so it stays a result screen. */
 internal const val MAX_GAME_OVER_OFFERS = 2
 
-/** The ad is usable when one is loaded and none is on screen. */
 private fun RewardedAdUiState.canStart(): Boolean = isReady && !isShowing
 
-/**
- * The Bonuses list: every offer, with the ones that only make sense mid-run marked as such rather
- * than hidden. Seeing what a run can earn is the point of the section.
- */
 internal fun bonusOffers(
     progression: ProgressionState,
     rewardedAdUiState: RewardedAdUiState
@@ -55,7 +42,7 @@ internal fun bonusOffers(
 
         RewardedOfferType.StreakProtect -> RewardedOfferState(
             type = type,
-            // Not a limit but a condition: there is nothing to protect until the streak is at risk.
+            // Not a limit but a condition: nothing to protect until the streak is at risk.
             availability = when {
                 !progression.dailyReward.canProtectStreak -> RewardedOfferAvailability.NotApplicable
                 !rewardedAdUiState.canStart() -> RewardedOfferAvailability.AdNotReady
@@ -71,13 +58,7 @@ internal fun bonusOffers(
     }
 }
 
-/**
- * The rewarded actions the Game Over panel may show, in priority order and capped at
- * [MAX_GAME_OVER_OFFERS]. Anything unavailable is left out entirely rather than disabled.
- *
- * Continue comes first because it is the only one that changes the run; doubling the payout is
- * still there afterwards, when continuing is no longer on the table.
- */
+/** Continue comes first: it is the only offer that changes the run. */
 internal fun gameOverRewardedOffers(
     canContinue: Boolean,
     isContinueReady: Boolean,
@@ -105,9 +86,7 @@ internal fun gameOverRewardedOffers(
     }
 }.take(MAX_GAME_OVER_OFFERS)
 
-/**
- * Rewarded-offer analytics. Carries only the offer's own identity and figures — never the player name or uid.
- */
+/** Carries only the offer's own identity and figures — never playerName or uid. */
 internal fun logRewardedOfferEvent(
     event: FirebaseEvent,
     type: RewardedOfferType? = null,

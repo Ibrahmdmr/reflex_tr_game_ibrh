@@ -4,13 +4,6 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/**
- * The three opening days, each a theme rather than a difficulty step. A new player sees exactly
- * one of these at a time, which is the whole point: the rest of the app can wait.
- *
- * [rewardChest] and the day-3 badge are optional extras — a build without those systems simply
- * leaves them null and pays the coins.
- */
 enum class StarterJourneyDay(
     val dayNumber: Int,
     @StringRes val titleRes: Int,
@@ -34,7 +27,7 @@ enum class StarterJourneyDay(
         rewardCoins = 200
     );
 
-    /** Derived rather than stored, so a task can never claim a day the day does not list. */
+    /** Derived, so a task can never claim a day the day does not list. */
     val tasks: List<StarterTask>
         get() = StarterTask.entries.filter { it.day == this }
 
@@ -44,11 +37,7 @@ enum class StarterJourneyDay(
     }
 }
 
-/**
- * Every starter task. [target] is the count that finishes it; one-shot tasks use 1.
- *
- * @see advanceStarterJourneyAfterGame and [advanceStarterJourneyForAction] for what moves them.
- */
+/** [target] is the count that finishes a task; one-shot tasks use 1. */
 enum class StarterTask(
     val storageKey: String,
     val day: StarterJourneyDay,
@@ -71,26 +60,17 @@ enum class StarterTask(
     }
 }
 
-/**
- * Where the player is in the opening three days.
- *
- * [daysSinceStart] is derived from the stored first-open date at load time rather than persisted,
- * so a clock change cannot leave a stale day behind.
- */
+/** [daysSinceStart] is derived at load time, not persisted, so a clock change cannot stale it. */
 @Immutable
 data class StarterJourneyState(
     val daysSinceStart: Int = 1,
     val taskProgress: Map<StarterTask, Int> = emptyMap(),
     val claimedDays: Set<Int> = emptySet()
 ) {
-    /** The highest day the player has reached; later days stay locked until their date. */
     val unlockedDayNumber: Int
         get() = daysSinceStart.coerceIn(1, STARTER_JOURNEY_DAYS)
 
-    /**
-     * The day the card is about: the earliest unclaimed day that has already unlocked. Missing a
-     * day therefore parks the journey on it rather than skipping past it.
-     */
+    /** Earliest unclaimed unlocked day, so missing a day parks the journey on it. */
     val activeDay: StarterJourneyDay?
         get() = StarterJourneyDay.entries.firstOrNull {
             it.dayNumber !in claimedDays && it.dayNumber <= unlockedDayNumber
@@ -113,20 +93,15 @@ data class StarterJourneyState(
         return ((completedTaskCount(day) * 100) / total).coerceIn(0, 100)
     }
 
-    /** True once the active day's tasks are all done and its reward is still waiting. */
     val hasClaimableReward: Boolean
         get() = activeDay?.let { isDayCompleted(it) } == true
 
-    /**
-     * Shown while there is still something to do inside the window, or a finished day left to
-     * collect — a reward earned on day 3 is not lost just because midnight passed.
-     */
+    /** Stays true for a finished day left to collect, so day 3's reward survives midnight. */
     val isActive: Boolean
         get() = !isCompleted &&
             activeDay != null &&
             (daysSinceStart <= STARTER_JOURNEY_DAYS || hasClaimableReward)
 
-    /** The "completed" note fades out after a week; the badge is the permanent record. */
     val showsCompletedNote: Boolean
         get() = isCompleted && daysSinceStart <= STARTER_JOURNEY_NOTE_DAYS
 }

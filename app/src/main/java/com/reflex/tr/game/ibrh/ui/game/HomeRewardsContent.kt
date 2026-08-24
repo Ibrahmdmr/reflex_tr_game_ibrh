@@ -147,7 +147,6 @@ internal fun RewardsTabContent(
     )
 }
 
-/** Divider between quest-hub sections, so the rewards tab reads as grouped rather than a stack. */
 @Composable
 private fun QuestSectionHeader(@StringRes titleRes: Int) {
     Text(

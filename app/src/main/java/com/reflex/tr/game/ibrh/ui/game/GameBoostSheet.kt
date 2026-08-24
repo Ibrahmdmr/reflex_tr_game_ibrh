@@ -152,10 +152,7 @@ private fun SheetSectionHeader(
     }
 }
 
-/**
- * A boost is the cheap tier: it can be bought with coins or earned by watching a rewarded ad,
- * which is why this row carries two actions where [PowerUpOptionRow] carries one.
- */
+/** Two actions, unlike [PowerUpOptionRow]: a boost can be bought or earned with an ad. */
 @Composable
 private fun BoostOptionRow(
     boost: GameBoost,

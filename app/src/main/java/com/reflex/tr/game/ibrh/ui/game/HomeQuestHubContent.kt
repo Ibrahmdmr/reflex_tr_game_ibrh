@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,10 +29,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/**
- * Compact home-screen entry. Replaces the separate daily-event and weekly-league cards there so
- * the same figures are not repeated three times down the page.
- */
 @Composable
 internal fun QuestHubCard(
     summary: QuestHubRewardSummary,
@@ -104,10 +100,7 @@ internal fun QuestHubCard(
     }
 }
 
-/**
- * Header of the rewards tab: what is waiting, and the single next step. The detail sections below
- * it keep their own claim buttons, so nothing here can pay a reward.
- */
+/** The detail sections below keep their own claim buttons, so nothing here can pay a reward. */
 @Composable
 internal fun QuestHubSummarySection(
     summary: QuestHubRewardSummary,
@@ -214,7 +207,6 @@ private fun QuestHubRewardRow(reward: QuestHubReward) {
     }
 }
 
-/** The one progress bar style shared by every quest, league and shop card. */
 @Composable
 internal fun QuestProgressBar(
     percent: Int,

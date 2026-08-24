@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/** Weekly-challenge and personal-record rules. Extracted from GameViewModel so the rules stay unit testable on their own. */
-
 internal fun advanceWeeklyChallenge(
     challenge: ChallengeState,
     mode: GameMode,

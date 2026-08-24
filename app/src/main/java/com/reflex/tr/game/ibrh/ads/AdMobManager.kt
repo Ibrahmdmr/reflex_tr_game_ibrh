@@ -59,10 +59,7 @@ class AdMobManager(
         get() = rewardedAd != null
     var onRewardedUiStateChanged: ((RewardedAdUiState) -> Unit)? = null
 
-    /**
-     * Flags are derived from [status] so they cannot drift out of step with it. [isShowing] stays
-     * a parameter: a request rejected mid-ad must still report the ad that is on screen.
-     */
+    /** [isShowing] stays a parameter: a request rejected mid-ad must still report the live ad. */
     private fun publishRewardedUiState(
         status: AdPresentationState,
         rewardEarned: Boolean = false,

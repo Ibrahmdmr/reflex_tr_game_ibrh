@@ -130,11 +130,7 @@ object LocalNotificationScheduler {
         )
     }
 
-    /**
-     * Start of tonight's reminder batch, or tomorrow's once the whole batch is behind us. The roll
-     * over is decided by the *last* of the [slotCount] slots, so firing the first one does not
-     * cancel the siblings still pending today.
-     */
+    /** Roll-over is decided by the *last* slot, so firing the first does not cancel its siblings. */
     private fun nextReminderBaseTime(slotCount: Int): Long {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 20)
@@ -148,6 +144,20 @@ object LocalNotificationScheduler {
             }
         }
         return calendar.timeInMillis
+    }
+}
+
+/** Reboot and app update both wipe every [AlarmManager] alarm; this puts the reminders back. */
+class BootCompletedReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
+            else -> return
+        }
+        // The stored schedule date and mask survived the wipe, so a non-forced sync would decide
+        // the alarms are already set and return without setting any.
+        LocalNotificationScheduler.sync(context.applicationContext, force = true)
     }
 }
 

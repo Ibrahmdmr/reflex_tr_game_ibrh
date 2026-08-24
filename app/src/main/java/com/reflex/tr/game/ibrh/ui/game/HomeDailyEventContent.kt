@@ -26,7 +26,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/** Compact home-screen entry: what today's event is and the one action available on it. */
 @Composable
 internal fun DailyEventCard(
     state: DailyEventState,
@@ -91,7 +90,6 @@ internal fun DailyEventCard(
     }
 }
 
-/** Fuller view for the rewards tab: adds the status line and the countdown. */
 @Composable
 internal fun DailyEventDetailSection(
     state: DailyEventState,

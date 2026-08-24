@@ -18,22 +18,15 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/** Outcome of a share attempt, so the caller can pick the right message. */
 enum class ScoreShareResult {
-    /** Share sheet opened with the rendered card attached. */
     Launched,
 
-    /** Share sheet opened, but the card could not be produced, so only the text went out. */
     TextOnly,
 
-    /** Nothing opened — no app could handle the intent. */
     Failed
 }
 
-/**
- * Renders the score card, publishes it through [FileProvider] and opens the share sheet. A card
- * that cannot be drawn or written degrades to a plain text share.
- */
+/** A card that cannot be drawn or written degrades to a plain text share. */
 object ScoreShareManager {
 
     private const val CARD_DIRECTORY = "share_cards"
@@ -42,13 +35,9 @@ object ScoreShareManager {
     private const val AUTHORITY_SUFFIX = ".fileprovider"
     private const val CHOSEN_ACTION = "com.reflex.tr.game.ibrh.SHARE_TARGET_CHOSEN"
 
-    /** A receiver left behind by an abandoned share sheet is dropped after this. */
     private const val CHOOSER_CALLBACK_TIMEOUT_MS = 5 * 60 * 1000L
 
-    /**
-     * Draws and stores the card off the main thread. Returns null when the bitmap, the cache file
-     * or the provider lookup fails.
-     */
+    /** Off the main thread. Null when the bitmap, the cache file or the provider lookup fails. */
     suspend fun prepareCard(context: Context, data: ScoreShareData): Uri? =
         withContext(Dispatchers.Default) {
             val appContext = context.applicationContext
@@ -56,8 +45,8 @@ object ScoreShareManager {
             try {
                 val directory = File(appContext.cacheDir, CARD_DIRECTORY)
                 if (!directory.exists() && !directory.mkdirs()) return@withContext null
-                // A fresh name per share: the previous file may still be open in a share sheet the
-                // player left standing, and overwriting it would swap the image under them.
+                // Fresh name per share: the previous file may still be open in a standing share
+                // sheet, and overwriting it would swap the image under the player.
                 directory.listFiles()?.forEach { it.delete() }
                 val file = File(directory, CARD_PREFIX + System.currentTimeMillis() + CARD_SUFFIX)
                 FileOutputStream(file).use { output ->
@@ -79,10 +68,7 @@ object ScoreShareManager {
             }
         }
 
-    /**
-     * Opens the system share sheet. Main thread only. [onTargetChosen] fires only once the player
-     * picks an app — a dismissed sheet reports nothing, so a reward is not paid for it.
-     */
+    /** Main thread only. [onTargetChosen] fires only on a real pick, so a dismissal pays nothing. */
     fun launchShareSheet(
         context: Context,
         imageUri: Uri?,
@@ -114,7 +100,6 @@ object ScoreShareManager {
         }
     }
 
-    /** Falls back to a plain chooser when the callback cannot be registered. */
     private fun createChooser(
         context: Context,
         sendIntent: Intent,

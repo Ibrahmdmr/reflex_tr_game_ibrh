@@ -4,10 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/**
- * @property title filled in locally for the player's own row only. The board is never asked to
- * carry a title, so nothing about the stored or uploaded score model changes.
- */
+/** @property title filled in locally for the player's own row; never stored or uploaded. */
 @Immutable
 data class LeaderboardEntry(
     val rank: Int,
@@ -40,10 +37,7 @@ data class PlayerProfile(
     val hasName: Boolean
         get() = name.isNotBlank()
 
-    /**
-     * Null until a title is both earned and chosen. Reading through this rather than [title]
-     * keeps a stored title the player no longer owns off the screen.
-     */
+    /** Reading through this rather than [title] keeps a no-longer-owned title off the screen. */
     val activeTitle: PlayerTitle?
         get() = title?.takeIf { it in unlockedTitles }
 

@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/** SharedPreferences keys and tuning constants for [GamePreferences], kept in one place. */
-
 internal const val GAME_PREFERENCES_NAME = "game_preferences"
 internal const val BEST_SCORE_KEY = "best_score"
 internal const val LANGUAGE_KEY = "language"

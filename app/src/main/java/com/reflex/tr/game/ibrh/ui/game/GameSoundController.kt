@@ -75,10 +75,7 @@ class GameSoundController(
         generatedTonePlayer.release()
     }
 
-    /**
-     * Looks effects up by name so files can be dropped into `res/raw` later. There is no static
-     * `R.raw` reference, so `res/raw/keep.xml` stops resource shrinking from stripping them.
-     */
+    /** Looked up by name, so `res/raw/keep.xml` is what stops resource shrinking stripping them. */
     private fun preloadIfExists(
         effect: GameSoundEffect,
         resourceName: String
@@ -152,11 +149,7 @@ private val GameSoundEffect.cooldownMillis: Long
         GameSoundEffect.GameOver -> 800L
     }
 
-/**
- * Synthesises the fallback tones used when no `res/raw` file is bundled. Building the eleven
- * [AudioTrack]s is too slow for the main thread, so it warms up in the background and the lock
- * only guards publication of the finished map.
- */
+/** Fallback tones for when no `res/raw` file is bundled. Built off the main thread: too slow for it. */
 private class GeneratedTonePlayer {
     private val lock = Any()
     private var tracks: Map<GameSoundEffect, AudioTrack> = emptyMap()

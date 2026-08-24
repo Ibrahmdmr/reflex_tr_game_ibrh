@@ -3,22 +3,12 @@ package com.reflex.tr.game.ibrh.ui.game
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 
-/** Every rule the player-title system needs. UI reads state; only these functions decide it. */
-
-/** What one title check produced: the profile to persist, and what there is to announce. */
 data class PlayerTitleUnlockResult(
     val profile: PlayerProfile,
     val newlyUnlocked: List<PlayerTitle>
 )
 
-/**
- * How far [progression] has come toward [title], on the same scale as
- * [PlayerTitle.requirementValue] — the one place a condition is written down.
- *
- * Every figure comes from [ProgressionState], which defaults each of them to zero or empty, so a
- * player with no league, collection or streak history reads as 0 rather than failing. Both the
- * unlock check and the "x / y" hint read this, so they cannot drift apart.
- */
+/** Both the unlock check and the "x / y" hint read this, so they cannot drift apart. */
 internal fun playerTitleProgressValue(
     title: PlayerTitle,
     progression: ProgressionState
@@ -50,19 +40,12 @@ internal fun playerTitleProgressValue(
     PlayerTitle.ReflexLegend -> progression.totalGames
 }.coerceAtLeast(0)
 
-/** Whether [progression] satisfies [title] right now. */
 internal fun meetsPlayerTitleRequirement(
     title: PlayerTitle,
     progression: ProgressionState
 ): Boolean = playerTitleProgressValue(title, progression) >= title.requirementValue.coerceAtLeast(1)
 
-/**
- * Re-checks every title against [progression] and folds the result into [profile].
- *
- * Titles are sticky: once earned they stay owned, which is what stops a broken daily streak from
- * taking "Loyal Player" back. Returns [profile] unchanged when nothing moved, so callers can skip
- * the write — this runs after every progression save.
- */
+/** Titles are sticky: a broken daily streak cannot take "Loyal Player" back. */
 internal fun refreshedPlayerTitles(
     profile: PlayerProfile,
     progression: ProgressionState
@@ -71,8 +54,7 @@ internal fun refreshedPlayerTitles(
         it !in profile.unlockedTitles && meetsPlayerTitleRequirement(it, progression)
     }
     val owned = profile.unlockedTitles + newlyUnlocked
-    // Also repairs a stored title the player does not own, and hands a first-time player their
-    // starter title without a trip to the profile screen.
+    // Also repairs a stored title the player does not own.
     val active = profile.title?.takeIf { it in owned } ?: bestPlayerTitle(owned)
     if (newlyUnlocked.isEmpty() && active == profile.title) {
         return PlayerTitleUnlockResult(profile, emptyList())
@@ -83,13 +65,10 @@ internal fun refreshedPlayerTitles(
     )
 }
 
-/** The title worth wearing out of [titles]: rarest first, then the hardest to earn. */
 internal fun bestPlayerTitle(titles: Set<PlayerTitle>): PlayerTitle? =
     titles.maxWithOrNull(compareBy<PlayerTitle>({ it.rarity.ordinal }, { it.ordinal }))
 
-/**
- * Player-title analytics. Carries only the title's own identity — never the player name or uid.
- */
+/** Carries only the title's own identity — never playerName or uid. */
 internal fun logPlayerTitleEvent(
     event: FirebaseEvent,
     title: PlayerTitle? = null

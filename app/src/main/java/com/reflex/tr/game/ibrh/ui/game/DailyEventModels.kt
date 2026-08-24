@@ -4,10 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/**
- * The pool the daily event rotates through; [dailyEventTypeForDate] picks one per day.
- * [requiredMode] is set when the event only counts runs in that mode.
- */
+/** [requiredMode] is set when the event only counts runs in that mode. */
 enum class DailyEventType(
     val storageKey: String,
     @StringRes val titleRes: Int,
@@ -81,7 +78,6 @@ enum class DailyEventType(
     }
 }
 
-/** Today's event and how far the player has got with it. */
 @Immutable
 data class DailyEventState(
     val createdDate: String = "",

@@ -4,12 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/**
- * Chest tiers, weakest first.
- *
- * [rollWeightPercent] is the chance of drawing this tier; the weights add up to 100 and
- * [rollRewardChestType] derives its ranges from them, so the odds live in this table alone.
- */
+/** Weakest first. [rollWeightPercent] adds up to 100, so the odds live in this table alone. */
 enum class RewardChestType(
     val storageKey: String,
     @StringRes val titleRes: Int,
@@ -53,7 +48,7 @@ enum class RewardChestType(
     }
 }
 
-/** Why a chest was handed out. Reported to analytics; it never changes what the chest pays. */
+/** Reported to analytics; it never changes what the chest pays. */
 enum class RewardChestSource(val storageKey: String) {
     GameCount("game_count"),
     DailyEvent("daily_event"),
@@ -61,7 +56,6 @@ enum class RewardChestSource(val storageKey: String) {
     NewRecord("new_record")
 }
 
-/** Chests waiting to be opened, and how close the next "every N games" chest is. */
 @Immutable
 data class RewardChestState(
     val pendingChests: List<RewardChestType> = emptyList(),
@@ -75,7 +69,7 @@ data class RewardChestState(
     val hasPendingChest: Boolean
         get() = pendingChests.isNotEmpty()
 
-    /** Opened first and named on the cards, so the chest promised is the one that pays out. */
+    /** Opened first and named on the cards, so the chest promised is the one that pays. */
     val bestPendingChest: RewardChestType?
         get() = pendingChests.maxByOrNull { it.ordinal }
 
@@ -83,7 +77,6 @@ data class RewardChestState(
         get() = (GAMES_PER_REWARD_CHEST - gamesSinceLastChest).coerceIn(0, GAMES_PER_REWARD_CHEST)
 }
 
-/** What one opened chest paid. [seasonXp] is 0 when the tier rolled no XP. */
 @Immutable
 data class RewardChestReward(
     val type: RewardChestType,

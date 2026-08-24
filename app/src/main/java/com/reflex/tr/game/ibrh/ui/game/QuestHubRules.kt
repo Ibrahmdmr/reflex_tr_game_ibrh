@@ -6,14 +6,6 @@ import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 
-/**
- * The single source for "what can I collect?" and "what should I do next?".
- *
- * Every reward system keeps its own claim state; this only reads them, so nothing here can pay a
- * reward twice or bypass an existing rule.
- */
-
-/** A reward the player has earned but not collected, and the tab that collects it. */
 internal enum class QuestHubRewardKind(
     @StringRes val titleRes: Int,
     val targetTab: HomeTab
@@ -37,7 +29,6 @@ internal data class QuestHubReward(
     val coins: Int
 )
 
-/** Roll-up of everything waiting to be collected. */
 @Immutable
 internal data class QuestHubRewardSummary(
     val rewards: List<QuestHubReward> = emptyList()
@@ -46,11 +37,9 @@ internal data class QuestHubRewardSummary(
     val totalCoins: Int get() = rewards.sumOf { it.coins }
     val hasRewards: Boolean get() = rewards.isNotEmpty()
 
-    /** The biggest payout, used as the headline on the summary card. */
     val topReward: QuestHubReward? get() = rewards.maxByOrNull { it.coins }
 }
 
-/** What the player should do next, in priority order. */
 internal enum class QuestHubRecommendationType(
     @StringRes val titleRes: Int,
     @StringRes val buttonRes: Int,
@@ -65,16 +54,13 @@ internal enum class QuestHubRecommendationType(
     PlayAnotherGame(R.string.quest_hub_reco_play, R.string.quest_hub_play, HomeTab.Play)
 }
 
-/** A task counts as "nearly done" once it is at least this far along. */
 private const val NEARLY_DONE_PERCENT = 50
 
-/** Everything currently claimable, ordered as it is presented. */
 internal fun claimableRewards(
     progression: ProgressionState,
     dailyChallenge: DailyChallengeState
 ): List<QuestHubReward> = buildList {
-    // First in the list as well as first in priority: a new player should see their own track
-    // above everything the rest of the app offers.
+    // First in priority: a new player should see their own track above everything else.
     progression.starterJourney.let {
         if (it.isActive && it.hasClaimableReward) {
             add(QuestHubReward(QuestHubRewardKind.StarterJourney, it.activeDay?.rewardCoins ?: 0))
@@ -128,16 +114,12 @@ internal fun claimableRewards(
     }
 }
 
-/** Everything claimable, rolled up. */
 internal fun questHubRewardSummary(
     progression: ProgressionState,
     dailyChallenge: DailyChallengeState
 ): QuestHubRewardSummary = QuestHubRewardSummary(claimableRewards(progression, dailyChallenge))
 
-/**
- * The one thing worth doing next. Replaces the separate home-screen suggestion chain so the hub
- * card and the "next goal" card cannot disagree.
- */
+/** The one source for "next", so the hub card and the "next goal" card cannot disagree. */
 internal fun questHubRecommendation(
     progression: ProgressionState,
     dailyChallenge: DailyChallengeState
@@ -145,8 +127,7 @@ internal fun questHubRecommendation(
     if (claimableRewards(progression, dailyChallenge).isNotEmpty()) {
         return QuestHubRecommendationType.ClaimReward
     }
-    // Ahead of every ordinary suggestion: during the opening days this is the only track that
-    // matters, and it disappears on its own afterwards.
+    // Ahead of every ordinary suggestion; it disappears on its own after the opening days.
     if (progression.starterJourney.isActive) {
         return QuestHubRecommendationType.FinishStarterTask
     }
@@ -171,9 +152,7 @@ internal fun questHubRecommendation(
     return QuestHubRecommendationType.PlayAnotherGame
 }
 
-/**
- * Quest-hub analytics. Carries only counts and section names — never the player name or uid.
- */
+/** Carries only counts and section names — never playerName or uid. */
 internal fun logQuestHubEvent(
     event: FirebaseEvent,
     section: String? = null,

@@ -6,26 +6,19 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
-/** Every rule the daily event needs. UI reads state; only these functions decide it. */
-
-/** Result of feeding a finished run into today's event, so the caller can tell what moved. */
 data class DailyEventAdvance(
     val state: DailyEventState,
     val gainedProgress: Int,
     val justCompleted: Boolean
 )
 
-/**
- * Picks the event for [dateKey]. Deriving it from the date keeps the choice stable for the whole
- * day and identical for everyone, with no backend involved.
- */
+/** Derived from the date, so the choice is stable all day and identical for everyone. */
 fun dailyEventTypeForDate(dateKey: String = todayDateKey()): DailyEventType {
     val types = DailyEventType.entries
     val index = Math.floorMod(epochDayOf(dateKey), types.size)
     return types[index]
 }
 
-/** Today's event, rolled over when [state] belongs to an earlier day. */
 fun dailyEventForToday(
     state: DailyEventState,
     dateKey: String = todayDateKey()
@@ -38,10 +31,7 @@ fun dailyEventForToday(
     }
 }
 
-/**
- * Applies one finished run. Returns the same state when the run does not count, so callers can
- * skip persisting and skip the Game Over notice.
- */
+/** Returns [state] unchanged when the run does not count, so callers can skip the write. */
 fun advanceDailyEventAfterGame(
     state: DailyEventState,
     mode: GameMode,
@@ -72,8 +62,7 @@ fun advanceDailyEventAfterGame(
     }
     if (gain <= 0) return DailyEventAdvance(today, gainedProgress = 0, justCompleted = false)
 
-    // StreakGuard reports the best streak of a single run rather than a running total, so it takes
-    // the maximum instead of accumulating across runs.
+    // StreakGuard is the best streak of a single run, so it takes the maximum, not the sum.
     val nextProgress = when (today.type) {
         DailyEventType.StreakGuard -> maxOf(today.progress, gain)
         else -> today.progress + gain
@@ -90,7 +79,6 @@ fun advanceDailyEventAfterGame(
     )
 }
 
-/** Hours and minutes until the event rotates, for the "time left" line. */
 fun dailyEventRemainingMinutes(nowMillis: Long = System.currentTimeMillis()): Int {
     val calendar = Calendar.getInstance().apply {
         timeInMillis = nowMillis
@@ -105,7 +93,7 @@ fun dailyEventRemainingMinutes(nowMillis: Long = System.currentTimeMillis()): In
         .toInt()
 }
 
-/** Days since the epoch for a `yyyy-MM-dd` key; 0 when the key cannot be read. */
+/** 0 when the key cannot be read. */
 private fun epochDayOf(dateKey: String): Int {
     val parts = dateKey.split("-")
     if (parts.size != 3) return 0
@@ -119,9 +107,7 @@ private fun epochDayOf(dateKey: String): Int {
     return (calendar.timeInMillis / 86_400_000L).toInt()
 }
 
-/**
- * Daily-event analytics. Carries only the event figures — never the player name or uid.
- */
+/** Carries only the event figures — never playerName or uid. */
 fun logDailyEventEvent(event: FirebaseEvent, state: DailyEventState) {
     logGameEvent(event) {
         putString(FirebaseParam.EventType.key, state.type.storageKey)

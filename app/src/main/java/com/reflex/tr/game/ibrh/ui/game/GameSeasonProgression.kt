@@ -50,7 +50,6 @@ internal fun todayDateKey(): String {
     return dateFormatter().format(Calendar.getInstance().time)
 }
 
-/** ISO-style `yyyy-Www` key identifying the current week. */
 internal fun currentWeekKey(nowMillis: Long = System.currentTimeMillis()): String {
     val calendar = Calendar.getInstance().apply { timeInMillis = nowMillis }
     return "${calendar.get(Calendar.YEAR)}-W${calendar.get(Calendar.WEEK_OF_YEAR)}"

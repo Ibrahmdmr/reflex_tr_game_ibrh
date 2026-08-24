@@ -2,7 +2,6 @@ package com.reflex.tr.game.ibrh.ui.game
 
 import androidx.compose.runtime.Immutable
 
-/** XP required per progression level. Single source for both the level maths and the UI bar. */
 internal const val XP_PER_LEVEL = 250
 
 @Immutable

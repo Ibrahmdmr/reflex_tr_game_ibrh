@@ -4,10 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/**
- * Weekly league bands, lowest first. Distinct from [RankTier], which tracks lifetime level: this
- * one resets weekly and is driven only by the points earned within the week.
- */
+/** Lowest first. Distinct from [RankTier]: this resets weekly and reads only the week's points. */
 enum class LeagueTier(
     val storageKey: String,
     @StringRes val titleRes: Int,
@@ -20,15 +17,11 @@ enum class LeagueTier(
     Diamond("diamond", R.string.league_tier_diamond, 3_000, 500),
     Neon("neon", R.string.league_tier_neon, 5_000, 750);
 
-    /** The next band up, or null when this is already the top. */
     val next: LeagueTier?
         get() = entries.getOrNull(ordinal + 1)
 }
 
-/**
- * This week's standing. [pendingRewardPoints] carries a finished week whose reward went
- * uncollected; only a finished week pays out, so it cannot be banked twice in one week.
- */
+/** [pendingRewardPoints] carries a finished week's uncollected reward; only a finished week pays. */
 @Immutable
 data class WeeklyLeagueState(
     val weekKey: String = "",
@@ -44,11 +37,9 @@ data class WeeklyLeagueState(
     val canClaimReward: Boolean
         get() = pendingRewardPoints > 0
 
-    /** Points still needed for [LeagueTier.next], or 0 at the top band. */
     val pointsToNextTier: Int
         get() = tier.next?.let { (it.minPoints - points).coerceAtLeast(0) } ?: 0
 
-    /** Progress through the current band, 0..100. Always 100 once the top band is reached. */
     val tierProgressPercent: Int
         get() {
             val next = tier.next ?: return 100

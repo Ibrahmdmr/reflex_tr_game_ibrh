@@ -6,6 +6,7 @@ import com.reflex.tr.game.ibrh.ads.AdPacingState
 import com.reflex.tr.game.ibrh.ads.PremiumRepository
 import com.reflex.tr.game.ibrh.ads.PremiumSource
 import com.reflex.tr.game.ibrh.ads.PremiumState
+import com.reflex.tr.game.ibrh.firebase.FirebaseGameServices
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -263,11 +264,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
         )
     }
 
-    /**
-     * No purchase flow writes this yet, so it reads as "nothing owned" for every real user. A bad
-     * read falls back to the same defaults rather than failing, because losing an entitlement is
-     * recoverable and a crash on launch is not.
-     */
+    /** A bad read falls back to "nothing owned": a lost entitlement is recoverable, a crash is not. */
     override fun premiumState(): PremiumState = runCatching {
         PremiumState(
             isPremiumUser = sharedPreferences.getBoolean(PREMIUM_IS_PREMIUM_KEY, false),
@@ -277,7 +274,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
                 ?: PremiumSource.None,
             expiresAtMillis = sharedPreferences.getLong(PREMIUM_EXPIRES_AT_KEY, 0L).coerceAtLeast(0L)
         )
-    }.getOrDefault(PremiumState())
+    }.orReported(PremiumState(), "premium entitlement")
 
     override fun savePremiumState(state: PremiumState) {
         sharedPreferences.edit()
@@ -288,10 +285,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             .commitSafely()
     }
 
-    /**
-     * The run counters survive a restart, which is what stops the "first games are free" grace
-     * from being farmed by relaunching. The elapsed-time cooldowns stay in memory by design.
-     */
+    /** The counters survive a restart, so the "first games free" grace cannot be farmed. */
     fun getAdPacingState(): AdPacingState = runCatching {
         AdPacingState(
             completedGames = sharedPreferences.getInt(AD_PACING_COMPLETED_GAMES_KEY, 0)
@@ -299,7 +293,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             nextInterstitialGame = sharedPreferences.getInt(AD_PACING_NEXT_INTERSTITIAL_GAME_KEY, 0)
                 .coerceAtLeast(0)
         )
-    }.getOrDefault(AdPacingState())
+    }.orReported(AdPacingState(), "the ad pacing counters")
 
     fun saveAdPacingState(state: AdPacingState) {
         sharedPreferences.edit()
@@ -364,20 +358,17 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             .commitSafely()
     }
 
-    /**
-     * Null when nothing is stored, when the key is from a build that no longer has that title, or
-     * when the read fails outright — every one of those means "no title chosen yet".
-     */
+    /** Null also covers a key from a build that no longer has that title. */
     private fun loadActivePlayerTitle(): PlayerTitle? = runCatching {
         sharedPreferences.getString(PLAYER_TITLE_KEY, null)
             ?.let { PlayerTitle.fromStorageKey(it) }
-    }.getOrNull()
+    }.orReported(null, "the active player title")
 
     private fun loadUnlockedPlayerTitles(): Set<PlayerTitle> = runCatching {
         sharedPreferences.getString(PLAYER_TITLE_UNLOCKED_IDS_KEY, "").orEmpty()
             .split(",")
             .mapNotNullTo(mutableSetOf()) { PlayerTitle.fromStorageKey(it.trim()) }
-    }.getOrDefault(emptySet())
+    }.orReported(emptySet(), "unlocked player titles")
 
     fun saveWeeklyBestScore(mode: GameMode, score: Int) {
         val safeScore = score.coerceAtLeast(0)
@@ -681,7 +672,6 @@ class GamePreferences(private val context: Context) : PremiumRepository {
         return hasEnoughGames || isNewBestScore || hasReturnedAnotherDay || positiveGameOverMoment
     }
 
-    /** True when today's score-share reward has not been paid yet; the reward is once per day. */
     fun canClaimScoreShareReward(): Boolean {
         return sharedPreferences.getString(SCORE_SHARE_REWARD_DATE_KEY, "").orEmpty() != todayDateKey()
     }
@@ -714,7 +704,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             val first = formatter.parse(firstOpenDate) ?: Date()
             val today = formatter.parse(todayDateKey()) ?: Date()
             (((today.time - first.time) / DAY_IN_MILLIS).toInt() + 1).coerceAtLeast(1)
-        }.getOrDefault(1)
+        }.orReported(1, "the days-since-first-open count")
     }
 
     private fun chooseDailyChallengeType(previousType: DailyChallenge?): DailyChallenge {
@@ -783,11 +773,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
         return unlocked + TargetSkin.ClassicTarget
     }
 
-    /**
-     * The journey's own day count comes from the stored first-open date, not from the record, so
-     * it cannot go stale. Unreadable entries are dropped rather than guessed at, and a failed read
-     * starts the player at day one with nothing claimed — never a crash.
-     */
+    /** The day count comes from the stored first-open date, not the record, so it cannot go stale. */
     private fun loadStarterJourneyState(): StarterJourneyState = runCatching {
         val progress = sharedPreferences.getString(STARTER_JOURNEY_PROGRESS_KEY, "").orEmpty()
             .split(",")
@@ -812,12 +798,9 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             taskProgress = progress,
             claimedDays = claimedDays
         )
-    }.getOrDefault(StarterJourneyState(daysSinceStart = activeAppDays()))
+    }.orReported(StarterJourneyState(daysSinceStart = activeAppDays()), "the starter journey")
 
-    /**
-     * Unopened chests survive a restart. Unknown keys are dropped rather than guessed at, and a
-     * failed read falls back to an empty stack, so bad stored data costs a chest but never a crash.
-     */
+    /** Unknown keys are dropped, so bad stored data costs a chest but never a crash. */
     private fun loadRewardChestState(): RewardChestState = runCatching {
         RewardChestState(
             pendingChests = sharedPreferences.getString(REWARD_CHEST_PENDING_KEY, "").orEmpty()
@@ -833,7 +816,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             lastRewardSeasonXp = sharedPreferences.getInt(REWARD_CHEST_LAST_REWARD_XP_KEY, 0)
                 .coerceAtLeast(0)
         )
-    }.getOrDefault(RewardChestState())
+    }.orReported(RewardChestState(), "pending reward chests")
 
     private fun loadCoinChestState(): CoinChestState {
         val today = todayDateKey()
@@ -1432,7 +1415,7 @@ class GamePreferences(private val context: Context) : PremiumRepository {
             val start = formatter.parse(startDateKey) ?: Date(0L)
             val end = formatter.parse(endDateKey) ?: Date(0L)
             ((end.time - start.time) / DAY_IN_MILLIS).toInt()
-        }.getOrDefault(Int.MAX_VALUE)
+        }.orReported(Int.MAX_VALUE, "the gap between two stored dates")
     }
 
     private fun weekDateKey(): String = currentWeekKey()
@@ -1492,10 +1475,7 @@ private fun SharedPreferences.Editor.commitSafely() {
     apply()
 }
 
-/**
- * Blank when no name was entered. The fallback is left to the UI so it can follow the in-app
- * language; a stored default would show one language's wording to everyone.
- */
+/** Blank when unset: the UI supplies the fallback so it follows the in-app language. */
 internal fun safePlayerName(name: String): String {
     return name.trim().take(12)
 }
@@ -1571,6 +1551,12 @@ private fun isValidWeekKey(weekKey: String): Boolean {
     val year = parts[0].toIntOrNull() ?: return false
     val week = parts[1].toIntOrNull() ?: return false
     return year in 2000..2100 && week in 1..53
+}
+
+/** [Result.getOrDefault] that reports first. Not for validators, which fail on the normal path. */
+private fun <T> Result<T>.orReported(fallback: T, what: String): T = getOrElse { error ->
+    FirebaseGameServices.recordNonFatal("GamePreferences could not read $what", error)
+    fallback
 }
 
 /** Strict, locale-fixed parser for every `yyyy-MM-dd` key the app stores. */

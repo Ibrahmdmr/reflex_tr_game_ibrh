@@ -4,37 +4,26 @@ import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import kotlin.random.Random
 
-/** Every rule the reward chest needs. UI reads state; only these functions decide it. */
-
-/** One guaranteed chest per this many finished runs. */
 internal const val GAMES_PER_REWARD_CHEST = 5
 
-/** Ceiling on unopened chests, so a long break cannot pile up a stack of them. */
 internal const val MAX_PENDING_REWARD_CHESTS = 5
 
-/** A new record only sometimes pays a chest; otherwise every strong run would. */
 private const val NEW_RECORD_CHEST_CHANCE_PERCENT = 20
 
-/** Coin payouts land on this step, so a reward reads as a round number. */
 private const val REWARD_CHEST_COIN_STEP = 5
 
-/** What one finished run did to the chest state. */
 data class RewardChestEarn(
     val state: RewardChestState,
     val earnedChest: RewardChestType?,
     val source: RewardChestSource?
 )
 
-/** An opened chest: the state with that chest removed, and what it paid. */
 data class RewardChestOpen(
     val state: RewardChestState,
     val reward: RewardChestReward
 )
 
-/**
- * Draws a tier from [RewardChestType.rollWeightPercent]. Any probability the weights leave over
- * falls to the first (weakest) tier, so a mistuned table can never fail to return a chest.
- */
+/** Leftover probability falls to the weakest tier, so a mistuned table still returns a chest. */
 internal fun rollRewardChestType(random: Random = Random): RewardChestType {
     val roll = random.nextInt(100)
     var threshold = 0
@@ -45,7 +34,6 @@ internal fun rollRewardChestType(random: Random = Random): RewardChestType {
     return RewardChestType.Small
 }
 
-/** The payout for one chest of [type]. Never negative, and never below the tier's floor. */
 internal fun rollRewardChestReward(
     type: RewardChestType,
     random: Random = Random
@@ -69,10 +57,7 @@ internal fun rollRewardChestReward(
     return RewardChestReward(type = type, coins = coins, seasonXp = seasonXp)
 }
 
-/**
- * Applies one finished run. At most one chest per run: the sources are checked in priority order
- * and the first match wins, so a run that satisfies every condition still pays exactly one.
- */
+/** At most one chest per run: sources are checked in priority order and the first match wins. */
 internal fun earnRewardChestAfterGame(
     state: RewardChestState,
     dailyEventJustCompleted: Boolean,
@@ -113,10 +98,7 @@ internal fun earnRewardChestAfterGame(
     )
 }
 
-/**
- * Hands out one chest from outside a run — a starter-journey day, for instance. Returns the state
- * unchanged when the stack is already full, so no caller has to know about the cap.
- */
+/** Hands out a chest from outside a run. Returns [state] unchanged when the stack is full. */
 internal fun grantedRewardChest(
     state: RewardChestState,
     chest: RewardChestType
@@ -125,7 +107,6 @@ internal fun grantedRewardChest(
     return state.copy(pendingChests = state.pendingChests + chest)
 }
 
-/** Opens the best waiting chest, or returns null when there is nothing to open. */
 internal fun openBestRewardChest(
     state: RewardChestState,
     random: Random = Random
@@ -143,9 +124,7 @@ internal fun openBestRewardChest(
     )
 }
 
-/**
- * Reward-chest analytics. Carries only the chest figures — never the player name or uid.
- */
+/** Carries only the chest figures — never playerName or uid. */
 internal fun logRewardChestEvent(
     event: FirebaseEvent,
     type: RewardChestType,

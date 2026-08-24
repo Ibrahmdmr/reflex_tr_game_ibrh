@@ -30,12 +30,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/**
- * The one place that answers "what can I get out of an ad, and how much is left today?".
- *
- * Nothing here starts an ad the player did not ask for, and an offer that cannot be taken shows a
- * status line instead of a dead button — a greyed-out button reads as broken rather than as spent.
- */
 @Composable
 internal fun BonusesSection(
     offers: List<RewardedOfferState>,
@@ -45,8 +39,8 @@ internal fun BonusesSection(
     onPremiumClick: () -> Unit,
     onOpened: (List<RewardedOfferState>) -> Unit
 ) {
-    // One report per visit, not per ad-state change: keying this on `offers` re-fired the whole
-    // set every time an ad finished loading and inflated every "viewed" count.
+    // One report per visit: keying this on `offers` re-fires on every ad-state change and
+    // inflates every "viewed" count.
     val openedOffers by rememberUpdatedState(offers)
     LaunchedEffect(Unit) { onOpened(openedOffers) }
     Column(
@@ -124,10 +118,9 @@ private fun BonusOfferCard(
                     )
                 }
             }
-            // Only an offer that can actually pay out gets a button; the rest say why not.
+            // Only an offer that can pay out gets a button; the rest say why not.
             if (offer.isAvailable) {
-                // Bounded width: the button fills its width, so an unconstrained one in a Row
-                // collapses the text column beside it.
+                // Bounded: the button fills its width and would collapse the text column beside it.
                 SecondaryGameButton(
                     modifier = Modifier
                         .widthIn(min = 104.dp, max = 124.dp)
@@ -148,12 +141,11 @@ private fun BonusOfferCard(
         }
     }
     if (offer.availability == RewardedOfferAvailability.LimitReached) {
-        // Reported on render rather than on tap: a spent offer has no button left to tap.
+        // Reported on render, not on tap: a spent offer has no button left to tap.
         LaunchedEffect(offer.type) { onLimitReached() }
     }
 }
 
-/** The line that tells the player how much of today is left, when there is a daily count at all. */
 @Composable
 private fun bonusOfferStatusText(offer: RewardedOfferState): String? = when {
     !offer.hasDailyLimit -> null
@@ -174,10 +166,7 @@ private fun bonusOfferBlockedLabelRes(availability: RewardedOfferAvailability): 
     RewardedOfferAvailability.Available -> R.string.bonus_watch_and_claim
 }
 
-/**
- * Honest placeholder. There is no purchase flow behind this yet, so it says so rather than
- * offering a button that would do nothing.
- */
+/** No purchase flow behind this yet, so it says so rather than offering a dead button. */
 @Composable
 private fun PremiumComingSoonCard(
     premiumState: PremiumState,

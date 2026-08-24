@@ -25,13 +25,7 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/**
- * The first thing a new player should read. Deliberately one day, one next step and one button —
- * the rest of the home screen is exactly what this card exists to postpone.
- *
- * The caller renders it only while [StarterJourneyState.isActive], so a returning veteran never
- * sees it.
- */
+/** Rendered only while [StarterJourneyState.isActive]. */
 @Composable
 internal fun StarterJourneyCard(
     state: StarterJourneyState,
@@ -90,8 +84,7 @@ internal fun StarterJourneyCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            // One next step, never the whole checklist: three open tasks at once is the crowding
-            // this card is meant to prevent.
+            // One next step, never the whole checklist: crowding is what this card prevents.
             Text(
                 text = day.tasks.firstOrNull { !state.isTaskCompleted(it) }
                     ?.let { stringResource(it.titleRes) }
@@ -119,7 +112,6 @@ internal fun StarterJourneyCard(
     }
 }
 
-/** Coins, plus the chest the day carries when the build has a chest system at all. */
 @Composable
 private fun starterRewardText(day: StarterJourneyDay): String {
     val coins = stringResource(R.string.starter_reward_value, day.rewardCoins)
@@ -127,7 +119,6 @@ private fun starterRewardText(day: StarterJourneyDay): String {
     return "$coins · ${stringResource(chest.titleRes)}"
 }
 
-/** Quiet closing line, shown for a week after the third day is collected and then never again. */
 @Composable
 internal fun StarterJourneyCompletedNote(modifier: Modifier = Modifier) {
     Text(
@@ -140,10 +131,6 @@ internal fun StarterJourneyCompletedNote(modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Game Over note: one line at most. A waiting reward outranks a finished task, because that is the
- * one the player can act on right now.
- */
 @Composable
 internal fun StarterJourneyGameOverNote(
     state: StarterJourneyState,

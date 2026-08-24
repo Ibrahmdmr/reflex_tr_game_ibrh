@@ -1,11 +1,11 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 /**
  * The chest decides real payouts from a random draw, so the parts that must never drift — the

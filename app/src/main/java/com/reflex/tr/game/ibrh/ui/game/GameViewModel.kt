@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
-/** Collaborators are injected so the game logic is testable; production wiring is in [Factory]. */
 class GameViewModel internal constructor(
     private val gamePreferences: GamePreferences,
     private val leaderboardRepository: LeaderboardRepository,
@@ -42,7 +41,6 @@ class GameViewModel internal constructor(
 ) : ViewModel() {
 
     companion object {
-        /** Production wiring for [GameViewModel]. */
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
@@ -661,18 +659,12 @@ class GameViewModel internal constructor(
         logDailyEventEvent(FirebaseEvent.DailyEventRewardClaimed, claimedEvent)
     }
 
-    /**
-     * Opens the best waiting chest and banks what it paid. The reward is drawn here rather than in
-     * the UI, so [onOpened] always reports the amount that actually reached the wallet. Does
-     * nothing when no chest is waiting.
-     */
     fun openRewardChest(onOpened: (RewardChestReward) -> Unit = {}) {
         if (isStorePreviewModeActive()) return
         val progression = progressionForClaim()
         val opened = openBestRewardChest(progression.rewardChest) ?: return
 
         logRewardChestEvent(FirebaseEvent.RewardChestOpened, opened.reward.type)
-        // Season XP is skipped by addSeasonXp when the chest rolled none.
         val paidProgression = addSeasonXp(
             addCoins(progression, opened.reward.coins).copy(rewardChest = opened.state),
             opened.reward.seasonXp
@@ -690,10 +682,7 @@ class GameViewModel internal constructor(
         onOpened(opened.reward)
     }
 
-    /**
-     * Collects the active starter day. [claimedStarterJourneyDay] is the only place a day is
-     * marked collected, so a double tap cannot pay twice.
-     */
+    /** [claimedStarterJourneyDay] is the only place a day is marked, so a double tap cannot pay twice. */
     fun claimStarterJourneyReward() {
         if (isStorePreviewModeActive()) return
         val progression = progressionForClaim()
@@ -701,7 +690,6 @@ class GameViewModel internal constructor(
 
         val rewarded = addCoins(progression, day.rewardCoins).copy(
             starterJourney = claimedJourney,
-            // Skipped silently when the day carries no chest, or when the stack is already full.
             rewardChest = day.rewardChest
                 ?.let { grantedRewardChest(progression.rewardChest, it) }
                 ?: progression.rewardChest
@@ -717,17 +705,12 @@ class GameViewModel internal constructor(
         }
     }
 
-    /** Reported from the rewards tab, so seeing today's event counts once per event. */
     fun onDailyEventViewed() {
         if (isStorePreviewModeActive()) return
         advanceStarterJourney(StarterTask.SeeDailyEvent)
     }
 
-    /**
-     * The one hook for starter tasks that a finished run cannot prove. Writes straight to storage
-     * rather than through [saveProgressionAndUpdateState], which is what keeps the reward-claim
-     * task from re-entering this function.
-     */
+    /** Writes straight to storage: going through [saveProgressionAndUpdateState] would re-enter here. */
     private fun advanceStarterJourney(task: StarterTask) {
         val progression = _uiState.value.progressionState
         val advance = advanceStarterJourneyForAction(progression.starterJourney, task)
@@ -747,12 +730,7 @@ class GameViewModel internal constructor(
         markClaimed = { it.copy(comboChallenge = it.comboChallenge.copy(claimed = true)) }
     )
 
-    /**
-     * The one claim path for a reward that is earned once and paid once.
-     *
-     * Reading through [progressionForClaim] rather than the UI state is what makes it idempotent:
-     * a second tap arriving right behind the first already sees `claimed = true` and pays nothing.
-     */
+    /** Idempotent: reading through [progressionForClaim] means a second tap sees `claimed = true`. */
     private fun claimOnce(
         isClaimable: (ProgressionState) -> Boolean,
         rewardCoins: (ProgressionState) -> Int,
@@ -766,13 +744,9 @@ class GameViewModel internal constructor(
     }
 
     /**
-     * The authoritative progression to claim against: stored values, plus the run flags the UI may
-     * still be showing.
-     *
-     * Storage is the authority because `SharedPreferences.apply()` publishes to the in-memory map
-     * at once, so a claim always sees one that landed a moment earlier. But storage deliberately
-     * holds none of the "this just happened" flags, so reading it plainly would clear a level-up
-     * popup or the new-badge card while they are on screen — those are carried across instead.
+     * Storage is the authority: `apply()` publishes to the in-memory map at once, so a claim always
+     * sees one that landed a moment earlier. It holds none of the "this just happened" flags though,
+     * so those are carried across rather than cleared off the screen.
      */
     private fun progressionForClaim(): ProgressionState {
         val onScreen = _uiState.value.progressionState
@@ -858,11 +832,7 @@ class GameViewModel internal constructor(
         logNewAchievementUnlocks(updatedProgression)
     }
 
-    /**
-     * Pays the once-a-day share reward after the share sheet actually opened. Returns the coins
-     * granted, or 0 when today's reward is already spent, so the caller can show the message only
-     * when something was paid.
-     */
+    /** Returns the coins granted, or 0 when today's reward is already spent. */
     fun onScoreShareCompleted(): Int {
         if (isStorePreviewModeActive()) return 0
         if (!gamePreferences.canClaimScoreShareReward()) return 0
@@ -981,17 +951,12 @@ class GameViewModel internal constructor(
         refreshProfileAndLeaderboard()
     }
 
-    /** Reported from the profile so opening the list counts once, not once per recomposition. */
     fun onPlayerTitlesOpened() {
         if (isStorePreviewModeActive()) return
         logPlayerTitleEvent(FirebaseEvent.PlayerTitlesOpened)
     }
 
-    /**
-     * The one hook that awards titles. Called after every progression write and on profile
-     * refresh, so a game, a claim, a purchase and a streak all reach it without each knowing the
-     * rules. Persists and announces only when something actually moved.
-     */
+    /** The one hook that awards titles; called after every progression write. */
     private fun refreshPlayerTitles(progression: ProgressionState): List<PlayerTitle> {
         val result = refreshedPlayerTitles(_uiState.value.playerProfile, progression)
         if (result.newlyUnlocked.isEmpty() && result.profile == _uiState.value.playerProfile) {
@@ -1233,13 +1198,8 @@ class GameViewModel internal constructor(
         )
     }
 
-    /** Read through the repository each time, so a future billing client needs no cache here. */
     private fun premiumState(): PremiumState = premiumRepository.premiumState()
 
-    /**
-     * Nothing writes an entitlement in this build; the card says "coming soon" and this only
-     * records that the player looked at it.
-     */
     fun onPremiumCardClicked() {
         if (isStorePreviewModeActive()) return
         logRewardedOfferEvent(
@@ -1249,10 +1209,6 @@ class GameViewModel internal constructor(
         )
     }
 
-    /**
-     * Everything the Bonuses section makes observable, reported in one place: that it was opened,
-     * what the premium card said, and the state each offer was in when the player saw it.
-     */
     fun onBonusesOpened(offers: List<RewardedOfferState>) {
         if (isStorePreviewModeActive()) return
         val isPremium = premiumState().grants(PremiumFeature.NoInterstitials)
@@ -1280,11 +1236,7 @@ class GameViewModel internal constructor(
         }
     }
 
-    /**
-     * Grants a Bonuses offer by handing off to the reward handler that already owned it. Nothing
-     * is paid here: each handler keeps its own duplicate-callback guard and its own daily limit,
-     * so this cannot pay twice or bypass a cap.
-     */
+    /** Nothing is paid here: each handler keeps its own duplicate guard and daily limit. */
     fun onRewardedOfferEarned(type: RewardedOfferType) {
         if (isStorePreviewModeActive()) return
         logRewardedOfferEvent(
@@ -1317,7 +1269,6 @@ class GameViewModel internal constructor(
         }
     }
 
-    /** Reported when the player taps an offer whose daily chances are already spent. */
     fun onBonusOfferBlocked(type: RewardedOfferType) {
         if (isStorePreviewModeActive()) return
         logRewardedOfferEvent(
@@ -1327,7 +1278,6 @@ class GameViewModel internal constructor(
         )
     }
 
-    /** Reported when the player chooses to watch, before any ad is requested. */
     fun onRewardedOfferClicked(type: RewardedOfferType) {
         if (isStorePreviewModeActive()) return
         logRewardedOfferEvent(
@@ -1575,7 +1525,6 @@ class GameViewModel internal constructor(
         if (cancelTimer) {
             bossRoundJob?.cancel()
         }
-        // generateTargets() is randomised, so it must not run inside an update{} lambda.
         val endedState = _uiState.value.let { state ->
             if (!state.isBossRoundActive) return@let state
 
@@ -1870,7 +1819,6 @@ class GameViewModel internal constructor(
         }
 
         lastHitElapsedMillis = 0L
-        // generateTargets() is randomised, so it must not run inside an update{} lambda.
         _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
@@ -2321,7 +2269,6 @@ class GameViewModel internal constructor(
             return
         }
 
-        // generateTargets() is randomised, so it must not run inside an update{} lambda.
         _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
@@ -2356,7 +2303,6 @@ class GameViewModel internal constructor(
         }
 
         lastHitElapsedMillis = 0L
-        // generateTargets() is randomised, so it must not run inside an update{} lambda.
         _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = it.selectedMode,
@@ -2841,7 +2787,6 @@ class GameViewModel internal constructor(
         }
     }
 
-    /** Drives everything the home screen shows that moves with the clock rather than with play. */
     private fun startBonusHourTicker() {
         bonusHourJob?.cancel()
         bonusHourJob = viewModelScope.launch {
@@ -2926,10 +2871,7 @@ class GameViewModel internal constructor(
         ).withPlayerTitle(profile.activeTitle)
     }
 
-    /**
-     * Stamps the active title onto the player's own row after the board is built. The repository
-     * and the uploaded score model never learn about titles, so the board itself is unchanged.
-     */
+    /** Local only: the repository and the uploaded score model never learn about titles. */
     private fun LeaderboardSnapshot.withPlayerTitle(title: PlayerTitle?): LeaderboardSnapshot {
         if (title == null || entries.none { it.isPlayer }) return this
         return copy(entries = entries.map { if (it.isPlayer) it.copy(title = title) else it })
@@ -2974,10 +2916,6 @@ class GameViewModel internal constructor(
         }
     }
 
-    /**
-     * Counts the run, asks [AdPacingManager] for a verdict and records what it decided. The rules
-     * themselves live in the manager; this only owns the state they read.
-     */
     private fun decideInterstitialAfterGame(
         score: Int,
         bestScore: Int,
@@ -3048,7 +2986,6 @@ class GameViewModel internal constructor(
         val currentState = _uiState.value
         if (!currentState.canAcceptGameplayInput()) return
 
-        // Randomised positions are generated once, outside the update{} lambda.
         val movedTargets = currentState.targets.map { target ->
             target.copy(
                 position = targetEngine.generateRandomTargetPosition(
@@ -3068,7 +3005,6 @@ class GameViewModel internal constructor(
         if (!currentState.canAcceptGameplayInput()) return
 
         val newColor = targetEngine.nextColorRule(currentState.activeColor)
-        // generateTargets() is randomised, so it must not run inside an update{} lambda.
         _uiState.value = currentState.let {
             val nextTargets = targetEngine.generateTargets(
                 mode = GameMode.ColorReflex,

@@ -132,12 +132,6 @@ internal fun calculateProgressionLevel(xp: Int): Int {
     return (xp / XP_PER_LEVEL + 1).coerceAtLeast(1)
 }
 
-/**
- * Where the player sits inside their current level.
- *
- * The profile bar used to work this out inline with the level size written out three times as a
- * literal, which meant retuning [XP_PER_LEVEL] would silently leave the bar reading wrong.
- */
 @Immutable
 internal data class LevelProgress(
     val currentLevelXp: Int,

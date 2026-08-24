@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/** Coin wallet arithmetic. Extracted from GameViewModel so the rules stay unit testable on their own. */
-
 internal fun addCoins(progression: ProgressionState, coins: Int): ProgressionState {
     val safeCoins = coins.coerceAtLeast(0)
     val totalCoins = progression.coins.toLong() + safeCoins.toLong()

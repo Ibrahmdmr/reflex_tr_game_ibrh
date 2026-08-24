@@ -27,10 +27,6 @@ import com.reflex.tr.game.ibrh.R
 import com.reflex.tr.game.ibrh.ui.game.components.SecondaryGameButton
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/**
- * Rewards-tab entry. The caller renders it only when a chest is waiting, so an empty stack costs
- * no space at all rather than showing a placeholder.
- */
 @Composable
 internal fun RewardChestCard(
     state: RewardChestState,
@@ -95,10 +91,6 @@ internal fun RewardChestCard(
     }
 }
 
-/**
- * Game Over notice. One headline plus one button: the panel already carries the score, the coins
- * and the progress lines, so the chest earns a single compact row rather than a block.
- */
 @Composable
 internal fun RewardChestGameOverCard(
     type: RewardChestType,
@@ -164,7 +156,6 @@ internal fun RewardChestGameOverCard(
     }
 }
 
-/** Tier name as a pill, so the card headline stays about the count rather than the tier. */
 @Composable
 private fun RewardChestBadge(type: RewardChestType) {
     val accent = rewardChestAccent(type)

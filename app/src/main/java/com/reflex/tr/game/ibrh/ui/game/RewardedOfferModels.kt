@@ -4,10 +4,9 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.reflex.tr.game.ibrh.R
 
-/** No daily cap: the offer is limited by the run or the streak instead of by a counter. */
+/** No daily cap: limited by the run or the streak instead of by a counter. */
 internal const val REWARDED_OFFER_UNLIMITED = -1
 
-/** What the player walks away with. Used for analytics and for picking the card's accent. */
 enum class RewardedOfferKind {
     Coins,
     Continue,
@@ -15,19 +14,12 @@ enum class RewardedOfferKind {
     StreakProtect
 }
 
-/** Where an offer can be acted on. Everything is listed in Bonuses; only some can be taken there. */
 enum class RewardedOfferSurface {
     Bonuses,
     GameOver
 }
 
-/**
- * Every rewarded-ad offer in the game, in one table.
- *
- * Each one maps onto a [RewardedAction] that already exists — this adds no new ad placement and no
- * second reward path. It is the presentation and eligibility layer over what the app already does,
- * so limits and payouts stay wherever they were already enforced.
- */
+/** Each maps onto an existing [RewardedAction]: no new placement, no second reward path. */
 enum class RewardedOfferType(
     val storageKey: String,
     val action: RewardedAction,
@@ -78,10 +70,6 @@ enum class RewardedOfferType(
     )
 }
 
-/**
- * Why an offer can or cannot be taken right now. Anything other than [Available] renders as a
- * short status line rather than a dead button — a greyed-out button reads as broken.
- */
 enum class RewardedOfferAvailability {
     Available,
     LimitReached,
@@ -90,10 +78,6 @@ enum class RewardedOfferAvailability {
     AdNotReady
 }
 
-/**
- * One offer as the UI sees it. Every field is derived from state the app already keeps, so this
- * carries no stored data of its own and cannot drift from the system that pays the reward.
- */
 @Immutable
 data class RewardedOfferState(
     val type: RewardedOfferType,
@@ -108,7 +92,6 @@ data class RewardedOfferState(
     val hasDailyLimit: Boolean
         get() = dailyLimit > 0
 
-    /** How many of today's chances are already spent, for the "1/2 used" line. */
     val usedToday: Int
         get() = (dailyLimit - remaining).coerceIn(0, dailyLimit.coerceAtLeast(0))
 }

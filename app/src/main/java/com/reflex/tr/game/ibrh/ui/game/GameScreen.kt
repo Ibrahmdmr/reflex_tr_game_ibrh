@@ -36,12 +36,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.reflex.tr.game.ibrh.R
+import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.share.ScoreShareData
 import com.reflex.tr.game.ibrh.share.ScoreShareLabels
 import com.reflex.tr.game.ibrh.share.ScoreShareManager
 import com.reflex.tr.game.ibrh.share.ScoreShareResult
-import com.reflex.tr.game.ibrh.ads.RewardedAdUiState
 import com.reflex.tr.game.ibrh.ui.game.feedback.rememberGameSoundHooks
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 import kotlinx.coroutines.delay

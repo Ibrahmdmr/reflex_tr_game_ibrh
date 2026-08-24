@@ -29,12 +29,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/**
- * Profile entry: the active title, how far the collection has come, and the way into the list.
- *
- * The list expands in place rather than opening a screen, so titles cost the app no extra tab and
- * no back-stack of their own.
- */
 @Composable
 internal fun PlayerTitleCard(
     profile: PlayerProfile,
@@ -117,10 +111,6 @@ internal fun PlayerTitleCard(
     }
 }
 
-/**
- * The full ladder, easiest first. Locked rows stay legible rather than greyed out to nothing —
- * the requirement line is the reason to keep playing, so it has to be readable.
- */
 @Composable
 private fun PlayerTitlesSection(
     profile: PlayerProfile,
@@ -227,7 +217,6 @@ private fun PlayerTitleRow(
     }
 }
 
-/** Small "x / y" line under a locked title, so the ladder shows how close the next rung is. */
 @Composable
 private fun PlayerTitleProgressHint(
     title: PlayerTitle,
@@ -268,7 +257,6 @@ private fun PlayerTitleRarityChip(rarity: PlayerTitleRarity) {
     }
 }
 
-/** One-line badge for the leaderboard row and the profile header. */
 @Composable
 internal fun PlayerTitleInlineLabel(
     title: PlayerTitle,
@@ -284,10 +272,6 @@ internal fun PlayerTitleInlineLabel(
     )
 }
 
-/**
- * Game Over notice. At most two lines so the panel keeps its shape; anything beyond that is a
- * pointer to the profile rather than another row.
- */
 @Composable
 internal fun NewPlayerTitlesCard(
     titles: List<PlayerTitle>,

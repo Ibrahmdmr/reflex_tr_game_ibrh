@@ -99,10 +99,7 @@ data class SeasonState(
     val claimedRewardLevels: Set<Int> = emptySet(),
     val preservedBadgeLevels: Set<Int> = emptySet(),
     val xpBoostEndTimeMillis: Long = 0L,
-    /**
-     * Minutes left on [xpBoostEndTimeMillis], stored like [remainingDays] rather than read from
-     * the clock: a clock-reading getter would change value without Compose ever recomposing.
-     */
+    /** Stored, not read from the clock: a clock-reading getter never triggers recomposition. */
     val xpBoostRemainingMinutes: Int = 0,
     val missionDateKey: String = "",
     val gamesPlayedToday: Int = 0,
@@ -132,7 +129,6 @@ data class SeasonState(
             seasonRewardForLevel(level = level, claimedLevels = claimedRewardLevels)
         }
 
-    /** A reached reward still waiting to be collected, without building the whole [rewards] list. */
     val hasClaimableReward: Boolean
         get() = (1..level).any { it !in claimedRewardLevels }
 
@@ -218,10 +214,7 @@ fun seasonRewardForLevel(
     )
 }
 
-/**
- * Reprojects [SeasonState.xpBoostRemainingMinutes] against [nowMillis], keeping the instance when
- * the count has not moved. Call it wherever the season state is loaded or republished.
- */
+/** Keeps the instance when the count has not moved. Call wherever season state is republished. */
 internal fun SeasonState.withRefreshedXpBoost(
     nowMillis: Long = System.currentTimeMillis()
 ): SeasonState {

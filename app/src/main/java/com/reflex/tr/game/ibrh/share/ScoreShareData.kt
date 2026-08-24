@@ -1,9 +1,5 @@
 package com.reflex.tr.game.ibrh.share
 
-/**
- * Localised text for the score card, resolved in composition so the card follows the in-app
- * language rather than the system one.
- */
 data class ScoreShareLabels(
     val title: String,
     val slogan: String,
@@ -18,10 +14,7 @@ data class ScoreShareLabels(
     val storeHint: String
 )
 
-/**
- * The figures the score card draws. Numbers are clamped here so the generator can render them
- * without re-checking, and every label is optional — a blank one drops its row.
- */
+/** Clamped here so the generator need not re-check; a blank label drops its row. */
 data class ScoreShareData(
     val score: Int,
     val modeName: String,
@@ -39,7 +32,6 @@ data class ScoreShareData(
     }
 
     companion object {
-        /** Clamps the raw gameplay figures into a drawable card. */
         fun of(
             score: Int,
             modeName: String,

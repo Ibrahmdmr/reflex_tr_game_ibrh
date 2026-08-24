@@ -46,10 +46,7 @@ internal fun Context.showShortToast(message: String) {
     runCatching { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
 }
 
-/**
- * Score-card analytics. Carries only gameplay figures — never the player name or uid — and never
- * throws, so a reporting failure cannot break the share.
- */
+/** Carries only gameplay figures — never playerName or uid. */
 internal fun logScoreShareEvent(
     event: FirebaseEvent,
     uiState: GameUiState,

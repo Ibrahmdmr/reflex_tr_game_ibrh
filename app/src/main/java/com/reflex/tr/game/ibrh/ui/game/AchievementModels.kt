@@ -13,10 +13,7 @@ data class PersonalRecordsState(
     val mostCoinsInGame: Int = 0
 )
 
-/**
- * @property icon a language-neutral glyph carrying U+FE0E, so it renders as monochrome text and
- * takes the badge tint. Title initials do not work here: the Turkish ones collide.
- */
+/** @property icon carries U+FE0E so it renders as monochrome text. Turkish initials collide. */
 enum class ProfileBadge(
     val storageKey: String,
     @StringRes val titleRes: Int,

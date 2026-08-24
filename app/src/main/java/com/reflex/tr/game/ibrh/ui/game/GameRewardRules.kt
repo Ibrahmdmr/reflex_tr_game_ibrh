@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/** Streak, boss-round and coin bonus rules. Extracted from GameViewModel so the rules stay unit testable on their own. */
-
 internal const val FLAWLESS_STREAK_5_BONUS_COINS = 10
 internal const val FLAWLESS_STREAK_10_BONUS_COINS = 25
 internal const val FLAWLESS_STREAK_20_BONUS_COINS = 75

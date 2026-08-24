@@ -27,7 +27,6 @@ import com.reflex.tr.game.ibrh.ui.theme.ArcadeGold
 import com.reflex.tr.game.ibrh.ui.theme.ArcadeTeal
 import com.reflex.tr.game.ibrh.ui.theme.ReflexGamePalette
 
-/** Each band gets its own accent so the tiers read apart at a glance. */
 internal val LeagueTier.accentColor: Color
     get() = when (this) {
         LeagueTier.Bronze -> Color(0xFFCD7F32)
@@ -37,7 +36,6 @@ internal val LeagueTier.accentColor: Color
         LeagueTier.Neon -> ReflexGamePalette.neonPurple
     }
 
-/** Compact home-screen entry: where the player stands and what is left to climb. */
 @Composable
 internal fun WeeklyLeagueCard(
     state: WeeklyLeagueState,
@@ -105,7 +103,6 @@ internal fun WeeklyLeagueCard(
     }
 }
 
-/** Fuller view for the rewards tab: adds the last-week reward and the tier payout table. */
 @Composable
 internal fun WeeklyLeagueSection(
     state: WeeklyLeagueState,
@@ -168,7 +165,6 @@ internal fun WeeklyLeagueSection(
     }
 }
 
-/** Small tier badge, also used on the profile header. */
 @Composable
 internal fun LeagueTierChip(tier: LeagueTier) {
     Surface(

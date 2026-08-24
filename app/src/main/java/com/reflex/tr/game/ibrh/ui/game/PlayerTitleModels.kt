@@ -3,10 +3,7 @@ package com.reflex.tr.game.ibrh.ui.game
 import androidx.annotation.StringRes
 import com.reflex.tr.game.ibrh.R
 
-/**
- * Rarity band of a title. Deliberately separate from [ThemeRarity]: retuning shop rarities must
- * not silently reclassify what a player earned.
- */
+/** Separate from [ThemeRarity]: retuning shop rarities must not reclassify what a player earned. */
 enum class PlayerTitleRarity(@StringRes val titleRes: Int) {
     Common(R.string.title_rarity_common),
     Rare(R.string.title_rarity_rare),
@@ -14,7 +11,7 @@ enum class PlayerTitleRarity(@StringRes val titleRes: Int) {
     Legendary(R.string.title_rarity_legendary)
 }
 
-/** Grouping used only to label a title in the list. No rule reads it. */
+/** Labelling only. No rule reads it. */
 enum class PlayerTitleCategory(@StringRes val titleRes: Int) {
     Starter(R.string.title_category_starter),
     Score(R.string.title_category_score),
@@ -28,16 +25,7 @@ enum class PlayerTitleCategory(@StringRes val titleRes: Int) {
     Mastery(R.string.title_category_mastery)
 }
 
-/**
- * Every title in the game, easiest first — the list is shown in this order, so it reads as a
- * ladder.
- *
- * [requirementValue] is the threshold the rule checks *and* the number the requirement line
- * prints, so the two can never disagree. Requirement strings without a placeholder simply ignore
- * it.
- *
- * @see meetsPlayerTitleRequirement for the conditions themselves.
- */
+/** [requirementValue] is both the threshold checked and the number printed, so they agree. */
 enum class PlayerTitle(
     val storageKey: String,
     @StringRes val titleRes: Int,

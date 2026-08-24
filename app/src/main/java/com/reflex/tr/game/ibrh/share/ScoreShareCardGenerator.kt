@@ -9,10 +9,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 
-/**
- * Draws the shareable score card onto a [Canvas]. Rendering a Compose tree would need a live
- * window and a measured layout; this poster is fixed-size, so Canvas keeps it lifecycle-free.
- */
+/** Canvas rather than Compose: a fixed-size poster needs no live window or measured layout. */
 object ScoreShareCardGenerator {
 
     const val WIDTH = 1080
@@ -20,7 +17,6 @@ object ScoreShareCardGenerator {
 
     private const val MARGIN = 84f
 
-    // Sampled from ReflexGamePalette so the card matches the app.
     private const val BG_TOP = 0xFF0B1330.toInt()
     private const val BG_BOTTOM = 0xFF3A2280.toInt()
     private const val NEON_BLUE = 0xFF4A6CF7.toInt()
@@ -32,10 +28,7 @@ object ScoreShareCardGenerator {
     private const val CARD_FILL = 0x2EFFFFFF
     private const val CARD_STROKE = 0x5CFFFFFF
 
-    /**
-     * Returns null instead of throwing when the bitmap cannot be allocated, so a low-memory device
-     * degrades to "sharing failed" rather than a crash.
-     */
+    /** Null rather than throwing, so a low-memory device degrades to "sharing failed". */
     fun generate(data: ScoreShareData): Bitmap? = runCatching {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).drawCard(data)
@@ -58,7 +51,6 @@ object ScoreShareCardGenerator {
         )
         drawRect(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), paint)
 
-        // Two soft glows so the flat gradient reads as the game's neon arena.
         paint.shader = RadialGradient(
             WIDTH * 0.82f, HEIGHT * 0.16f, 620f,
             intArrayOf(0x59FF2D35, 0x00FF2D35), null, Shader.TileMode.CLAMP
@@ -217,7 +209,6 @@ object ScoreShareCardGenerator {
         }.measureText(text)
     }
 
-    /** Trims and ellipsises [text] until it fits [maxWidth]. */
     private fun fitText(text: String, maxWidth: Float, size: Float, typeface: Typeface): String {
         if (maxWidth <= 0f) return ""
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -232,7 +223,6 @@ object ScoreShareCardGenerator {
         return if (end <= 0) "" else text.take(end).trimEnd() + "…"
     }
 
-    /** Wraps on spaces so a long localised sentence never runs past the card edge. */
     private fun Canvas.drawCenteredMultiline(
         text: String,
         baselineY: Float,

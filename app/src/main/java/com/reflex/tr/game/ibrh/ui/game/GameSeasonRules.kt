@@ -1,7 +1,5 @@
 package com.reflex.tr.game.ibrh.ui.game
 
-/** Season-quest and mode-mastery progression rules. Extracted from GameViewModel so the rules stay unit testable on their own. */
-
 internal data class ModeMasteryAdvanceResult(
     val xpByMode: Map<GameMode, Int>,
     val coinBonus: Int,

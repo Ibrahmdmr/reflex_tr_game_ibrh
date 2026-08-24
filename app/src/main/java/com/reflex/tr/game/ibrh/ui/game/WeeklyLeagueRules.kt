@@ -4,15 +4,12 @@ import com.reflex.tr.game.ibrh.firebase.FirebaseEvent
 import com.reflex.tr.game.ibrh.firebase.FirebaseParam
 import java.util.Calendar
 
-/** Every rule the weekly league needs. UI reads state; only these functions decide it. */
-
 private const val LEAGUE_COMBO_MULTIPLIER = 2
 private const val LEAGUE_ACCURACY_BONUS = 25
 private const val LEAGUE_ACCURACY_THRESHOLD = 80
 private const val LEAGUE_NEW_RECORD_BONUS = 50
 private const val LEAGUE_DAILY_EVENT_BONUS = 25
 
-/** What one finished run did to the league standing. */
 data class WeeklyLeagueAdvance(
     val state: WeeklyLeagueState,
     val earnedPoints: Int,
@@ -20,13 +17,13 @@ data class WeeklyLeagueAdvance(
     val upgradedTo: LeagueTier?
 )
 
-/** The band [points] falls into. Never fails: below every threshold means [LeagueTier.Bronze]. */
+/** Never fails: below every threshold means [LeagueTier.Bronze]. */
 fun leagueTierForPoints(points: Int): LeagueTier {
     val safePoints = points.coerceAtLeast(0)
     return LeagueTier.entries.lastOrNull { safePoints >= it.minPoints } ?: LeagueTier.Bronze
 }
 
-/** League points for one finished run. Separate from coins — this feeds only the league. */
+/** Separate from coins — this feeds only the league. */
 fun calculateLeaguePoints(
     score: Int,
     maxCombo: Int,
@@ -42,10 +39,7 @@ fun calculateLeaguePoints(
     return base + comboBonus + accuracyBonus + recordBonus + eventBonus
 }
 
-/**
- * This week's standing, rolling over when [state] is from an earlier week. Only the most recent
- * uncollected reward is carried, so no history builds up.
- */
+/** Rolls over when [state] is from an earlier week; only the latest uncollected reward carries. */
 fun weeklyLeagueForWeek(
     state: WeeklyLeagueState,
     weekKey: String = currentWeekKey()
@@ -62,7 +56,6 @@ fun weeklyLeagueForWeek(
     )
 }
 
-/** Adds one finished run to this week's total. */
 fun advanceWeeklyLeagueAfterGame(
     state: WeeklyLeagueState,
     score: Int,
@@ -98,13 +91,11 @@ fun advanceWeeklyLeagueAfterGame(
     )
 }
 
-/** Claims the waiting reward, returning null when there is nothing to collect. */
 fun claimedWeeklyLeagueReward(state: WeeklyLeagueState): Pair<WeeklyLeagueState, LeagueTier>? {
     if (!state.canClaimReward) return null
     return state.copy(pendingRewardPoints = 0) to state.pendingRewardTier
 }
 
-/** Minutes until the league resets, for the "time left this week" line. */
 fun weeklyLeagueRemainingMinutes(nowMillis: Long = System.currentTimeMillis()): Int {
     val calendar = Calendar.getInstance().apply {
         timeInMillis = nowMillis
@@ -125,9 +116,7 @@ fun weeklyLeagueRemainingMinutes(nowMillis: Long = System.currentTimeMillis()): 
         .toInt()
 }
 
-/**
- * Weekly-league analytics. Carries only league figures — never the player name or uid.
- */
+/** Carries only league figures — never playerName or uid. */
 fun logWeeklyLeagueEvent(
     event: FirebaseEvent,
     tier: LeagueTier,

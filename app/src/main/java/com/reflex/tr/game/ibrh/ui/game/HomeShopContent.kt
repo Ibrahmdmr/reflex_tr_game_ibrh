@@ -419,9 +419,6 @@ private fun TargetSkinCard(
                     text = stringResource(skin.titleRes),
                     style = MaterialTheme.typography.titleSmall,
                     color = ReflexGamePalette.textPrimary,
-                    // Wraps rather than clips: beside the preview and the fixed-width action
-                    // button the name has about 130dp on a 360dp screen, which cut
-                    // "Classic Target" down to "Classic Tar…".
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
