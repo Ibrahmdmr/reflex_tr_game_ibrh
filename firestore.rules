@@ -1,0 +1,76 @@
+// Firestore security rules for the Reflex Avı leaderboard.
+//
+// NOT VERIFIED AGAINST PRODUCTION. Reconstructed from the access patterns in
+// LeaderboardRepository.kt, not exported from the Firebase console. Diff it against the live rules
+// before deploying — replacing them blind can lock every player out of the leaderboard.
+//
+// Patterns this is built from:
+//   path   leaderboards/{mode}/scores/{uid}     scoresCollection(), line 382
+//   read   orderBy("score", DESC).limit(100)    refresh(), line 249
+//   write  set(merge) in a transaction that only writes when the new score beats the stored one
+//   auth   anonymous sign-in; the document id is the caller's uid
+//
+// The client already sanitises what it sends, but anyone can talk to Firestore directly with the
+// app's config, so these rules are the only thing that actually holds.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // From GameMode.leaderboardCollectionKey.
+    function isKnownMode(mode) {
+      return mode in ['classic', 'moving_target', 'fake_target', 'color_reflex'];
+    }
+
+    // The test bot reached 103 in a 30-second run, so this ceiling is far above anything reachable
+    // even with a rewarded continue. It only stops a forged score from owning rank 1 forever.
+    function isSaneScore(score) {
+      return score is int && score >= 0 && score <= 5000;
+    }
+
+    function hasOnlyKnownFields(data) {
+      return data.keys().hasOnly(
+        ['uid', 'playerName', 'score', 'level', 'selectedTheme', 'updatedAt', 'createdAt']
+      );
+    }
+
+    function isWellFormed(data, uid) {
+      return hasOnlyKnownFields(data)
+        && data.uid == uid
+        && isSaneScore(data.score)
+        // Matches sanitizeFirestorePlayerName().
+        && data.playerName is string && data.playerName.size() > 0 && data.playerName.size() <= 12
+        && data.level is int && data.level >= 1 && data.level <= 999
+        && data.selectedTheme is string && data.selectedTheme.size() <= 32
+        // Forces the server clock, so no client can backdate an entry.
+        && data.updatedAt == request.time;
+    }
+
+    match /leaderboards/{mode}/scores/{uid} {
+
+      allow read: if isKnownMode(mode) && request.auth != null;
+
+      allow create: if isKnownMode(mode)
+        && request.auth != null
+        && request.auth.uid == uid
+        && isWellFormed(request.resource.data, uid)
+        && request.resource.data.createdAt == request.time;
+
+      // Scores only go up — the same condition uploadScore() applies client-side, enforced where
+      // it cannot be bypassed.
+      allow update: if isKnownMode(mode)
+        && request.auth != null
+        && request.auth.uid == uid
+        && isWellFormed(request.resource.data, uid)
+        && request.resource.data.score > resource.data.score
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
